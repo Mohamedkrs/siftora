@@ -114,6 +114,41 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
   )
 }
 
+/** One finished video in the strip above the clips: a frame, its title and how far along it is. */
+function VideoCard({ job, selected, onSelect }: { job: Job; selected: boolean; onSelect: () => void }) {
+  const best = [...job.clips].sort((a, b) => b.score - a.score)[0]
+  const rendered = job.clips.filter((clip) => clip.render.status === 'done').length
+  return (
+    <button
+      type="button"
+      className={selected ? 'video-card selected' : 'video-card'}
+      aria-pressed={selected}
+      onClick={onSelect}
+      title={job.title}
+    >
+      <span className="video-card-frame">
+        {job.videoPath ? (
+          <video
+            src={mediaUrl(job.videoPath)}
+            muted
+            preload="metadata"
+            onLoadedMetadata={(event) => {
+              event.currentTarget.currentTime = (best?.start ?? 0) / 1000 + 1.5
+            }}
+          />
+        ) : null}
+      </span>
+      <span className="video-card-text">
+        <strong>{job.title}</strong>
+        <span className="muted">
+          {job.clips.length} clips{rendered > 0 ? ` · ${rendered} reels` : ''}
+          {job.durationMs ? ` · ${formatClock(job.durationMs)}` : ''}
+        </span>
+      </span>
+    </button>
+  )
+}
+
 export default function Results() {
   const { jobs, render, findAgain } = useJobs()
   const { settings } = useSettings()
@@ -150,16 +185,15 @@ export default function Results() {
     <div className="screen">
       <div className="screen-head">
         <h1>Results</h1>
-        {doneJobs.length > 1 ? (
-          <select value={job.id} onChange={(event) => setParams({ job: event.target.value })} aria-label="Video">
-            {doneJobs.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.title}
-              </option>
-            ))}
-          </select>
-        ) : null}
       </div>
+
+      {doneJobs.length > 1 ? (
+        <nav className="video-strip" aria-label="Videos">
+          {doneJobs.map((item) => (
+            <VideoCard key={item.id} job={item} selected={item.id === job.id} onSelect={() => setParams({ job: item.id })} />
+          ))}
+        </nav>
+      ) : null}
 
       <section className="card results-head">
         <div>
