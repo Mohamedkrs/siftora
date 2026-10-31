@@ -296,7 +296,9 @@ const LABELS: Record<EngineName, string> = {
 
 /** Display name, e.g. "llama.cpp (CUDA)" or "FFmpeg" for CPU builds. */
 export function engineLabel(entry: EngineEntry): string {
-  return entry.backend === 'cpu'
-    ? LABELS[entry.engine]
-    : `${LABELS[entry.engine]} (${entry.backend.toUpperCase()})`
+  // FFmpeg and sherpa-onnx only come as CPU builds, so the backend says nothing there.
+  if (entry.backend === 'cpu') {
+    return entry.engine === 'llama' || entry.engine === 'whisper' ? `${LABELS[entry.engine]} (CPU)` : LABELS[entry.engine]
+  }
+  return `${LABELS[entry.engine]} (${entry.backend.toUpperCase()})`
 }

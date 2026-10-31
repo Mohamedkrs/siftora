@@ -1682,3 +1682,50 @@ select {
   padding: 11px 20px;
   font-size: 14px;
 }
+
+/* Models: a plain-words line under each section title */
+.section-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.section-intro p {
+  margin: 0;
+  max-width: 72ch;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.not-in-use {
+  padding: 12px 14px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+.not-in-use > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.not-in-use > summary::-webkit-details-marker {
+  display: none;
+}
+
+.not-in-use[open] > summary .muted {
+  visibility: hidden;
+}
+
+.not-in-use > p {
+  margin: 10px 0;
+  font-size: 13px;
+}
+
+.not-in-use .model-card + .model-card,
+.not-in-use .model-actions {
+  margin-top: 10px;
+}

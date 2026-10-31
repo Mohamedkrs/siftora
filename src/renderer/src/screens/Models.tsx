@@ -28,6 +28,7 @@ interface CardProps {
   title?: string
   description?: string
   recommended?: boolean
+  inUse?: boolean
   warning?: boolean
   radioName?: string
   radio?: { checked: boolean; onChange: () => void }
@@ -36,6 +37,14 @@ interface CardProps {
   onDownload: (ids: string[]) => void
   onCancel: (id: string) => void
   onDelete: (ids: string[]) => void
+}
+
+/** What each engine does, in plain words. */
+const ENGINE_ROLES: Record<string, string> = {
+  whisper: 'Runs the transcription model: turns speech into text with word timings.',
+  llama: 'Runs the clip finder AI: reads the transcript and picks the moments.',
+  ffmpeg: 'Cuts the clips and renders the vertical reels with captions.',
+  sherpa: 'Runs the speaker detection models.'
 }
 
 function ModelCard(props: CardProps) {
@@ -82,9 +91,10 @@ function ModelCard(props: CardProps) {
           <h3>
             {title}
             {props.recommended ? <span className="badge">Recommended</span> : null}
+            {props.inUse && installed ? <span className="badge badge-ok">In use</span> : null}
             {linkedFile ? (
               <span className="badge badge-ok">On this computer</span>
-            ) : missingIds.length === 0 && props.entries.length > 0 && !props.custom ? (
+            ) : missingIds.length === 0 && props.entries.length > 0 && !props.custom && !props.inUse ? (
               <span className="badge badge-ok">Already downloaded</span>
             ) : null}
           </h3>
@@ -217,9 +227,17 @@ export default function Models() {
   const engineEntries = selectedOption
     ? ENGINES.filter((entry) => selectedOption.ids.includes(entry.id))
     : []
-  const otherInstalled = ENGINES.filter(
+  // Builds for another engine type (e.g. CPU while the GPU is chosen). sherpa-onnx is not one of
+  // those: it belongs to speaker detection and is shown there.
+  const notInUse = ENGINES.filter(
     (entry) =>
-      !selectedOption?.ids.includes(entry.id) && models[entry.id]?.status === 'installed'
+      entry.engine !== 'sherpa' &&
+      !selectedOption?.ids.includes(entry.id) &&
+      models[entry.id]?.status === 'installed'
+  )
+  const notInUseBytes = notInUse.reduce((sum, entry) => sum + engineBytes(entry), 0)
+  const sherpa = ENGINES.find(
+    (entry) => entry.engine === 'sherpa' && entry.platform === hardware?.platform && entry.arch === hardware?.arch
   )
 
   const customState = (model: CustomModel): ModelState =>
@@ -271,7 +289,7 @@ export default function Models() {
       <div className="screen-head screen-head-row">
         <div>
           <h1>Models</h1>
-          <p>Install and manage the models used for transcription and analysis.</p>
+          <p>Everything Siftora runs on your computer: the engines, and the AI models they load.</p>
         </div>
         <button type="button" className="button" onClick={openFolder}>
           Open models folder
@@ -282,7 +300,10 @@ export default function Models() {
       <SearchComputerButton />
 
       <section className="models-section">
-        <h2>Engines</h2>
+        <div className="section-intro">
+          <h2>Engines</h2>
+          <p>The programs that run the AI models and render your reels. Choose where they run: the GPU is much faster.</p>
+        </div>
         <FoundEngines onChange={() => setEnginesVersion((v) => v + 1)} />
         <p className="label">Engine type</p>
         {engineOptions ? (
@@ -311,32 +332,34 @@ export default function Models() {
                 bytes: engineBytes(entry),
                 license: entry.license,
                 description:
-                  entry.backend === 'cuda'
-                    ? 'Includes NVIDIA CUDA runtime — runs on the GPU, much faster than CPU.'
-                    : undefined
+                  ENGINE_ROLES[entry.engine] + (entry.backend === 'cuda' ? ' Includes the NVIDIA CUDA runtime.' : '')
               }
             ]}
             states={[stateOf(entry)]}
             title={engineLabel(entry)}
+            inUse
             onDownload={download}
             onCancel={cancel}
             onDelete={removeMany}
           />
         ))}
-        {otherInstalled.length > 0 ? (
-          <>
-            <h3>Other installed engines</h3>
-            {otherInstalled.map((entry) => (
+        {notInUse.length > 0 ? (
+          <details className="not-in-use">
+            <summary>
+              <span>
+                <strong>Not in use</strong> · {notInUse.length} {notInUse.length === 1 ? 'engine' : 'engines'},{' '}
+                {formatBytes(notInUseBytes)}
+              </span>
+              <span className="muted">Show</span>
+            </summary>
+            <p className="muted">
+              Builds for a different engine type, downloaded earlier. Siftora only uses them if you switch the engine
+              type above, so they are safe to delete. You can download them again at any time.
+            </p>
+            {notInUse.map((entry) => (
               <ModelCard
                 key={entry.id}
-                entries={[
-                  {
-                    id: entry.id,
-                    bytes: engineBytes(entry),
-                    license: entry.license,
-                    description: 'Installed engine from another choice.'
-                  }
-                ]}
+                entries={[{ id: entry.id, bytes: engineBytes(entry), license: entry.license, description: ENGINE_ROLES[entry.engine] }]}
                 states={[stateOf(entry)]}
                 title={engineLabel(entry)}
                 onDownload={download}
@@ -344,12 +367,29 @@ export default function Models() {
                 onDelete={removeMany}
               />
             ))}
-          </>
+            <div className="model-actions">
+              <button
+                type="button"
+                className="button danger"
+                onClick={() => {
+                  const what = `${notInUse.length} unused ${notInUse.length === 1 ? 'engine' : 'engines'} (${formatBytes(notInUseBytes)})`
+                  if (confirm(`Delete ${what}? You can download them again later.`)) {
+                    removeMany(notInUse.map((entry) => entry.id))
+                  }
+                }}
+              >
+                Delete all unused ({formatBytes(notInUseBytes)})
+              </button>
+            </div>
+          </details>
         ) : null}
       </section>
 
       <section className="models-section">
-        <h2>Transcription</h2>
+        <div className="section-intro">
+          <h2>Transcription</h2>
+          <p>Turns what is said into text with a time for every word, used to find moments and for captions. Pick one.</p>
+        </div>
         <FoundTranscription onChange={() => setEnginesVersion((v) => v + 1)} />
         {transcriptionModels.map((entry) => (
           <ModelCard
@@ -397,7 +437,10 @@ export default function Models() {
       </section>
 
       <section className="models-section">
-        <h2>Clip finder AI</h2>
+        <div className="section-intro">
+          <h2>Clip finder AI</h2>
+          <p>Reads the transcript and picks the moments with a hook, a setup and a payoff. Bigger models judge better but need more memory. Pick one.</p>
+        </div>
         <FoundLlms onChange={() => setEnginesVersion((v) => v + 1)} />
         {llmModels.map((entry) => (
           <ModelCard
@@ -445,7 +488,10 @@ export default function Models() {
       </section>
 
       <section className="models-section">
-        <h2>Voice detection</h2>
+        <div className="section-intro">
+          <h2>Voice detection</h2>
+          <p>Finds where people actually speak, so silence and music do not turn into invented captions. Recommended.</p>
+        </div>
         {vadModels.map((entry) => (
           <ModelCard
             key={entry.id}
@@ -465,12 +511,18 @@ export default function Models() {
       </section>
 
       <section className="models-section">
-        <h2>Speaker detection</h2>
+        <div className="section-intro">
+          <h2>Speaker detection</h2>
+          <p>Tells the people in a video apart, so each speaker's captions can get their own colour. Optional.</p>
+        </div>
         <ModelCard
-          entries={speakerModels}
-          states={speakerModels.map(stateOf)}
+          entries={[
+            ...speakerModels,
+            ...(sherpa ? [{ id: sherpa.id, bytes: engineBytes(sherpa), license: sherpa.license }] : [])
+          ]}
+          states={[...speakerModels, ...(sherpa ? [sherpa] : [])].map(stateOf)}
           title="Speaker detection"
-          description="Tells speakers apart so each gets its own caption color."
+          description="Two small models plus sherpa-onnx, the engine that runs them. Downloaded and deleted together."
           warning={tooBig(speakerModels)}
           toggle={{
             label: 'Detect speakers in new videos',
