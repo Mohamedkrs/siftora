@@ -1,7 +1,7 @@
-import { app, BrowserWindow, net, protocol, shell } from 'electron'
+import { app, BrowserWindow, protocol, shell } from 'electron'
 import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
 import { loadJobs } from './jobs'
+import { serveMedia } from './media'
 import { registerIpc } from './ipc'
 import { initLogger, log } from './logger'
 
@@ -96,11 +96,7 @@ if (!app.requestSingleInstanceLock()) {
   app
     .whenReady()
     .then(() => {
-      protocol.handle('vcf-media', (request) => {
-        const path = decodeURIComponent(new URL(request.url).pathname.slice(1))
-        if (!/\.(mp4|mov|mkv|webm|avi|m4v)$/i.test(path)) return new Response('Not found', { status: 404 })
-        return net.fetch(pathToFileURL(path).toString(), { headers: request.headers })
-      })
+      protocol.handle('vcf-media', serveMedia)
       registerIpc()
       loadJobs()
       createWindow()

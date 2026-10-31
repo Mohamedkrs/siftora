@@ -36,7 +36,8 @@ const clean = (text: string): string => text.replace(/[{}\\]/g, '')
  * one event per word colours only the word being spoken (like the preview).
  */
 export function buildAss(clip: Clip, segments: Segment[], style: SubtitleStyle): string {
-  const weight = CAPTION_FONTS.find((font) => font.family === style.font)?.weight ?? 800
+  // Each bundled file is a single heavy weight, so ask libass for it by name, never fake bold.
+  const fontName = CAPTION_FONTS.find((font) => font.family === style.font)?.assName ?? style.font
   const outline = style.outline ? Math.max(2, Math.round(style.sizePx * 0.08)) : 0
   const header = `[Script Info]
 ScriptType: v4.00+
@@ -47,7 +48,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${style.font},${style.sizePx},${assColor(style.color)},${assColor(style.color)},${assColor(style.outlineColor)},&H80000000,${weight >= 700 ? -1 : 0},0,0,0,100,100,0,0,1,${outline},${style.outline ? 0 : 2},5,80,80,0,1
+Style: Default,${fontName},${style.sizePx},${assColor(style.color)},${assColor(style.color)},${assColor(style.outlineColor)},&H80000000,0,0,0,0,100,100,0,0,1,${outline},${style.outline ? 0 : 2},5,80,80,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -122,11 +123,9 @@ export async function renderClip(opts: {
   // Work in a folder with the .ass file and a copy of the fonts, so the subtitles filter
   // gets plain relative paths (Windows drive letters need awkward escaping in filters).
   const fontsDir = join(opts.workDir, 'fonts')
-  if (!existsSync(fontsDir)) {
-    mkdirSync(fontsDir, { recursive: true })
-    for (const file of readdirSync(fontsSource()).filter((name) => /\.(ttf|otf)$/i.test(name))) {
-      copyFileSync(join(fontsSource(), file), join(fontsDir, file))
-    }
+  mkdirSync(fontsDir, { recursive: true })
+  for (const file of readdirSync(fontsSource()).filter((name) => /\.(ttf|otf)$/i.test(name))) {
+    if (!existsSync(join(fontsDir, file))) copyFileSync(join(fontsSource(), file), join(fontsDir, file))
   }
   const assName = `clip-${clip.start}.ass`
   writeFileSync(join(opts.workDir, assName), buildAss(clip, opts.segments, opts.style))

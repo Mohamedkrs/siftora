@@ -53,12 +53,15 @@ export const SPEAKER_COLOR_SUGGESTIONS = [
   '#FFFFFF', '#4FC3F7', '#FF8A65', '#AED581', '#BA68C8', '#FFD54F', '#F06292', '#4DB6AC'
 ]
 
-/** Caption fonts bundled in resources/fonts. `weight` is the weight the captions use. */
+/**
+ * Caption fonts bundled in resources/fonts. `weight` is the weight the preview uses; `assName`
+ * is the font's own family name, which libass matches when rendering.
+ */
 export const CAPTION_FONTS = [
-  { family: 'Montserrat', weight: 800 },
-  { family: 'Poppins', weight: 900 },
-  { family: 'Anton', weight: 400 },
-  { family: 'Bebas Neue', weight: 400 }
+  { family: 'Montserrat', weight: 800, assName: 'Montserrat ExtraBold' },
+  { family: 'Poppins', weight: 900, assName: 'Poppins Black' },
+  { family: 'Anton', weight: 400, assName: 'Anton' },
+  { family: 'Bebas Neue', weight: 400, assName: 'Bebas Neue' }
 ] as const
 
 import type { Job } from './jobs'

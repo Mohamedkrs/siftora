@@ -8,5 +8,5 @@ video renderer (libass), so the preview matches the exported reel.
 | --- | --- | --- |
 | Anton-Regular.ttf | Anton | https://fonts.google.com/specimen/Anton |
 | BebasNeue-Regular.ttf | Bebas Neue | https://fonts.google.com/specimen/Bebas+Neue |
-| Montserrat.ttf | Montserrat (variable) | https://fonts.google.com/specimen/Montserrat |
+| Montserrat-ExtraBold.ttf | Montserrat ExtraBold (static: libass cannot pick weights from variable fonts) | https://github.com/JulietaUla/Montserrat |
 | Poppins-Black.ttf | Poppins | https://fonts.google.com/specimen/Poppins |

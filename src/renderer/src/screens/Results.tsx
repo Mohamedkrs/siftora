@@ -22,9 +22,20 @@ function ClipCard({ job, clip, rank }: { job: Job; clip: Clip; rank: number }) {
         ) : job.videoPath ? (
           <video
             className="clip-source"
-            src={`${mediaUrl(job.videoPath)}#t=${clip.start / 1000},${clip.end / 1000}`}
+            src={mediaUrl(job.videoPath)}
             controls
             preload="metadata"
+            // Play only the clip's range of the source video (#t= fragments are not honoured here).
+            onLoadedMetadata={(event) => {
+              event.currentTarget.currentTime = clip.start / 1000
+            }}
+            onTimeUpdate={(event) => {
+              const video = event.currentTarget
+              if (video.currentTime >= clip.end / 1000) {
+                video.pause()
+                video.currentTime = clip.start / 1000
+              }
+            }}
           />
         ) : null}
       </div>

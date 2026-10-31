@@ -263,6 +263,7 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
     } else {
       update(job, { stage: 'speakers', progress: 0, message: undefined })
       const binary = await speakerEngine(job, signal)
+      update(job, { message: 'Listening for who speaks when — this takes a few minutes…' })
       const [segmentation, embedding] = SPEAKER_MODEL_IDS.map((id) => modelFilePath(id))
       if (!segmentation || !embedding || !existsSync(segmentation) || !existsSync(embedding)) {
         throw new Error('Speaker detection models are not downloaded. Get them on the Models screen.')
