@@ -2,6 +2,28 @@
 
 A local-first desktop application that analyzes long-form videos and identifies promising short-form clips for TikTok, Instagram Reels, and YouTube Shorts.
 
+Free and open source (GPL-3.0). Everything runs on your computer; no video or transcript is uploaded.
+
+## What it does
+
+1. Add videos (files or YouTube links) on **Create**, pick a layout (blurred background or cropped) and a caption style.
+2. The app transcribes them (whisper.cpp, or OpenAI Whisper if you already have it), optionally detects speakers (sherpa-onnx), and an AI model (Qwen via llama.cpp, or your Ollama) picks moments with a hook, setup and payoff.
+3. On **Results**, review the clips by score and render vertical 1080×1920 reels with karaoke captions (FFmpeg + libass).
+
+On first start, onboarding checks your hardware (NVIDIA CUDA, Apple Metal, Vulkan or CPU), recommends models, and finds what you already have (Ollama, Python Whisper, FFmpeg, model files) so you download as little as possible.
+
+## Running from source
+
+```sh
+npm install
+node node_modules/electron/install.js   # npm 11 blocks Electron's own install script
+npm run dev
+```
+
+`npm run typecheck`, `npm run build`, and `npm run dist` (installers via electron-builder) are also available. If you start it from a VS Code extension terminal and Electron behaves like plain Node, unset `ELECTRON_RUN_AS_NODE`.
+
+The design and decisions are in [docs/PHASE0_PROPOSAL.md](docs/PHASE0_PROPOSAL.md).
+
 ## Documentation
 
 - [Project specification](PROJECT_SPEC.md) — product requirements and scope.
