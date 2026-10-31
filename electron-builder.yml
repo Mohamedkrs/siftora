@@ -4,6 +4,14 @@ directories:
   output: release
 files:
   - out/**
+# Caption fonts: used by the preview (bundled by Vite) and by the video renderer (libass),
+# which reads them from <resources>/fonts.
+extraResources:
+  - from: resources/fonts
+    to: fonts
+    filter:
+      - '*.ttf'
+      - README.md
 win:
   target: nsis
 mac:

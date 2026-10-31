@@ -1,12 +1,14 @@
-import { Navigate, NavLink, Route, Routes } from 'react-router-dom'
+import { Navigate, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
 import { CATALOG } from '../../shared/catalog'
 import { ENGINES, engineBytes, engineLabel } from '../../shared/engines'
+import { STAGE_LABELS } from '../../shared/jobs'
 import Create from './screens/Create'
 import Models from './screens/Models'
 import Onboarding from './screens/Onboarding'
 import Queue from './screens/Queue'
 import Results from './screens/Results'
 import SettingsScreen from './screens/Settings'
+import { isActive, useJobs } from './state/jobs'
 import { useModels } from './state/models'
 import { useSettings } from './state/settings'
 
@@ -21,6 +23,8 @@ const navItems = [
 export default function App() {
   const { settings } = useSettings()
   const { models } = useModels()
+  const { jobs } = useJobs()
+  const navigate = useNavigate()
 
   if (!settings.onboarded) return <Onboarding />
 
@@ -34,6 +38,9 @@ export default function App() {
     downloading && totalBytes > 0
       ? Math.min(100, Math.round((downloading.receivedBytes / totalBytes) * 100))
       : 0
+
+  const activeJob = jobs.find(isActive)
+  const waiting = jobs.filter((job) => job.stage === 'queued').length
 
   return (
     <div className="app">
@@ -55,9 +62,20 @@ export default function App() {
       </aside>
 
       <div className="workspace">
-        <header className="queue-strip">
-          <span className={downloading ? 'queue-dot active' : 'queue-dot'} aria-hidden="true" />
-          {downloading ? `Downloading ${name} — ${percent}%` : 'Queue empty'}
+        <header className="queue-strip" onClick={() => navigate('/queue')} title="Open the queue">
+          <span className={downloading || activeJob ? 'queue-dot active' : 'queue-dot'} aria-hidden="true" />
+          {activeJob
+            ? `${activeJob.title} — ${STAGE_LABELS[activeJob.stage]} ${Math.round(activeJob.progress * 100)}%${waiting > 0 ? ` · ${waiting} waiting` : ''}`
+            : downloading
+              ? `Downloading ${name} — ${percent}%`
+              : waiting > 0
+                ? `${waiting} waiting`
+                : 'Queue empty'}
+          {activeJob ? (
+            <span className="strip-progress">
+              <span style={{ width: `${Math.round(activeJob.progress * 100)}%` }} />
+            </span>
+          ) : null}
         </header>
 
         <main className="content">

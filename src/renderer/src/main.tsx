@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { HashRouter } from 'react-router-dom'
 import App from './App'
 import ErrorBoundary from './components/ErrorBoundary'
+import { JobsProvider } from './state/jobs'
 import { ModelsProvider } from './state/models'
 import { SettingsProvider } from './state/settings'
 import './fonts.css'
@@ -25,7 +26,9 @@ createRoot(document.getElementById('root')!).render(
       <HashRouter>
         <SettingsProvider>
           <ModelsProvider>
-            <App />
+            <JobsProvider>
+              <App />
+            </JobsProvider>
           </ModelsProvider>
         </SettingsProvider>
       </HashRouter>

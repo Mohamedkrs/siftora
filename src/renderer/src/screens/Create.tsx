@@ -1,5 +1,5 @@
 import { useRef, useState, type DragEvent, type FormEvent, type PointerEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { CATALOG, SPEAKER_MODEL_IDS } from '../../../shared/catalog'
 import { formatBytes } from '../lib/format'
 import {
@@ -9,7 +9,7 @@ import {
   type Layout,
   type SubtitleStyle
 } from '../../../shared/types'
-import NotImplemented from '../components/NotImplemented'
+import { useJobs } from '../state/jobs'
 import { useModels } from '../state/models'
 import { useSettings } from '../state/settings'
 
@@ -86,7 +86,8 @@ export default function Create() {
   const [dragging, setDragging] = useState(false)
   const [url, setUrl] = useState('')
   const [urlError, setUrlError] = useState('')
-  const [findClicked, setFindClicked] = useState(false)
+  const { add } = useJobs()
+  const navigate = useNavigate()
   const [previewSpeaker, setPreviewSpeaker] = useState(0)
   const [dragY, setDragY] = useState<number | null>(null)
   const frameRef = useRef<HTMLDivElement>(null)
@@ -245,7 +246,6 @@ export default function Create() {
             </form>
             {urlError ? <p className="error">{urlError}</p> : null}
             <div className="spaced">
-              <NotImplemented phase={5} note="downloading" />
             </div>
           </section>
 
@@ -477,7 +477,12 @@ export default function Create() {
               type="button"
               className="button primary"
               disabled={videos.length === 0}
-              onClick={() => setFindClicked(true)}
+              onClick={() => {
+                void add(videos).then(() => {
+                  setVideos([])
+                  navigate('/queue')
+                })
+              }}
             >
               Find clips
             </button>
@@ -486,7 +491,6 @@ export default function Create() {
             ) : null}
           </div>
 
-          {findClicked ? <NotImplemented phase={3} note="clip detection" /> : null}
         </div>
 
         <aside className="create-side">

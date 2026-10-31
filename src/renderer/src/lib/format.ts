@@ -19,3 +19,12 @@ export function formatEta(seconds: number | null): string {
   const rest = minutes % 60
   return rest > 0 ? `${hours} h ${rest} min` : `${hours} h`
 }
+
+/** 83000 → "1:23", 3723000 → "1:02:03". */
+export function formatClock(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000))
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const sec = String(total % 60).padStart(2, '0')
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`
+}
