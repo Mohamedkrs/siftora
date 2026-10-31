@@ -12,7 +12,7 @@ const TYPES: Record<string, string> = {
 }
 
 /**
- * Serves vcf-media://local/<encoded path> with HTTP range support, which <video> needs to seek
+ * Serves siftora-media://local/<encoded path> with HTTP range support, which <video> needs to seek
  * (a plain file fetch through a custom protocol does not answer Range requests).
  */
 export function serveMedia(request: Request): Response {

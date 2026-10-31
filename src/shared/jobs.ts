@@ -86,7 +86,7 @@ export interface Job {
 
 /** URL the renderer can use in <video src> for a local file (served by the main process). */
 export function mediaUrl(path: string): string {
-  return `vcf-media://local/${encodeURIComponent(path)}`
+  return `siftora-media://local/${encodeURIComponent(path)}`
 }
 
 export const STAGE_LABELS: Record<JobStage, string> = {

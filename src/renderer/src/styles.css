@@ -1801,3 +1801,81 @@ select {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* Settings → Storage: one bar split by what takes the space, in the logo's colours */
+.storage {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.storage .section-head {
+  margin-bottom: 0;
+}
+
+.storage-total {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.storage-bar {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #12151c;
+}
+
+.storage-bar span {
+  min-width: 2px;
+}
+
+.storage-parts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px 20px;
+  margin: 0;
+}
+
+.storage-parts div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.storage-parts dt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.storage-parts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.storage-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.tone-violet {
+  background: #7b61ff;
+}
+
+.tone-magenta {
+  background: #c04fe8;
+}
+
+.tone-pink {
+  background: #f0437a;
+}
+
+.tone-orange {
+  background: #ff7a1a;
+}

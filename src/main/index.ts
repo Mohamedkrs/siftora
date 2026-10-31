@@ -1,5 +1,4 @@
 import { app, BrowserWindow, protocol, shell } from 'electron'
-import { existsSync, renameSync, rmdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { loadEngineList } from './engineList'
 import { loadJobs } from './jobs'
@@ -77,24 +76,6 @@ function appIcon(): string {
   return app.isPackaged ? join(process.resourcesPath, file) : join(app.getAppPath(), 'resources', file)
 }
 
-/**
- * The app used to be called "Viral Clip Finder", and Electron names the data folder (settings,
- * jobs, models) after the app. Move the old folder over once; if that fails (e.g. the old app is
- * still running), keep using it where it is. Runs before anything writes to the data folder.
- */
-function adoptOldDataFolder(): void {
-  const current = app.getPath('userData')
-  const old = join(app.getPath('appData'), 'Viral Clip Finder')
-  if (existsSync(join(current, 'settings.json')) || !existsSync(join(old, 'settings.json'))) return
-  try {
-    if (existsSync(current)) rmdirSync(current) // only if Electron already made it, and it is empty
-    renameSync(old, current)
-  } catch {
-    app.setPath('userData', old)
-  }
-}
-
-adoptOldDataFolder()
 // Groups the taskbar button under our name and icon (in dev it would show Electron's).
 if (process.platform === 'win32') app.setAppUserModelId('app.siftora')
 
@@ -118,15 +99,15 @@ if (!app.requestSingleInstanceLock()) {
     mainWindow.focus()
   })
 
-  // vcf-media://local/<encoded path> lets the renderer play local videos (dev server or file://).
+  // siftora-media://local/<encoded path> lets the renderer play local videos (dev server or file://).
   protocol.registerSchemesAsPrivileged([
-    { scheme: 'vcf-media', privileges: { stream: true, supportFetchAPI: true, standard: true, secure: true } }
+    { scheme: 'siftora-media', privileges: { stream: true, supportFetchAPI: true, standard: true, secure: true } }
   ])
 
   app
     .whenReady()
     .then(() => {
-      protocol.handle('vcf-media', serveMedia)
+      protocol.handle('siftora-media', serveMedia)
       registerIpc()
       loadJobs()
       loadEngineList()

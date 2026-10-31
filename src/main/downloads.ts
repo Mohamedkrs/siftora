@@ -185,7 +185,7 @@ function installedState(id: string, bytes: number): ModelState {
   return { id, status: 'installed', receivedBytes: bytes, bytesPerSec: 0, etaSec: null }
 }
 
-const VERSION_FILE = '.vcf-version'
+const VERSION_FILE = '.siftora-version'
 
 /** Version written at install; installs from before that are the built-in version. */
 function installedVersion(entry: EngineEntry): string | undefined {
@@ -245,6 +245,17 @@ export function refreshEngineStates(): void {
     active.delete(entry.id)
     broadcast(initialState(entry))
   }
+}
+
+/** True while anything is queued or downloading. */
+export function isDownloading(): boolean {
+  return queue.length > 0 || controllers.size > 0
+}
+
+/** Re-send every model and engine state, e.g. after their folders were deleted. */
+export function resetModelStates(): void {
+  active.clear()
+  for (const item of [...CATALOG, ...ENGINES]) broadcast(initialState(item))
 }
 
 /** Push a model state to the renderer, used by custom-model verification. */

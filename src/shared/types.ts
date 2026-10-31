@@ -21,6 +21,18 @@ export interface EngineOption {
   available: boolean
 }
 
+/** Space used by the app's data folder, in bytes. */
+export interface StorageUsage {
+  folder: string
+  total: number
+  engines: number
+  models: number
+  /** Saved analysis per video: audio, transcripts, YouTube downloads. */
+  results: number
+  /** Settings, logs and Electron's cache. */
+  other: number
+}
+
 export interface ScannedModel {
   path: string
   name: string
@@ -236,6 +248,12 @@ export interface Api {
   cancelDownload(id: string): Promise<void>
   deleteModel(id: string): Promise<void>
   openModelsFolder(): Promise<void>
+  getStorage(): Promise<StorageUsage>
+  openDataFolder(): Promise<void>
+  /** Deletes downloaded engines and models; settings and results stay. */
+  deleteDownloads(): Promise<{ ok: boolean; problem?: string; freed?: number }>
+  /** Removes all app data and quits (for before deleting the app). */
+  removeAllData(): Promise<{ ok: boolean; problem?: string }>
   scanForModels(): Promise<ScannedModel[]>
   pickModelFile(): Promise<string | null>
   addCustomModel(path: string, name?: string): Promise<{ id?: string; error?: string }>
@@ -284,6 +302,10 @@ export const IPC = {
   cancelDownload: 'models:cancel',
   deleteModel: 'models:delete',
   openModelsFolder: 'models:open-folder',
+  getStorage: 'storage:get',
+  openDataFolder: 'storage:open-folder',
+  deleteDownloads: 'storage:delete-downloads',
+  removeAllData: 'storage:remove-all',
   scanForModels: 'models:scan',
   pickModelFile: 'dialog:pick-model-file',
   addCustomModel: 'models:add-custom',

@@ -21,8 +21,8 @@ const flag = (name: string, def?: string) => {
   return i >= 0 ? argv[i + 1] : def;
 };
 const video = argv[0] && !argv[0].startsWith('--') ? resolve(argv[0]) : '';
-const toolsDir = flag('tools', process.env.VCF_TOOLS);
-const modelsDir = flag('models', process.env.VCF_MODELS);
+const toolsDir = flag('tools', process.env.SIFTORA_TOOLS);
+const modelsDir = flag('models', process.env.SIFTORA_MODELS);
 if (!video || !existsSync(video) || !toolsDir || !modelsDir) {
   console.error('Usage: node spike/find-clips.ts <video> --tools <dir> --models <dir> [--out dir] [--count 8] [--min 20] [--max 60] [--lang auto]');
   process.exit(1);

@@ -1,6 +1,7 @@
 import { app, dialog, ipcMain, shell } from 'electron'
 import { IPC, type Settings } from '../shared/types'
 import { currentEngineList } from './engineList'
+import { deleteDownloads, removeAllData, storageUsage } from './storage'
 import { cancelDownload, deleteModel, downloadModels, listModels, modelsDir } from './downloads'
 import { detectHardware, engineOptions, recommend, requiredEngineInfo } from './hardware'
 import { addCustomModel, removeCustomModel, scanForModels } from './localModels'
@@ -123,6 +124,12 @@ export function registerIpc(): void {
     if (typeof path === 'string') shell.showItemInFolder(path)
   })
 
+  ipcMain.handle(IPC.getStorage, () => storageUsage())
+  ipcMain.handle(IPC.openDataFolder, async () => {
+    await shell.openPath(app.getPath('userData'))
+  })
+  ipcMain.handle(IPC.deleteDownloads, () => deleteDownloads())
+  ipcMain.handle(IPC.removeAllData, () => removeAllData())
   ipcMain.handle(IPC.openModelsFolder, async () => {
     await shell.openPath(modelsDir())
   })

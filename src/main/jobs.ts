@@ -71,6 +71,11 @@ export function loadJobs(): void {
   void work()
 }
 
+/** True while a video is being processed or a reel rendered. */
+export function isBusy(): boolean {
+  return working || rendering
+}
+
 export function listJobs(): Job[] {
   return [...jobs.values()].sort((a, b) => b.createdAt - a.createdAt)
 }
