@@ -144,6 +144,11 @@ function sanitize(input: unknown): Settings {
     transcriptionModel: modelIdOr(raw.transcriptionModel, 'transcription', customModels),
     llmModel: modelIdOr(raw.llmModel, 'llm', customModels),
     useVad: typeof raw.useVad === 'boolean' ? raw.useVad : defaults.useVad,
+    // Older settings used the speaker-colors switch for both.
+    detectSpeakers:
+      typeof raw.detectSpeakers === 'boolean'
+        ? raw.detectSpeakers
+        : subtitle.speakerColors === true,
     engineBackend:
       ENGINE_BACKENDS.find((backend) => backend === raw.engineBackend) ?? defaults.engineBackend,
     customModels,

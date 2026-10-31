@@ -1277,3 +1277,56 @@ select {
     grid-template-columns: 1fr;
   }
 }
+
+.create-main.narrow {
+  max-width: 760px;
+}
+
+/* Real clip frame behind the caption preview (Results). */
+.preview-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.preview-frame.has-frame .preview-backdrop,
+.preview-frame.has-frame .preview-content {
+  background: #000;
+}
+
+.style-panel > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.style-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.style-panel > summary h2 {
+  margin: 0;
+}
+
+.style-panel[open] > summary {
+  margin-bottom: 14px;
+}
+
+.style-panel h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.style-panel section + section {
+  margin-top: 18px;
+}
+
+.stale-hint {
+  color: var(--warning, #e0a030);
+}

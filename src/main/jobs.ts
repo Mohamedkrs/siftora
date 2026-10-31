@@ -12,6 +12,7 @@ import { findMoments, ollamaClient, startLlamaServer, type LlmClient } from './p
 import { renderClip } from './pipeline/render'
 import { Cancelled, ffmpegPaths, run } from './pipeline/run'
 import { assignSpeakers, detectSpeakers } from './pipeline/speakers'
+import { renderStyleKey } from '../shared/jobs'
 import { fitWordsToSegments, transcribePython, transcribeWhisperCpp, type Transcript } from './pipeline/transcribe'
 import { getSettings } from './settings'
 import { downloadYoutube, isYoutubeUrl } from './youtube'
@@ -86,7 +87,7 @@ export function addJobs(sources: string[]): Job[] {
   const settings = getSettings()
   const options: JobOptions = {
     useVad: settings.useVad,
-    speakers: settings.subtitle.speakerColors,
+    speakers: settings.detectSpeakers,
     subtitle: settings.subtitle,
     layout: settings.layout,
     language: settings.language,
@@ -375,15 +376,16 @@ async function renderOne(job: Job, clip: Clip): Promise<void> {
     const output = join(job.outputDir, `${String(rank).padStart(2, '0')} - ${safeName(clip.title)}.mp4`)
     clip.render = { status: 'rendering', progress: 0 }
     update(job)
+    // The style on Results now, not the one saved with the job, so restyling + "Render again" works.
+    const { subtitle: style, layout } = getSettings()
     let last = 0
     await renderClip({
       ffmpeg,
       video: job.videoPath as string,
       clip,
       segments: transcript.segments,
-      // The style on Create now, not the one saved with the job, so restyling + "Render again" works.
-      style: getSettings().subtitle,
-      layout: getSettings().layout,
+      style,
+      layout,
       workDir: join(jobDir(job.id), 'render'),
       output,
       signal: controller.signal,
@@ -394,7 +396,7 @@ async function renderOne(job: Job, clip: Clip): Promise<void> {
         update(job)
       }
     })
-    clip.render = { status: 'done', progress: 1, path: output }
+    clip.render = { status: 'done', progress: 1, path: output, style: renderStyleKey(style, layout) }
   } catch (err) {
     log.error('render', `${job.title} / ${clip.title}: ${String(err)}`)
     clip.render = { status: 'error', progress: 0, error: err instanceof Error ? err.message : String(err) }

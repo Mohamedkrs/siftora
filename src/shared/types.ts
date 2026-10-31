@@ -108,6 +108,8 @@ export interface Settings {
   transcriptionModel: string | null
   llmModel: string | null
   useVad: boolean
+  /** Run speaker detection on new videos (needed for per-speaker caption colors). */
+  detectSpeakers: boolean
   engineBackend: EngineBackend
   customModels: CustomModel[]
   linkedModels: Record<string, string>
@@ -145,6 +147,7 @@ export const DEFAULT_SETTINGS: Settings = {
   transcriptionModel: null,
   llmModel: null,
   useVad: true,
+  detectSpeakers: false,
   engineBackend: 'auto',
   customModels: [],
   linkedModels: {},

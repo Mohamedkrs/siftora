@@ -50,7 +50,12 @@ export interface Clip {
   notes: string[]
   /** Transcript text of the clip. */
   text: string
-  render: { status: RenderStatus; progress: number; path?: string; error?: string }
+  /** style: renderStyleKey() of the look it was rendered with, to flag reels that are out of date. */
+  render: { status: RenderStatus; progress: number; path?: string; error?: string; style?: string }
+}
+
+export function renderStyleKey(subtitle: SubtitleStyle, layout: Layout): string {
+  return JSON.stringify({ subtitle, layout })
 }
 
 export interface Job {

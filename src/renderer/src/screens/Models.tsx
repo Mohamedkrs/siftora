@@ -455,9 +455,9 @@ export default function Models() {
           description="Tells speakers apart so each gets its own caption color."
           warning={tooBig(speakerModels)}
           toggle={{
-            label: 'Color captions per speaker',
-            checked: settings.subtitle.speakerColors,
-            onChange: (speakerColors) => update({ subtitle: { ...settings.subtitle, speakerColors } })
+            label: 'Detect speakers in new videos',
+            checked: settings.detectSpeakers,
+            onChange: (detectSpeakers) => update({ detectSpeakers })
           }}
           onDownload={download}
           onCancel={cancel}
