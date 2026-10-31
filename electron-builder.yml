@@ -1,0 +1,15 @@
+appId: app.viralclipfinder
+productName: Viral Clip Finder
+directories:
+  output: release
+files:
+  - out/**
+win:
+  target: nsis
+mac:
+  target: dmg
+linux:
+  target: AppImage
+extraMetadata:
+  license: GPL-3.0-only
+# electron-builder has no top-level license field; package.json and extraMetadata carry GPL-3.0-only
