@@ -9,6 +9,7 @@ import SystemCard from '../components/SystemCard'
 import { formatBytes } from '../lib/format'
 import { useModels } from '../state/models'
 import { useSettings } from '../state/settings'
+import logo from '../../../../resources/brand/siftora-horizontal-on-dark.svg'
 
 const VAD_ID = CATALOG.find((model) => model.kind === 'vad')?.id
 
@@ -163,7 +164,7 @@ export default function Onboarding() {
       <div className="onboarding-inner">
         <div className="onboarding-head">
           <div className="brand">
-            Sift<span>ora</span>
+            <img src={logo} alt="Siftora" />
           </div>
           <button type="button" className="onboarding-skip" onClick={skip}>
             Skip setup

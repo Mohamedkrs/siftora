@@ -11,6 +11,7 @@ import SettingsScreen from './screens/Settings'
 import { isActive, useJobs } from './state/jobs'
 import { useModels } from './state/models'
 import { useSettings } from './state/settings'
+import logo from '../../../resources/brand/siftora-horizontal-on-dark.svg'
 
 const navItems = [
   { to: '/create', label: 'Create' },
@@ -46,7 +47,7 @@ export default function App() {
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
-          Sift<span>ora</span>
+          <img src={logo} alt="Siftora" />
         </div>
         <nav className="nav" aria-label="Main">
           {navItems.map((item) => (

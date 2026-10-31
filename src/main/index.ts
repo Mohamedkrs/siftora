@@ -32,6 +32,7 @@ function isInternalUrl(url: string): boolean {
 
 function createWindow(): void {
   const win = new BrowserWindow({
+    icon: appIcon(),
     width: 1280,
     height: 800,
     minWidth: 960,
@@ -70,6 +71,12 @@ function createWindow(): void {
   loading.catch((err: unknown) => log.error('main', `Failed to load renderer: ${describe(err)}`))
 }
 
+/** Window and taskbar icon: the multi-size .ico on Windows, the 1024 px PNG elsewhere. */
+function appIcon(): string {
+  const file = process.platform === 'win32' ? 'icon.ico' : 'icon.png'
+  return app.isPackaged ? join(process.resourcesPath, file) : join(app.getAppPath(), 'resources', file)
+}
+
 /**
  * The app used to be called "Viral Clip Finder", and Electron names the data folder (settings,
  * jobs, models) after the app. Move the old folder over once; if that fails (e.g. the old app is
@@ -88,6 +95,8 @@ function adoptOldDataFolder(): void {
 }
 
 adoptOldDataFolder()
+// Groups the taskbar button under our name and icon (in dev it would show Electron's).
+if (process.platform === 'win32') app.setAppUserModelId('app.siftora')
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()

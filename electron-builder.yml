@@ -1,5 +1,8 @@
 appId: app.siftora
 productName: Siftora
+# 1024px PNG for macOS/Linux; Windows gets icon.ico, which uses the simpler symbol at 16-32 px
+# (see resources/brand/BRAND.md)
+icon: resources/icon.png
 directories:
   output: release
 files:
@@ -7,6 +10,12 @@ files:
 # Caption fonts: used by the preview (bundled by Vite) and by the video renderer (libass),
 # which reads them from <resources>/fonts.
 extraResources:
+  # The window/taskbar icon, read at runtime (src/main/index.ts appIcon)
+  - from: resources
+    to: .
+    filter:
+      - icon.png
+      - icon.ico
   - from: resources/fonts
     to: fonts
     filter:
@@ -14,6 +23,7 @@ extraResources:
       - README.md
 win:
   target: nsis
+  icon: resources/icon.ico
 mac:
   target: dmg
 linux:

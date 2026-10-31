@@ -4,7 +4,7 @@
   --border: #262b36;
   --text: #e6e8ee;
   --muted: #8b93a7;
-  --accent: #7c5cff;
+  --accent: #7b61ff; /* the logo's violet (resources/brand/BRAND.md) */
   --danger: #ff7b7b;
   color-scheme: dark;
 }
@@ -58,13 +58,13 @@ select {
 
 .brand {
   padding: 0 10px;
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
 }
 
-.brand span {
-  color: var(--accent);
+/* The logo lockup (resources/brand); BRAND.md asks for at least 120 px of width. */
+.brand img {
+  display: block;
+  height: 44px;
+  width: auto;
 }
 
 .nav {
