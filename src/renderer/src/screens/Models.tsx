@@ -266,7 +266,7 @@ export default function Models() {
       <section className="models-section">
         <h2>Engines</h2>
         <p className="label">Already on this computer</p>
-        <SystemEngines onChange={() => setEnginesVersion((v) => v + 1)} />
+        <SystemEngines autoScan={false} onChange={() => setEnginesVersion((v) => v + 1)} />
         <p className="label">Engine type</p>
         {engineOptions ? (
           <EngineChoice
@@ -458,6 +458,11 @@ export default function Models() {
           title="Speaker detection"
           description="Tells speakers apart so each gets its own caption color."
           warning={tooBig(speakerModels)}
+          toggle={{
+            label: 'Color captions per speaker',
+            checked: settings.subtitle.speakerColors,
+            onChange: (speakerColors) => update({ subtitle: { ...settings.subtitle, speakerColors } })
+          }}
           onDownload={download}
           onCancel={cancel}
           onDelete={removeMany}

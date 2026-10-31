@@ -14,6 +14,9 @@ const NAMES: Record<EngineKind, string> = { llama: 'llama.cpp', whisper: 'whispe
 const PROGRAMS: Record<EngineKind, string> = { llama: 'llama-server', whisper: 'whisper-cli', ffmpeg: 'ffmpeg' }
 const FFMPEG_BYTES = 194 * 1024 * 1024
 
+// Last scan, kept for the session so revisiting a screen does not search again.
+let lastScan: { engines: SystemEngine[]; ollama: OllamaInfo; pyWhisper: OpenAiWhisperInfo } | null = null
+
 function shortPath(path: string): string {
   return path.length > 60 ? `…${path.slice(-57)}` : path
 }
@@ -31,28 +34,41 @@ function defaultOllamaModel(info: OllamaInfo, recommendedId: string | undefined,
  * Engines already on the computer: llama-server / whisper-cli / FFmpeg binaries, Ollama and
  * OpenAI Whisper (Python). Using them means less (or nothing) to download.
  */
-export default function SystemEngines(props: { autoPickFfmpeg?: boolean; onChange?: () => void }) {
+export default function SystemEngines(props: {
+  autoPickFfmpeg?: boolean
+  /** Search on mount when there is no earlier result (onboarding). Models screen: manual. */
+  autoScan?: boolean
+  onChange?: () => void
+}) {
   const { settings, refresh } = useSettings()
   const { hardware, recommendation } = useModels()
-  const [engines, setEngines] = useState<SystemEngine[] | null>(null)
-  const [ollama, setOllama] = useState<OllamaInfo | null>(null)
-  const [pyWhisper, setPyWhisper] = useState<OpenAiWhisperInfo | null>(null)
+  const [engines, setEngines] = useState<SystemEngine[] | null>(lastScan?.engines ?? null)
+  const [ollama, setOllama] = useState<OllamaInfo | null>(lastScan?.ollama ?? null)
+  const [pyWhisper, setPyWhisper] = useState<OpenAiWhisperInfo | null>(lastScan?.pyWhisper ?? null)
+  const [scanning, setScanning] = useState(false)
   const [problems, setProblems] = useState<Partial<Record<EngineKind, string>>>({})
 
   const scan = async (force = false): Promise<void> => {
-    setEngines(null)
-    const [found, ollamaInfo, whisperInfo] = await Promise.all([
-      window.api.findSystemEngines(force),
-      window.api.detectOllama(),
-      window.api.detectOpenAiWhisper()
-    ])
-    setEngines(found)
-    setOllama(ollamaInfo)
-    setPyWhisper(whisperInfo)
+    setScanning(true)
+    try {
+      const [found, ollamaInfo, whisperInfo] = await Promise.all([
+        window.api.findSystemEngines(force),
+        window.api.detectOllama(),
+        window.api.detectOpenAiWhisper()
+      ])
+      lastScan = { engines: found, ollama: ollamaInfo, pyWhisper: whisperInfo }
+      setEngines(found)
+      setOllama(ollamaInfo)
+      setPyWhisper(whisperInfo)
+    } catch (err) {
+      window.api.log('error', `engine scan failed: ${String(err)}`)
+    } finally {
+      setScanning(false)
+    }
   }
 
   useEffect(() => {
-    scan().catch((err: unknown) => window.api.log('error', `engine scan failed: ${String(err)}`))
+    if (!lastScan && props.autoScan !== false) void scan()
   }, [])
 
   const use = async (engine: EngineKind, path: string): Promise<void> => {
@@ -91,11 +107,42 @@ export default function SystemEngines(props: { autoPickFfmpeg?: boolean; onChang
 
   const gpuMachine = hardware !== null && hardware.backend !== 'cpu'
 
-  if (!engines) {
+  if (scanning) {
     return (
       <div className="loading-row" role="status">
         <span className="spinner" aria-hidden="true" />
         Looking for engines already on this computer…
+      </div>
+    )
+  }
+
+  if (!engines) {
+    // Not searched yet: show what is in use from settings, search only on request.
+    const inUse = [
+      ...(Object.keys(settings.enginePaths) as EngineKind[]).map(
+        (engine) => `${NAMES[engine]}: ${shortPath(settings.enginePaths[engine] ?? '')}`
+      ),
+      ...(settings.llmProvider === 'ollama' ? [`Clip finding: Ollama (${settings.ollamaModel ?? '?'})`] : []),
+      ...(settings.transcriptionProvider === 'openai-whisper'
+        ? [`Transcription: OpenAI Whisper (${settings.openaiWhisperModel ?? '?'})`]
+        : [])
+    ]
+    return (
+      <div className="system-engines">
+        {inUse.length > 0 ? (
+          <ul className="reasons">
+            {inUse.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted">Not using any programs from this computer.</p>
+        )}
+        <div className="actions">
+          <button type="button" className="button" onClick={() => void scan(true)}>
+            Search this computer
+          </button>
+        </div>
       </div>
     )
   }
