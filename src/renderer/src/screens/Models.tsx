@@ -497,6 +497,8 @@ export default function Models() {
             key={entry.id}
             entries={[entry]}
             states={[stateOf(entry)]}
+            title="Voice detector"
+            description="Silero VAD: a tiny open-source model (under 1 MB) that whisper.cpp runs first to find the speech."
             warning={tooBig([entry])}
             toggle={{
               label: 'Use voice detection',

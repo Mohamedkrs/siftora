@@ -163,7 +163,7 @@ export const CATALOG: ModelEntry[] = [
     id: 'wespeaker-resnet34',
     kind: 'diarization',
     name: 'Voice fingerprints (WeSpeaker)',
-    description: 'Tells speakers apart so each gets its own caption color.',
+    description: 'Recognises each voice, so every line by the same person gets the same colour.',
     // "recongition" is the real (misspelled) release tag upstream.
     url: `${SHERPA}/speaker-recongition-models/wespeaker_en_voxceleb_resnet34_LM.onnx`,
     file: 'wespeaker_en_voxceleb_resnet34_LM.onnx',
