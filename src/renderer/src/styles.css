@@ -1729,3 +1729,13 @@ select {
 .button.icon-only {
   padding: 8px 10px;
 }
+
+.found-copy {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.found-copy .badge {
+  margin: 0 6px 0 0;
+}

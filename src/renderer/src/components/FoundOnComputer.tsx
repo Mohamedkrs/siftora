@@ -17,8 +17,10 @@ interface ScanResult {
   engines: SystemEngine[]
   ollama: OllamaInfo
   pyWhisper: OpenAiWhisperInfo
-  /** Model files (LM Studio, Hugging Face, …). Ollama's own blobs are covered by `ollama`. */
+  /** Other model files (LM Studio, Hugging Face, …). Ollama's own blobs are covered by `ollama`. */
   files: ScannedModel[]
+  /** Files that are one of the app's own catalog models (e.g. Ollama's qwen3:14b), usable without a download. */
+  copies: ScannedModel[]
 }
 
 let result: ScanResult | null = null
@@ -37,7 +39,13 @@ export async function searchComputer(): Promise<void> {
       window.api.detectOpenAiWhisper(),
       window.api.scanForModels()
     ])
-    result = { engines, ollama, pyWhisper, files: files.filter((file) => file.source !== 'Ollama') }
+    result = {
+      engines,
+      ollama,
+      pyWhisper,
+      files: files.filter((file) => !file.catalogId && file.source !== 'Ollama'),
+      copies: files.filter((file) => file.catalogId)
+    }
   } catch (err) {
     window.api.log('error', `search computer failed: ${String(err)}`)
   } finally {
@@ -56,6 +64,41 @@ export function useComputerSearch(): { result: ScanResult | null; scanning: bool
     }
   }, [])
   return { result, scanning }
+}
+
+/**
+ * Copies of catalog models found on this computer: `copyFor(id)` gives the file, `use(id)` makes
+ * the app use it in place of a download (it is linked, never copied or moved).
+ */
+export function useLocalCopies(onChange?: () => void): {
+  copyFor: (catalogId: string) => ScannedModel | undefined
+  use: (catalogId: string) => Promise<void>
+  busy: string | null
+} {
+  const { settings, refresh } = useSettings()
+  const { result: found } = useComputerSearch()
+  const [busy, setBusy] = useState<string | null>(null)
+  const copyFor = (catalogId: string): ScannedModel | undefined => found?.copies.find((file) => file.catalogId === catalogId)
+  const use = async (catalogId: string): Promise<void> => {
+    const copy = copyFor(catalogId)
+    if (!copy || busy || settings.linkedModels[catalogId] === copy.path) return
+    setBusy(catalogId)
+    try {
+      await window.api.addCustomModel(copy.path, copy.name)
+      if (result) result = { ...result, copies: result.copies.filter((file) => file.path !== copy.path) }
+      await refresh()
+      notify()
+      onChange?.()
+    } finally {
+      setBusy(null)
+    }
+  }
+  return { copyFor, use, busy }
+}
+
+/** "your Ollama", "LM Studio", … for a found copy. */
+export function copySource(copy: ScannedModel): string {
+  return copy.source === 'Ollama' ? 'your Ollama' : copy.source === 'Folder' ? 'a folder on this computer' : copy.source
 }
 
 // ── Helpers ──
@@ -325,6 +368,8 @@ export function FoundLlms(props: { onChange?: () => void }) {
 
       {ollama?.models.map((model) => {
         const inUse = settings.llmProvider === 'ollama' && settings.ollamaModel === model.name
+        const isCatalogModel = found?.copies.some((copy) => copy.source === 'Ollama' && copy.name === `${model.name} (Ollama)`)
+        if (isCatalogModel && !inUse) return null
         return (
           <Row
             key={model.name}

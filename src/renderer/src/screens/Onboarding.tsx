@@ -3,7 +3,14 @@ import { CATALOG, SPEAKER_MODEL_IDS, type ModelEntry } from '../../../shared/cat
 import { ENGINES, engineBytes, engineLabel } from '../../../shared/engines'
 import type { EngineOption, Settings } from '../../../shared/types'
 import EngineChoice from '../components/EngineChoice'
-import { FoundEngines, FoundLlms, FoundTranscription, SearchComputerButton } from '../components/FoundOnComputer'
+import {
+  copySource,
+  FoundEngines,
+  FoundLlms,
+  FoundTranscription,
+  SearchComputerButton,
+  useLocalCopies
+} from '../components/FoundOnComputer'
 import ModelProgress from '../components/ModelProgress'
 import SystemCard from '../components/SystemCard'
 import { formatBytes } from '../lib/format'
@@ -26,7 +33,6 @@ export default function Onboarding() {
   const [engineOptions, setEngineOptions] = useState<EngineOption[] | null>(null)
   const [engineBackend, setEngineBackend] = useState(settings.engineBackend)
   const [enginesVersion, setEnginesVersion] = useState(0)
-  const [ollamaModels, setOllamaModels] = useState<string[]>([])
   const useOllama = settings.llmProvider === 'ollama'
   const switchToApp = async (patch: Partial<Settings>): Promise<void> => {
     await window.api.setSettings(patch)
@@ -61,24 +67,20 @@ export default function Onboarding() {
     }
   }, [hardware, enginesVersion])
 
-  useEffect(() => {
-    window.api
-      .detectOllama()
-      .then((info) => setOllamaModels(info.models.map((model) => model.name.toLowerCase())))
-      .catch(() => undefined)
-  }, [])
+  const copies = useLocalCopies(() => setEnginesVersion((v) => v + 1))
 
-  /** Badge text when a catalog model is already on this computer (or in the user's Ollama). */
+  /** Badge text when a catalog model needs no download: already here, or a copy was found. */
   const presence = (id: string): string | null => {
     if (settings.linkedModels[id]) return 'On this computer'
     if (models[id]?.status === 'installed') return 'Already downloaded'
-    // catalog id "qwen3-14b" ↔ Ollama tag "qwen3:14b"
-    const ollamaName = id.replace(/-(\d+(\.\d+)?b)$/i, ':$1').toLowerCase()
-    if (ollamaModels.some((name) => name === ollamaName || name.startsWith(`${ollamaName}-`))) {
-      return 'In your Ollama'
-    }
+    const copy = copies.copyFor(id)
+    if (copy) return `Found in ${copySource(copy)}`
     return null
   }
+
+  /** Size line: a found copy is used as is, so there is nothing to download. */
+  const sizeNote = (id: string, bytes: number): string =>
+    copies.copyFor(id) && !settings.linkedModels[id] ? 'nothing to download, uses that file' : formatBytes(bytes)
 
   useEffect(() => {
     if (!recommendation) return
@@ -272,7 +274,10 @@ export default function Onboarding() {
                       type="radio"
                       name="onboarding-transcription"
                       checked={transcription === entry.id}
-                      onChange={() => setTranscription(entry.id)}
+                      onChange={() => {
+                        setTranscription(entry.id)
+                        void copies.use(entry.id)
+                      }}
                     />
                     <span className="choice-text">
                       <strong>
@@ -285,7 +290,7 @@ export default function Onboarding() {
                         ) : null}
                       </strong>
                       <span>
-                        {entry.description} · {formatBytes(entry.bytes)}
+                        {entry.description} · {sizeNote(entry.id, entry.bytes)}
                         {tooBig(entry) ? (
                           <span className="choice-warning"> · May not fit your GPU/RAM</span>
                         ) : null}
@@ -353,7 +358,10 @@ export default function Onboarding() {
                       type="radio"
                       name="onboarding-llm"
                       checked={llm === entry.id}
-                      onChange={() => setLlm(entry.id)}
+                      onChange={() => {
+                        setLlm(entry.id)
+                        void copies.use(entry.id)
+                      }}
                     />
                     <span className="choice-text">
                       <strong>
@@ -366,7 +374,7 @@ export default function Onboarding() {
                         ) : null}
                       </strong>
                       <span>
-                        {entry.description} · {formatBytes(entry.bytes)}
+                        {entry.description} · {sizeNote(entry.id, entry.bytes)}
                         {tooBig(entry) ? (
                           <span className="choice-warning"> · May not fit your GPU/RAM</span>
                         ) : null}

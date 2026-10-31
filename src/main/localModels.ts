@@ -188,13 +188,14 @@ function scanOllama(
   })
 }
 
-/** Model files in well-known folders that are not already used by the app. */
+/** Model files in well-known folders, except custom models the app already uses. */
 export async function scanForModels(): Promise<ScannedModel[]> {
   try {
     const settings = getSettings()
     const skip = new Set<string>()
+    // Linked files are still reported (with their catalogId), so the UI can tell that e.g. Ollama's
+    // qwen3:14b is the Qwen3 14B already in use and not list it twice.
     for (const model of settings.customModels) skip.add(canonical(model.path))
-    for (const path of Object.values(settings.linkedModels)) skip.add(canonical(path))
 
     const appModels = canonical(modelsDir())
     const found: ScannedModel[] = []
@@ -216,7 +217,8 @@ export async function scanForModels(): Promise<ScannedModel[]> {
           name: name ?? info.name,
           bytes: info.bytes,
           kind: info.kind,
-          source
+          source,
+          catalogId: info.catalogId
         })
       } catch {
         // Skip files that vanish or are not model files.

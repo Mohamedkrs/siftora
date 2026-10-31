@@ -27,6 +27,8 @@ export interface ScannedModel {
   bytes: number
   kind: 'transcription' | 'llm'
   source: 'Ollama' | 'LM Studio' | 'Hugging Face' | 'Folder'
+  /** The catalog model this file is (or may be, pending a hash check), so it can be used instead of downloading. */
+  catalogId?: string
 }
 
 export interface SubtitleStyle {

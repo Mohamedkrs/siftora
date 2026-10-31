@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react'
 import { CATALOG, type ModelEntry } from '../../../shared/catalog'
 import { ENGINES, engineBytes, engineLabel } from '../../../shared/engines'
-import type { CustomModel, EngineOption, ModelState } from '../../../shared/types'
+import type { CustomModel, EngineOption, ModelState, ScannedModel } from '../../../shared/types'
 import EngineChoice from '../components/EngineChoice'
-import { FoundEngines, FoundLlms, FoundTranscription, SearchComputerButton } from '../components/FoundOnComputer'
+import {
+  copySource,
+  FoundEngines,
+  FoundLlms,
+  FoundTranscription,
+  SearchComputerButton,
+  useLocalCopies
+} from '../components/FoundOnComputer'
 import ModelProgress from '../components/ModelProgress'
 import SystemCard from '../components/SystemCard'
 import { formatBytes } from '../lib/format'
@@ -29,6 +36,8 @@ interface CardProps {
   description?: string
   recommended?: boolean
   inUse?: boolean
+  /** A copy of this model found on the computer, offered instead of the download. */
+  localCopy?: { file: ScannedModel; busy: boolean; onUse: () => void }
   warning?: boolean
   radioName?: string
   radio?: { checked: boolean; onChange: () => void }
@@ -107,6 +116,12 @@ function ModelCard(props: CardProps) {
       </div>
 
       {props.warning ? <p className="model-warning">May not fit your GPU/RAM</p> : null}
+      {props.localCopy && missingIds.length > 0 ? (
+        <p className="found-copy">
+          <span className="badge badge-ok">Found in {copySource(props.localCopy.file)}</span> Use that file, nothing to
+          download.
+        </p>
+      ) : null}
       {linkedFile ? (
         <p className="muted" title={linkedFile}>
           Using your file — nothing to download.
@@ -125,13 +140,19 @@ function ModelCard(props: CardProps) {
       ))}
 
       <div className="model-actions">
+        {props.localCopy && missingIds.length > 0 && active.length === 0 ? (
+          <button type="button" className="button primary" disabled={props.localCopy.busy} onClick={props.localCopy.onUse}>
+            {props.localCopy.busy ? 'Checking…' : `Use the copy in ${copySource(props.localCopy.file)}`}
+          </button>
+        ) : null}
+
         {missingIds.length > 0 && active.length === 0 ? (
           <button
             type="button"
-            className="button primary"
+            className={props.localCopy ? 'button' : 'button primary'}
             onClick={() => props.onDownload(missingIds)}
           >
-            Download
+            {props.localCopy ? `Download instead (${formatBytes(totalBytes)})` : 'Download'}
           </button>
         ) : null}
 
@@ -195,6 +216,11 @@ export default function Models() {
   const [engineOptions, setEngineOptions] = useState<EngineOption[] | null>(null)
   // Bumped when the user starts/stops using their own engines, so sizes are recomputed.
   const [enginesVersion, setEnginesVersion] = useState(0)
+  const copies = useLocalCopies(() => setEnginesVersion((v) => v + 1))
+  const localCopy = (id: string): CardProps['localCopy'] => {
+    const file = copies.copyFor(id)
+    return file ? { file, busy: copies.busy === id, onUse: () => void copies.use(id) } : undefined
+  }
 
   useEffect(() => {
     let alive = true
@@ -397,6 +423,7 @@ export default function Models() {
             entries={[entry]}
             states={[stateOf(entry)]}
             recommended={recommendation?.transcription === entry.id}
+            localCopy={localCopy(entry.id)}
             warning={tooBig([entry])}
             radioName="transcription-model"
             radio={{
@@ -448,6 +475,7 @@ export default function Models() {
             entries={[entry]}
             states={[stateOf(entry)]}
             recommended={recommendation?.llm === entry.id}
+            localCopy={localCopy(entry.id)}
             warning={tooBig([entry])}
             radioName="llm-model"
             radio={{
