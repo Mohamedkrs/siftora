@@ -1,3 +1,4 @@
+import type { Job } from '../shared/jobs'
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
 import { IPC, type Api, type ModelState } from '../shared/types'
 
@@ -34,6 +35,20 @@ const api: Api = {
     const listener = (_event: IpcRendererEvent, state: ModelState): void => cb(state)
     ipcRenderer.on(IPC.onModelState, listener)
     return () => ipcRenderer.removeListener(IPC.onModelState, listener)
+  },
+  addJobs: (sources) => ipcRenderer.invoke(IPC.addJobs, sources),
+  listJobs: () => ipcRenderer.invoke(IPC.listJobs),
+  cancelJob: (id) => ipcRenderer.invoke(IPC.cancelJob, id),
+  removeJob: (id) => ipcRenderer.invoke(IPC.removeJob, id),
+  retryJob: (id) => ipcRenderer.invoke(IPC.retryJob, id),
+  findAgain: (id) => ipcRenderer.invoke(IPC.findAgain, id),
+  renderClips: (jobId, clipIds) => ipcRenderer.invoke(IPC.renderClips, jobId, clipIds),
+  openPath: (path) => ipcRenderer.invoke(IPC.openPath, path),
+  showInFolder: (path) => ipcRenderer.invoke(IPC.showInFolder, path),
+  onJobUpdate: (cb) => {
+    const listener = (_event: IpcRendererEvent, job: Job): void => cb(job)
+    ipcRenderer.on(IPC.onJobUpdate, listener)
+    return () => ipcRenderer.removeListener(IPC.onJobUpdate, listener)
   }
 }
 

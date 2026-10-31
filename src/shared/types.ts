@@ -61,6 +61,8 @@ export const CAPTION_FONTS = [
   { family: 'Bebas Neue', weight: 400 }
 ] as const
 
+import type { Job } from './jobs'
+
 export type EngineKind = 'llama' | 'whisper' | 'ffmpeg'
 
 /** An engine binary found on the computer (not installed by the app). */
@@ -229,6 +231,18 @@ export interface Api {
   addCustomModel(path: string, name?: string): Promise<{ id?: string; error?: string }>
   removeCustomModel(id: string): Promise<void>
   onModelState(cb: (state: ModelState) => void): () => void
+  /** Queue videos (file paths or YouTube URLs) with the current settings. */
+  addJobs(sources: string[]): Promise<Job[]>
+  listJobs(): Promise<Job[]>
+  cancelJob(id: string): Promise<void>
+  removeJob(id: string): Promise<void>
+  retryJob(id: string): Promise<void>
+  /** Run moment discovery again on the cached transcript ("Find moments again"). */
+  findAgain(id: string): Promise<void>
+  renderClips(jobId: string, clipIds: string[]): Promise<void>
+  openPath(path: string): Promise<void>
+  showInFolder(path: string): Promise<void>
+  onJobUpdate(cb: (job: Job) => void): () => void
 }
 
 export const IPC = {
@@ -257,5 +271,15 @@ export const IPC = {
   pickModelFile: 'dialog:pick-model-file',
   addCustomModel: 'models:add-custom',
   removeCustomModel: 'models:remove-custom',
-  onModelState: 'models:state'
+  onModelState: 'models:state',
+  addJobs: 'jobs:add',
+  listJobs: 'jobs:list',
+  cancelJob: 'jobs:cancel',
+  removeJob: 'jobs:remove',
+  retryJob: 'jobs:retry',
+  findAgain: 'jobs:find-again',
+  renderClips: 'jobs:render',
+  openPath: 'shell:open-path',
+  showInFolder: 'shell:show-in-folder',
+  onJobUpdate: 'jobs:update'
 } as const
