@@ -127,7 +127,7 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
 }
 
 export default function Results() {
-  const { jobs, render, findAgain } = useJobs()
+  const { jobs, render, findAgain, deleteJob } = useJobs()
   const { settings } = useSettings()
   const [params, setParams] = useSearchParams()
   const doneJobs = jobs.filter((job) => job.stage === 'done')
@@ -148,6 +148,18 @@ export default function Results() {
 
   const clips = [...job.clips].sort((a, b) => b.score - a.score)
   const notRendered = clips.filter((clip) => clip.render.status === 'idle' || clip.render.status === 'error')
+  const reels = clips.filter((clip) => clip.render.status === 'done').length
+  const rendering = clips.some((clip) => clip.render.status === 'queued' || clip.render.status === 'rendering')
+  const removeVideo = (): void => {
+    const what = [`${clips.length} clips`, reels > 0 ? `${reels} rendered ${reels === 1 ? 'reel' : 'reels'} (to the Recycle Bin)` : null]
+      .filter(Boolean)
+      .join(' and ')
+    if (!confirm(`Delete "${job.title}"?
+
+This removes its ${what}, and the transcript and analysis. Your original video file is not touched.`)) return
+    setParams({})
+    deleteJob(job.id)
+  }
   const styleKey = renderStyleKey(settings.subtitle, settings.layout)
   const isStale = (clip: Clip): boolean => clip.render.status === 'done' && clip.render.style !== styleKey
   const stale = clips.filter(isStale)
@@ -200,6 +212,18 @@ export default function Results() {
           </button>
           <button type="button" className="button" onClick={() => findAgain(job.id)}>
             Find moments again
+          </button>
+          <button
+            type="button"
+            className="button danger icon-only"
+            onClick={removeVideo}
+            disabled={rendering}
+            title={rendering ? 'Wait for rendering to finish' : 'Delete this video, its reels and data'}
+            aria-label="Delete this video, its reels and data"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
+            </svg>
           </button>
         </div>
       </section>

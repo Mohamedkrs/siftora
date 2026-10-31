@@ -1,6 +1,6 @@
 import { app, BrowserWindow, shell } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, extname, join, resolve, sep } from 'node:path'
 import { SPEAKER_MODEL_IDS } from '../shared/catalog'
 import { pickEngine } from '../shared/engines'
@@ -131,6 +131,35 @@ export function removeJob(id: string): void {
   cancelJob(id)
   jobs.delete(id)
   rmSync(jobDir(id), { recursive: true, force: true })
+}
+
+/** True for a path inside `folder` (case-insensitive on Windows). */
+function isInside(path: string, folder: string): boolean {
+  const norm = (p: string): string => (process.platform === 'win32' ? resolve(p).toLowerCase() : resolve(p))
+  return norm(path).startsWith(norm(folder) + sep)
+}
+
+/**
+ * Deletes everything a video produced: its rendered reels go to the Recycle Bin / Trash, then its
+ * saved data (audio, transcript, a YouTube download) is removed. The original video file is
+ * never touched.
+ */
+export async function deleteJob(id: string): Promise<void> {
+  const job = jobs.get(id)
+  if (!job) return
+  for (const clip of job.clips) {
+    const path = clip.render.path
+    // Only reels the app rendered into this video's output folder.
+    if (clip.render.status === 'done' && path && existsSync(path) && isInside(path, job.outputDir)) {
+      await shell.trashItem(path)
+    }
+  }
+  try {
+    if (readdirSync(job.outputDir).length === 0) rmdirSync(job.outputDir)
+  } catch {
+    // Folder already gone, or the user keeps other files there.
+  }
+  removeJob(id)
 }
 
 export function retryJob(id: string): void {
@@ -350,8 +379,7 @@ export async function deleteReel(jobId: string, clipId: string): Promise<void> {
   if (!job || !clip || clip.render.status !== 'done') return
   const path = clip.render.path
   // Only ever a file the app rendered into this video's output folder.
-  const norm = (p: string): string => (process.platform === 'win32' ? resolve(p).toLowerCase() : resolve(p))
-  if (path && existsSync(path) && norm(path).startsWith(norm(job.outputDir) + sep)) await shell.trashItem(path)
+  if (path && existsSync(path) && isInside(path, job.outputDir)) await shell.trashItem(path)
   clip.render = { status: 'idle', progress: 0 }
   update(job)
 }

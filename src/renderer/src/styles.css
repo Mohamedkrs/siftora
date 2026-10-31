@@ -1729,3 +1729,7 @@ select {
 .not-in-use .model-actions {
   margin-top: 10px;
 }
+
+.button.icon-only {
+  padding: 8px 10px;
+}

@@ -251,6 +251,8 @@ export interface Api {
   /** Run moment discovery again on the cached transcript ("Find moments again"). */
   findAgain(id: string): Promise<void>
   renderClips(jobId: string, clipIds: string[]): Promise<void>
+  /** Deletes a video's reels (to the Recycle Bin / Trash) and saved data; the original file stays. */
+  deleteJob(id: string): Promise<void>
   /** Moves a rendered reel to the Recycle Bin / Trash and marks the clip as not rendered. */
   deleteReel(jobId: string, clipId: string): Promise<void>
   openPath(path: string): Promise<void>
@@ -294,6 +296,7 @@ export const IPC = {
   retryJob: 'jobs:retry',
   findAgain: 'jobs:find-again',
   renderClips: 'jobs:render',
+  deleteJob: 'jobs:delete',
   deleteReel: 'jobs:delete-reel',
   openPath: 'shell:open-path',
   showInFolder: 'shell:show-in-folder',

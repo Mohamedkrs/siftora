@@ -11,6 +11,8 @@ interface JobsContextValue {
   findAgain: (id: string) => void
   render: (jobId: string, clipIds: string[]) => void
   deleteReel: (jobId: string, clipId: string) => void
+  /** Removes a video with its reels and data. */
+  deleteJob: (id: string) => void
 }
 
 const JobsContext = createContext<JobsContextValue | null>(null)
@@ -40,7 +42,11 @@ export function JobsProvider({ children }: { children: ReactNode }) {
     retry: (id) => void window.api.retryJob(id),
     findAgain: (id) => void window.api.findAgain(id),
     render: (jobId, clipIds) => void window.api.renderClips(jobId, clipIds),
-    deleteReel: (jobId, clipId) => void window.api.deleteReel(jobId, clipId)
+    deleteReel: (jobId, clipId) => void window.api.deleteReel(jobId, clipId),
+    deleteJob: (id) => {
+      setJobs((current) => current.filter((job) => job.id !== id))
+      void window.api.deleteJob(id)
+    }
   }
 
   return <JobsContext.Provider value={value}>{children}</JobsContext.Provider>

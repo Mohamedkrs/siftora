@@ -4,7 +4,7 @@ import { currentEngineList } from './engineList'
 import { cancelDownload, deleteModel, downloadModels, listModels, modelsDir } from './downloads'
 import { detectHardware, engineOptions, recommend, requiredEngineInfo } from './hardware'
 import { addCustomModel, removeCustomModel, scanForModels } from './localModels'
-import { addJobs, cancelJob, deleteReel, findAgain, listJobs, removeJob, renderClips, retryJob } from './jobs'
+import { addJobs, cancelJob, deleteJob, deleteReel, findAgain, listJobs, removeJob, renderClips, retryJob } from './jobs'
 import { log } from './logger'
 import {
   detectOllama,
@@ -114,6 +114,7 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.findAgain, (_event, id: unknown) => findAgain(String(id)))
   ipcMain.handle(IPC.renderClips, (_event, jobId: unknown, clipIds: unknown) => renderClips(String(jobId), ids(clipIds)))
   // Only files the app produced or the user chose are passed here; still, never run programs.
+  ipcMain.handle(IPC.deleteJob, (_event, id: unknown) => deleteJob(String(id)))
   ipcMain.handle(IPC.deleteReel, (_event, jobId: unknown, clipId: unknown) => deleteReel(String(jobId), String(clipId)))
   ipcMain.handle(IPC.openPath, async (_event, path: unknown) => {
     if (typeof path === 'string' && !/\.(exe|bat|cmd|com|ps1|sh|app|msi|lnk)$/i.test(path)) await shell.openPath(path)
