@@ -264,6 +264,7 @@ export default function Onboarding() {
             <section className="card">
               <h2>Transcription</h2>
               <FoundTranscription onChange={() => setEnginesVersion((v) => v + 1)} />
+              <p className="label list-label">Built into Siftora · whisper.cpp</p>
               <div className="choice-list">
                 {transcriptionModels.map((entry) => (
                   <label
@@ -351,6 +352,7 @@ export default function Onboarding() {
             <section className="card">
               <h2>Clip finder AI</h2>
               <FoundLlms onChange={() => setEnginesVersion((v) => v + 1)} />
+              <p className="label list-label">Built into Siftora · llama.cpp</p>
               <div className="choice-list">
                 {llmModels.map((entry) => (
                   <label key={entry.id} className={llm === entry.id ? 'choice selected' : 'choice'}>

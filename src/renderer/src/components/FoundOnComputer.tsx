@@ -280,6 +280,70 @@ export function FoundEngines(props: { onChange?: () => void; autoPickFfmpeg?: bo
 
 // ── Transcription section ──
 
+/**
+ * OpenAI's Python Whisper: a separate program the user installed, with its own models. Shown as
+ * one choice with a model picker, so it is not mistaken for the app's own Whisper models.
+ */
+function PythonWhisper(props: {
+  info: OpenAiWhisperInfo
+  using: boolean
+  onSave: (patch: Partial<Settings>) => Promise<void>
+}) {
+  const { settings } = useSettings()
+  const { info } = props
+  const [model, setModel] = useState(
+    (props.using && settings.openaiWhisperModel) || (info.models.includes('large-v3') ? 'large-v3' : info.models[0]) || ''
+  )
+  return (
+    <div className={props.using ? 'choice selected found-row' : 'choice found-row'}>
+      <span className="choice-text">
+        <strong>
+          OpenAI Whisper (Python) {info.version ?? ''}
+          {info.cuda !== null ? <span className="badge">{info.cuda ? 'GPU' : 'CPU only'}</span> : null}
+          <FoundBadge />
+        </strong>
+        <span>
+          A separate program you installed, not part of Siftora. It uses its own models, already on this computer. Slower
+          than the built-in engine below, with the same accuracy.
+        </span>
+        {info.models.length > 0 ? (
+          <label className="inline-field">
+            Its model
+            <select
+              value={model}
+              onChange={(event) => {
+                setModel(event.target.value)
+                if (props.using) void props.onSave({ openaiWhisperModel: event.target.value })
+              }}
+            >
+              {info.models.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <span className="model-warning">No models downloaded by it yet; it fetches one on first use.</span>
+        )}
+      </span>
+      <button
+        type="button"
+        className="button"
+        onClick={() =>
+          void props.onSave(
+            props.using
+              ? { transcriptionProvider: 'app' }
+              : { transcriptionProvider: 'openai-whisper', openaiWhisperPath: info.path, openaiWhisperModel: model || 'large-v3' }
+          )
+        }
+      >
+        {props.using ? 'Stop using' : 'Use this'}
+      </button>
+    </div>
+  )
+}
+
 export function FoundTranscription(props: { onChange?: () => void }) {
   const { settings } = useSettings()
   const { result: found } = useComputerSearch()
@@ -290,40 +354,7 @@ export function FoundTranscription(props: { onChange?: () => void }) {
 
   return (
     <div className="found-list">
-      {py?.path
-        ? py.models.map((model) => {
-            const inUse = usingPy && settings.openaiWhisperModel === model
-            return (
-              <Row
-                key={model}
-                selected={inUse}
-                title={
-                  <>
-                    Whisper {model} — OpenAI Whisper (Python) {py.version ?? ''}
-                    {py.cuda !== null ? <span className="badge">{py.cuda ? 'GPU' : 'CPU only'}</span> : null}
-                    <FoundBadge />
-                  </>
-                }
-                lines={['Uses your existing Python setup. Slower than the app’s engine, same accuracy.']}
-                action={
-                  <button
-                    type="button"
-                    className="button"
-                    onClick={() =>
-                      void save(
-                        inUse
-                          ? { transcriptionProvider: 'app' }
-                          : { transcriptionProvider: 'openai-whisper', openaiWhisperPath: py.path, openaiWhisperModel: model }
-                      )
-                    }
-                  >
-                    {inUse ? 'Stop using' : 'Use this'}
-                  </button>
-                }
-              />
-            )
-          })
-        : null}
+      {py?.path ? <PythonWhisper info={py} using={usingPy} onSave={save} /> : null}
 
       {found?.files
         .filter((file) => file.kind === 'transcription')

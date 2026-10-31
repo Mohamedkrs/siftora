@@ -125,6 +125,20 @@ export default function SettingsScreen() {
       </section>
 
       <section className="card">
+        <h2>Setup</h2>
+        <div className="row">
+          <div>
+            <div className="label">First-start setup</div>
+            <div className="value">Check your hardware again and choose the engines and models step by step.</div>
+          </div>
+          <button type="button" className="button" onClick={() => update({ onboarded: false })}>
+            Run setup again
+          </button>
+        </div>
+        <p className="muted small">Your videos, results and downloaded models are kept.</p>
+      </section>
+
+      <section className="card">
         <h2>About</h2>
         {info ? (
           <dl className="about">

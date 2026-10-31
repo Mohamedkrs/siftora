@@ -1739,3 +1739,25 @@ select {
 .found-copy .badge {
   margin: 0 6px 0 0;
 }
+
+/* "Built into Siftora" above the catalog lists, set apart from what was found on the computer */
+.list-label {
+  margin: 8px 0 0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+}
+
+.inline-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.inline-field select {
+  width: auto;
+  padding: 4px 8px;
+}

@@ -417,6 +417,9 @@ export default function Models() {
           <p>Turns what is said into text with a time for every word, used to find moments and for captions. Pick one.</p>
         </div>
         <FoundTranscription onChange={() => setEnginesVersion((v) => v + 1)} />
+        <p className="label list-label">
+          Built into Siftora · whisper.cpp{settings.transcriptionProvider === 'openai-whisper' ? ' · not in use while OpenAI Whisper is chosen' : ''}
+        </p>
         {transcriptionModels.map((entry) => (
           <ModelCard
             key={entry.id}
@@ -427,8 +430,8 @@ export default function Models() {
             warning={tooBig([entry])}
             radioName="transcription-model"
             radio={{
-              checked: settings.transcriptionModel === entry.id,
-              onChange: () => update({ transcriptionModel: entry.id })
+              checked: settings.transcriptionProvider !== 'openai-whisper' && settings.transcriptionModel === entry.id,
+              onChange: () => update({ transcriptionModel: entry.id, transcriptionProvider: 'app' })
             }}
             onDownload={download}
             onCancel={cancel}
@@ -452,8 +455,8 @@ export default function Models() {
               states={[customState(model)]}
               radioName="transcription-model"
               radio={{
-                checked: settings.transcriptionModel === model.id,
-                onChange: () => update({ transcriptionModel: model.id })
+                checked: settings.transcriptionProvider !== 'openai-whisper' && settings.transcriptionModel === model.id,
+                onChange: () => update({ transcriptionModel: model.id, transcriptionProvider: 'app' })
               }}
               onDownload={download}
               onCancel={cancel}
@@ -469,6 +472,9 @@ export default function Models() {
           <p>Reads the transcript and picks the moments with a hook, a setup and a payoff. Bigger models judge better but need more memory. Pick one.</p>
         </div>
         <FoundLlms onChange={() => setEnginesVersion((v) => v + 1)} />
+        <p className="label list-label">
+          Built into Siftora · llama.cpp{settings.llmProvider === 'ollama' ? ' · not in use while an Ollama model is chosen' : ''}
+        </p>
         {llmModels.map((entry) => (
           <ModelCard
             key={entry.id}
@@ -479,8 +485,8 @@ export default function Models() {
             warning={tooBig([entry])}
             radioName="llm-model"
             radio={{
-              checked: settings.llmModel === entry.id,
-              onChange: () => update({ llmModel: entry.id })
+              checked: settings.llmProvider !== 'ollama' && settings.llmModel === entry.id,
+              onChange: () => update({ llmModel: entry.id, llmProvider: 'app' })
             }}
             onDownload={download}
             onCancel={cancel}
@@ -504,8 +510,8 @@ export default function Models() {
               states={[customState(model)]}
               radioName="llm-model"
               radio={{
-                checked: settings.llmModel === model.id,
-                onChange: () => update({ llmModel: model.id })
+                checked: settings.llmProvider !== 'ollama' && settings.llmModel === model.id,
+                onChange: () => update({ llmModel: model.id, llmProvider: 'app' })
               }}
               onDownload={download}
               onCancel={cancel}
