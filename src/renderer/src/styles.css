@@ -1516,7 +1516,7 @@ select {
 }
 
 /* Empty state: what happens after you add a video */
-.steps {
+.how-steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
@@ -1525,7 +1525,7 @@ select {
   list-style: none;
 }
 
-.steps li {
+.how-steps li {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1534,7 +1534,7 @@ select {
   border-radius: 10px;
 }
 
-.steps .muted {
+.how-steps .muted {
   font-size: 13px;
   line-height: 1.45;
 }
@@ -1560,7 +1560,7 @@ select {
 }
 
 @media (max-width: 760px) {
-  .steps {
+  .how-steps {
     grid-template-columns: 1fr;
   }
 }
@@ -1878,4 +1878,11 @@ select {
 
 .tone-orange {
   background: #ff7a1a;
+}
+
+/* Engine status under the hardware list, set apart from it */
+.card .system-note {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
 }

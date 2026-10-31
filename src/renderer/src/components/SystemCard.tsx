@@ -60,7 +60,7 @@ export default function SystemCard() {
         </dl>
 
         {requiredEngines && hardware.backend !== 'cpu' ? (
-          <p className="muted">
+          <p className="muted system-note">
             GPU-accelerated engines (app download):{' '}
             {enginesInstalled
               ? 'installed'

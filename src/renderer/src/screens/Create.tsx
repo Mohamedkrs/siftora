@@ -249,7 +249,7 @@ export default function Create() {
               </ul>
             </section>
           ) : (
-            <ol className="steps" aria-label="How it works">
+            <ol className="how-steps" aria-label="How it works">
               <li>
                 <span className="step-dot one" aria-hidden="true" />
                 <strong>Add a long video</strong>
