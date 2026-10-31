@@ -12,7 +12,7 @@ import { findMoments, ollamaClient, startLlamaServer, type LlmClient } from './p
 import { renderClip } from './pipeline/render'
 import { Cancelled, ffmpegPaths, run } from './pipeline/run'
 import { assignSpeakers, detectSpeakers } from './pipeline/speakers'
-import { transcribePython, transcribeWhisperCpp, type Transcript } from './pipeline/transcribe'
+import { fitWordsToSegments, transcribePython, transcribeWhisperCpp, type Transcript } from './pipeline/transcribe'
 import { getSettings } from './settings'
 import { downloadYoutube, isYoutubeUrl } from './youtube'
 
@@ -363,6 +363,7 @@ async function renderOne(job: Job, clip: Clip): Promise<void> {
     const { ffmpeg } = ffmpegPaths()
     const transcript = readJson<Transcript>(join(jobDir(job.id), 'transcript.json'))
     if (!transcript) throw new Error('Transcript missing; run the job again.')
+    fitWordsToSegments(transcript.segments) // transcripts cached before this fix
     const speakers = readJson<{ speakers: (number | null)[] }>(join(jobDir(job.id), 'speakers.json'))
     if (speakers && job.options.speakers) {
       transcript.segments.forEach((segment, i) => {

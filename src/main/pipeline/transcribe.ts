@@ -50,6 +50,25 @@ function tokensToWords(tokens: { text?: string; t_dtw?: number; offsets: { from:
   return words.filter((word) => word.text.length > 0)
 }
 
+/**
+ * With --vad, whisper.cpp maps segment times back to the original timeline but leaves token
+ * times in the silence-trimmed one, so words drift earlier as the video goes on. Stretch each
+ * segment's words onto the segment's own span. Words already inside it are left alone.
+ */
+export function fitWordsToSegments(segments: Segment[]): Segment[] {
+  for (const segment of segments) {
+    const { words } = segment
+    if (words.length === 0) continue
+    const from = words[0].start
+    const to = Math.max(words[words.length - 1].end, from + 1)
+    if (from >= segment.start - 500 && to <= segment.end + 500) continue
+    const scale = (segment.end - segment.start) / (to - from)
+    const map = (ms: number): number => Math.round(segment.start + (ms - from) * scale)
+    segment.words = words.map((word) => ({ ...word, start: map(word.start), end: map(word.end) }))
+  }
+  return segments
+}
+
 export async function transcribeWhisperCpp(opts: {
   binary: string
   model: string
@@ -86,7 +105,7 @@ export async function transcribeWhisperCpp(opts: {
       words: tokensToWords(item.tokens ?? [])
     }))
     .filter((segment) => segment.text.length > 0)
-  return { language: raw.result?.language ?? opts.language, segments: cleanLoops(segments) }
+  return { language: raw.result?.language ?? opts.language, segments: cleanLoops(fitWordsToSegments(segments)) }
 }
 
 export async function transcribePython(opts: {
