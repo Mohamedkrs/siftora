@@ -13,6 +13,7 @@ const api: Api = {
   getPathForFile: (file) => webUtils.getPathForFile(file),
   getHardware: () => ipcRenderer.invoke(IPC.getHardware),
   getRecommendation: () => ipcRenderer.invoke(IPC.getRecommendation),
+  getRequiredEngines: () => ipcRenderer.invoke(IPC.getRequiredEngines),
   listModels: () => ipcRenderer.invoke(IPC.listModels),
   downloadModels: (ids) => ipcRenderer.invoke(IPC.downloadModels, ids),
   cancelDownload: (id) => ipcRenderer.invoke(IPC.cancelDownload, id),

@@ -197,3 +197,16 @@ export function pickEngine(
 export function engineBytes(entry: EngineEntry): number {
   return entry.files.reduce((sum, f) => sum + f.bytes, 0)
 }
+
+const LABELS: Record<EngineName, string> = {
+  llama: 'llama.cpp',
+  whisper: 'whisper.cpp',
+  ffmpeg: 'FFmpeg'
+}
+
+/** Display name, e.g. "llama.cpp (CUDA)" or "FFmpeg" for CPU builds. */
+export function engineLabel(entry: EngineEntry): string {
+  return entry.backend === 'cpu'
+    ? LABELS[entry.engine]
+    : `${LABELS[entry.engine]} (${entry.backend.toUpperCase()})`
+}

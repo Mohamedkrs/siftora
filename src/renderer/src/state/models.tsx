@@ -1,10 +1,16 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import type { HardwareInfo, ModelState, Recommendation } from '../../../shared/types'
+import type {
+  HardwareInfo,
+  ModelState,
+  Recommendation,
+  RequiredEngines
+} from '../../../shared/types'
 
 interface ModelsContextValue {
   models: Record<string, ModelState>
   hardware: HardwareInfo | null
   recommendation: Recommendation | null
+  requiredEngines: RequiredEngines | null
   download: (ids: string[]) => void
   cancel: (id: string) => void
   remove: (id: string) => void
@@ -16,6 +22,7 @@ export function ModelsProvider({ children }: { children: ReactNode }) {
   const [models, setModels] = useState<Record<string, ModelState>>({})
   const [hardware, setHardware] = useState<HardwareInfo | null>(null)
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null)
+  const [requiredEngines, setRequiredEngines] = useState<RequiredEngines | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -48,6 +55,15 @@ export function ModelsProvider({ children }: { children: ReactNode }) {
         window.api.log('error', `getRecommendation failed: ${String(err)}`)
       })
 
+    window.api
+      .getRequiredEngines()
+      .then((result) => {
+        if (alive) setRequiredEngines(result)
+      })
+      .catch((err: unknown) => {
+        window.api.log('error', `getRequiredEngines failed: ${String(err)}`)
+      })
+
     const unsubscribe = window.api.onModelState((state) => {
       setModels((current) => ({ ...current, [state.id]: state }))
     })
@@ -77,7 +93,9 @@ export function ModelsProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <ModelsContext.Provider value={{ models, hardware, recommendation, download, cancel, remove }}>
+    <ModelsContext.Provider
+      value={{ models, hardware, recommendation, requiredEngines, download, cancel, remove }}
+    >
       {children}
     </ModelsContext.Provider>
   )

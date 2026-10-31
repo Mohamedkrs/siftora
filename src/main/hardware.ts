@@ -1,7 +1,8 @@
 import { execFile } from 'node:child_process'
 import { cpus, totalmem } from 'node:os'
 import { CATALOG, type ModelEntry } from '../shared/catalog'
-import type { GpuInfo, HardwareInfo, Recommendation } from '../shared/types'
+import { pickEngine, type EngineEntry, type EngineName } from '../shared/engines'
+import type { GpuInfo, HardwareInfo, Recommendation, RequiredEngines } from '../shared/types'
 
 const GB = 1024 ** 3
 const MIB = 1024 ** 2
@@ -172,6 +173,26 @@ async function collect(): Promise<HardwareInfo> {
     cuda,
     backend,
     memoryBudgetBytes
+  }
+}
+
+const ENGINE_NAMES: EngineName[] = ['whisper', 'llama', 'ffmpeg']
+
+/** Engine builds this machine needs, best available per engine. */
+export function requiredEngines(hw: HardwareInfo): string[] {
+  return ENGINE_NAMES
+    .map((name) => pickEngine(name, process.platform, process.arch, hw.backend))
+    .filter((entry): entry is EngineEntry => entry !== null)
+    .map((entry) => entry.id)
+}
+
+export async function requiredEngineInfo(): Promise<RequiredEngines> {
+  const hw = await detectHardware()
+  return {
+    ids: requiredEngines(hw),
+    missing: ENGINE_NAMES.filter(
+      (name) => pickEngine(name, process.platform, process.arch, hw.backend) === null
+    )
   }
 }
 

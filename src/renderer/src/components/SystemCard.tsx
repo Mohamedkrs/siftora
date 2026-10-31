@@ -1,11 +1,11 @@
+import { ENGINES, engineBytes } from '../../../shared/engines'
 import { formatBytes } from '../lib/format'
 import { useModels } from '../state/models'
-import NotImplemented from './NotImplemented'
 
 const NVIDIA_URL = 'https://www.nvidia.com/Download/index.aspx'
 
 export default function SystemCard() {
-  const { hardware, recommendation } = useModels()
+  const { models, hardware, recommendation, requiredEngines } = useModels()
 
   if (!hardware) {
     return (
@@ -32,6 +32,14 @@ export default function SystemCard() {
 
   const nvidiaGpu = hardware.gpus.find((gpu) => gpu.vendor === 'nvidia')
 
+  const engineEntries = requiredEngines
+    ? ENGINES.filter((entry) => requiredEngines.ids.includes(entry.id))
+    : []
+  const engineBytesTotal = engineEntries.reduce((sum, entry) => sum + engineBytes(entry), 0)
+  const enginesInstalled =
+    engineEntries.length > 0 &&
+    engineEntries.every((entry) => models[entry.id]?.status === 'installed')
+
   return (
     <>
       <section className="card">
@@ -51,9 +59,12 @@ export default function SystemCard() {
           <dd>{hardware.backend.toUpperCase()}</dd>
         </dl>
 
-        <div className="spaced">
-          <NotImplemented phase={2} note="GPU engine pack download" />
-        </div>
+        {requiredEngines && hardware.backend !== 'cpu' ? (
+          <p className="muted">
+            GPU engine pack:{' '}
+            {enginesInstalled ? 'installed' : `not installed (${formatBytes(engineBytesTotal)})`}
+          </p>
+        ) : null}
 
         {recommendation ? (
           <ul className="reasons">

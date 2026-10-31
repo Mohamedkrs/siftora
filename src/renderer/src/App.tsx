@@ -1,5 +1,6 @@
 import { Navigate, NavLink, Route, Routes } from 'react-router-dom'
 import { CATALOG } from '../../shared/catalog'
+import { ENGINES, engineBytes, engineLabel } from '../../shared/engines'
 import Create from './screens/Create'
 import Models from './screens/Models'
 import Onboarding from './screens/Onboarding'
@@ -24,10 +25,14 @@ export default function App() {
   if (!settings.onboarded) return <Onboarding />
 
   const downloading = Object.values(models).find((state) => state.status === 'downloading')
-  const entry = downloading ? CATALOG.find((model) => model.id === downloading.id) : undefined
+  const model = downloading ? CATALOG.find((entry) => entry.id === downloading.id) : undefined
+  const engine =
+    downloading && !model ? ENGINES.find((entry) => entry.id === downloading.id) : undefined
+  const totalBytes = model ? model.bytes : engine ? engineBytes(engine) : 0
+  const name = model ? model.name : engine ? engineLabel(engine) : downloading?.id
   const percent =
-    downloading && entry
-      ? Math.min(100, Math.round((downloading.receivedBytes / entry.bytes) * 100))
+    downloading && totalBytes > 0
+      ? Math.min(100, Math.round((downloading.receivedBytes / totalBytes) * 100))
       : 0
 
   return (
@@ -52,9 +57,7 @@ export default function App() {
       <div className="workspace">
         <header className="queue-strip">
           <span className={downloading ? 'queue-dot active' : 'queue-dot'} aria-hidden="true" />
-          {downloading
-            ? `Downloading ${entry?.name ?? downloading.id} — ${percent}%`
-            : 'Queue empty'}
+          {downloading ? `Downloading ${name} — ${percent}%` : 'Queue empty'}
         </header>
 
         <main className="content">

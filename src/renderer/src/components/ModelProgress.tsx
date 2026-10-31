@@ -16,13 +16,14 @@ export default function ModelProgress({ state, totalBytes }: Props) {
   const percent =
     totalBytes > 0 ? Math.min(100, Math.round((state.receivedBytes / totalBytes) * 100)) : 0
   const verifying = state.status === 'verifying'
+  const extracting = state.status === 'extracting'
   const queued = state.status === 'queued'
 
   const parts = [`${percent}%`]
-  if (!verifying && !queued && state.bytesPerSec > 0) {
+  if (!verifying && !extracting && !queued && state.bytesPerSec > 0) {
     parts.push(`${formatBytes(state.bytesPerSec)}/s`)
   }
-  if (!verifying && !queued && state.etaSec) {
+  if (!verifying && !extracting && !queued && state.etaSec) {
     parts.push(`${formatEta(state.etaSec)} left`)
   }
 
@@ -33,12 +34,18 @@ export default function ModelProgress({ state, totalBytes }: Props) {
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={verifying ? 100 : percent}
+        aria-valuenow={verifying || extracting ? 100 : percent}
       >
-        <div className="progress-fill" style={{ width: `${verifying ? 100 : percent}%` }} />
+        <div className="progress-fill" style={{ width: `${verifying || extracting ? 100 : percent}%` }} />
       </div>
       <p className="progress-meta">
-        {verifying ? 'Verifying…' : queued ? 'Waiting…' : parts.join(' · ')}
+        {extracting
+          ? 'Unpacking…'
+          : verifying
+            ? 'Verifying…'
+            : queued
+              ? 'Waiting…'
+              : parts.join(' · ')}
       </p>
     </div>
   )

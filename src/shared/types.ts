@@ -90,7 +90,19 @@ export interface Recommendation {
   reasons: string[]
 }
 
-export type ModelStatus = 'missing' | 'queued' | 'downloading' | 'verifying' | 'installed' | 'error'
+export type ModelStatus =
+  | 'missing'
+  | 'queued'
+  | 'downloading'
+  | 'verifying'
+  | 'extracting'
+  | 'installed'
+  | 'error'
+
+export interface RequiredEngines {
+  ids: string[]
+  missing: ('whisper' | 'llama' | 'ffmpeg')[]
+}
 
 export interface ModelState {
   id: string
@@ -111,6 +123,7 @@ export interface Api {
   getPathForFile(file: File): string
   getHardware(): Promise<HardwareInfo>
   getRecommendation(): Promise<Recommendation>
+  getRequiredEngines(): Promise<RequiredEngines>
   listModels(): Promise<ModelState[]>
   downloadModels(ids: string[]): Promise<void>
   cancelDownload(id: string): Promise<void>
@@ -128,6 +141,7 @@ export const IPC = {
   appInfo: 'app:info',
   getHardware: 'hardware:get',
   getRecommendation: 'hardware:recommendation',
+  getRequiredEngines: 'engines:required',
   listModels: 'models:list',
   downloadModels: 'models:download',
   cancelDownload: 'models:cancel',

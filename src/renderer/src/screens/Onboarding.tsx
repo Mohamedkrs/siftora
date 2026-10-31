@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CATALOG, SPEAKER_MODEL_IDS, type ModelEntry } from '../../../shared/catalog'
+import { ENGINES, engineBytes, engineLabel } from '../../../shared/engines'
 import ModelProgress from '../components/ModelProgress'
 import SystemCard from '../components/SystemCard'
 import { formatBytes } from '../lib/format'
@@ -11,7 +12,7 @@ const VAD_ID = CATALOG.find((model) => model.kind === 'vad')?.id
 const stepLabels = ['Welcome', 'System check', 'Choose models', 'Download']
 
 export default function Onboarding() {
-  const { models, hardware, recommendation, download } = useModels()
+  const { models, hardware, recommendation, requiredEngines, download } = useModels()
   const { settings, update } = useSettings()
   const [step, setStep] = useState(0)
   const [transcription, setTranscription] = useState<string | null>(settings.transcriptionModel)
@@ -25,7 +26,12 @@ export default function Onboarding() {
     setLlm((current) => current ?? recommendation.llm)
   }, [recommendation])
 
-  const selectedIds = (): string[] => {
+  const engineEntries = requiredEngines
+    ? ENGINES.filter((entry) => requiredEngines.ids.includes(entry.id))
+    : []
+  const engineBytesTotal = engineEntries.reduce((sum, entry) => sum + engineBytes(entry), 0)
+
+  const selectedModelIds = (): string[] => {
     const ids: string[] = []
     if (transcription) ids.push(transcription)
     if (llm) ids.push(llm)
@@ -34,10 +40,15 @@ export default function Onboarding() {
     return ids
   }
 
+  const selectedIds = (): string[] => [
+    ...engineEntries.map((entry) => entry.id),
+    ...selectedModelIds()
+  ]
+
   useEffect(() => {
     if (step !== 3) return
     download(selectedIds())
-  }, [step])
+  }, [step, requiredEngines])
 
   const transcriptionModels = CATALOG.filter((model) => model.kind === 'transcription')
   const llmModels = CATALOG.filter((model) => model.kind === 'llm')
@@ -46,16 +57,22 @@ export default function Onboarding() {
     0
   )
 
-  const selectedEntries = selectedIds().flatMap((id) => {
+  const selectedEntries = selectedModelIds().flatMap((id) => {
     const entry = CATALOG.find((model) => model.id === id)
     return entry ? [entry] : []
   })
-  const totalBytes = selectedEntries.reduce(
-    (sum, entry) => sum + (models[entry.id]?.status === 'installed' ? 0 : entry.bytes),
-    0
-  )
+  const totalBytes =
+    engineEntries.reduce(
+      (sum, entry) => sum + (models[entry.id]?.status === 'installed' ? 0 : engineBytes(entry)),
+      0
+    ) +
+    selectedEntries.reduce(
+      (sum, entry) => sum + (models[entry.id]?.status === 'installed' ? 0 : entry.bytes),
+      0
+    )
   const allInstalled =
-    selectedEntries.length > 0 &&
+    engineEntries.length + selectedEntries.length > 0 &&
+    engineEntries.every((entry) => models[entry.id]?.status === 'installed') &&
     selectedEntries.every((entry) => models[entry.id]?.status === 'installed')
 
   const tooBig = (entry: ModelEntry): boolean =>
@@ -129,6 +146,24 @@ export default function Onboarding() {
 
         {step === 2 ? (
           <>
+            <section className="card">
+              <h2>Engines</h2>
+              <div className="choice-list">
+                <div className="choice selected">
+                  <span className="choice-text">
+                    <strong>
+                      Engines
+                      {hardware && hardware.backend !== 'cpu' ? ' (GPU accelerated)' : ''}
+                    </strong>
+                    <span>
+                      {formatBytes(engineBytesTotal)} · Required to run transcription and clip
+                      finding.
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </section>
+
             <section className="card">
               <h2>Transcription</h2>
               <div className="choice-list">
@@ -239,6 +274,14 @@ export default function Onboarding() {
           <>
             <section className="card">
               <h2>Downloading models</h2>
+              {engineEntries.map((entry) => (
+                <div className="download-row" key={entry.id}>
+                  <strong>{engineLabel(entry)}</strong>
+                  {models[entry.id] ? (
+                    <ModelProgress state={models[entry.id]} totalBytes={engineBytes(entry)} />
+                  ) : null}
+                </div>
+              ))}
               {selectedEntries.map((entry) => (
                 <div className="download-row" key={entry.id}>
                   <strong>{entry.name}</strong>

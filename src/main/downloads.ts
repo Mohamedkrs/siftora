@@ -1,20 +1,35 @@
 import { app, BrowserWindow } from 'electron'
+import { execFile } from 'node:child_process'
 import { createHash, type Hash } from 'node:crypto'
 import {
+  chmodSync,
   createReadStream,
   createWriteStream,
   mkdirSync,
+  readdirSync,
   renameSync,
   rmSync,
-  statSync
+  statSync,
+  type Dirent
 } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { CATALOG, type ModelEntry } from '../shared/catalog'
+import {
+  ENGINES,
+  engineBytes,
+  pickEngine,
+  type Backend,
+  type EngineEntry,
+  type EngineFile,
+  type EngineName
+} from '../shared/engines'
 import { IPC, type ModelState, type Settings } from '../shared/types'
 import { log } from './logger'
 import { getSettings, setSettings } from './settings'
+
+type Item = ModelEntry | EngineEntry
 
 const active = new Map<string, ModelState>()
 const queue: string[] = []
@@ -28,24 +43,68 @@ export function modelsDir(): string {
   return dir
 }
 
+function enginesDir(): string {
+  const dir = join(app.getPath('userData'), 'engines')
+  mkdirSync(dir, { recursive: true })
+  return dir
+}
+
+function engineDir(entry: EngineEntry): string {
+  return join(enginesDir(), entry.id)
+}
+
+function enginePart(file: EngineFile): string {
+  const dir = join(enginesDir(), '.downloads')
+  mkdirSync(dir, { recursive: true })
+  return join(dir, `${basename(file.url)}.part`)
+}
+
+function isEngine(item: Item): item is EngineEntry {
+  return 'files' in item
+}
+
+function findItem(id: string): Item | undefined {
+  return CATALOG.find((m) => m.id === id) ?? ENGINES.find((e) => e.id === id)
+}
+
 function filePath(entry: ModelEntry): string {
   return join(modelsDir(), entry.file)
 }
 
-function isInstalled(entry: ModelEntry): boolean {
+function fileSize(path: string): number {
   try {
-    return statSync(filePath(entry)).size === entry.bytes
+    return statSync(path).size
+  } catch {
+    return 0
+  }
+}
+
+function itemBytes(item: Item): number {
+  return isEngine(item) ? engineBytes(item) : item.bytes
+}
+
+function isInstalled(item: Item): boolean {
+  if (isEngine(item)) {
+    try {
+      if (!statSync(engineDir(item)).isDirectory()) return false
+    } catch {
+      return false
+    }
+    return findBinary(item) !== null
+  }
+
+  try {
+    return statSync(filePath(item)).size === item.bytes
   } catch {
     return false
   }
 }
 
-function partSize(entry: ModelEntry): number {
-  try {
-    return statSync(`${filePath(entry)}.part`).size
-  } catch {
-    return 0
+function partSize(item: Item): number {
+  if (isEngine(item)) {
+    return item.files.reduce((sum, file) => sum + fileSize(enginePart(file)), 0)
   }
+  return fileSize(`${filePath(item)}.part`)
 }
 
 function removeFile(path: string): void {
@@ -56,21 +115,72 @@ function removeFile(path: string): void {
   }
 }
 
-function initialState(entry: ModelEntry): ModelState {
-  if (isInstalled(entry)) {
+function removeDir(path: string): void {
+  try {
+    rmSync(path, { recursive: true, force: true })
+  } catch (err) {
+    log.warn('downloads', `could not remove ${path}: ${String(err)}`)
+  }
+}
+
+function searchBinary(dir: string, name: string): string | null {
+  let entries: Dirent[]
+  try {
+    entries = readdirSync(dir, { withFileTypes: true })
+  } catch {
+    return null
+  }
+
+  for (const entry of entries) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      const found = searchBinary(full, name)
+      if (found) return found
+    } else if (entry.name === name) {
+      return full
+    }
+  }
+  return null
+}
+
+/** The executable inside an installed engine folder, or null while it is missing. */
+export function findBinary(entry: EngineEntry): string | null {
+  const name = process.platform === 'win32' ? `${entry.binary}.exe` : entry.binary
+  return searchBinary(engineDir(entry), name)
+}
+
+const BACKEND_ORDER: Backend[] = ['cuda', 'metal', 'vulkan', 'cpu']
+
+/** Binary of the best installed build of `engineName` for this OS/arch. */
+export function enginePath(engineName: EngineName): string | null {
+  for (const backend of BACKEND_ORDER) {
+    const entry = pickEngine(engineName, process.platform, process.arch, backend)
+    if (entry && isInstalled(entry)) return findBinary(entry)
+  }
+  return null
+}
+
+// Windows' bundled bsdtar can unpack .zip; Git's GNU tar (often first on PATH) cannot.
+function tarPath(): string {
+  if (process.platform !== 'win32') return 'tar'
+  return join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe')
+}
+
+function initialState(item: Item): ModelState {
+  if (isInstalled(item)) {
     return {
-      id: entry.id,
+      id: item.id,
       status: 'installed',
-      receivedBytes: entry.bytes,
+      receivedBytes: itemBytes(item),
       bytesPerSec: 0,
       etaSec: null
     }
   }
 
-  const known = active.get(entry.id)
+  const known = active.get(item.id)
   if (known && known.status !== 'installed' && known.status !== 'missing') return known
 
-  return { id: entry.id, status: 'missing', receivedBytes: 0, bytesPerSec: 0, etaSec: null }
+  return { id: item.id, status: 'missing', receivedBytes: 0, bytesPerSec: 0, etaSec: null }
 }
 
 function broadcast(state: ModelState): void {
@@ -95,12 +205,12 @@ function setState(id: string, patch: Partial<ModelState>): ModelState {
 }
 
 export function listModels(): ModelState[] {
-  return CATALOG.map(initialState)
+  return [...CATALOG, ...ENGINES].map(initialState)
 }
 
 export function downloadModels(ids: string[]): void {
   for (const id of ids) {
-    const entry = CATALOG.find((m) => m.id === id)
+    const entry = findItem(id)
     if (!entry) continue
 
     const state = initialState(entry)
@@ -108,7 +218,8 @@ export function downloadModels(ids: string[]): void {
       state.status === 'installed' ||
       state.status === 'queued' ||
       state.status === 'downloading' ||
-      state.status === 'verifying'
+      state.status === 'verifying' ||
+      state.status === 'extracting'
     ) {
       continue
     }
@@ -133,10 +244,10 @@ async function pump(): Promise<void> {
     while (queue.length > 0) {
       const id = queue.shift()
       if (!id) continue
-      const entry = CATALOG.find((m) => m.id === id)
+      const entry = findItem(id)
       if (!entry) continue
 
-      const job = downloadOne(entry)
+      const job = isEngine(entry) ? installEngine(entry) : downloadOne(entry)
       runningJobs.set(id, job)
       try {
         await job
@@ -159,6 +270,129 @@ function hashFile(path: string): Promise<Hash> {
     stream.on('end', () => resolve(hash))
     stream.on('error', reject)
   })
+}
+
+interface TransferResult {
+  kind: 'ok' | 'aborted' | 'error'
+  received: number
+  digest?: string
+  error?: string
+}
+
+/** Downloads one file into `part` (resuming when possible) and returns its SHA-256. */
+async function transfer(
+  id: string,
+  file: EngineFile,
+  part: string,
+  signal: AbortSignal,
+  total: number,
+  offset: number,
+  onProgress: (received: number, bytesPerSec: number, etaSec: number | null) => void
+): Promise<TransferResult> {
+  let received = fileSize(part)
+  let hash = createHash('sha256')
+
+  if (received > 0) {
+    try {
+      hash = await hashFile(part)
+    } catch (err) {
+      log.warn('downloads', `could not read partial ${id}, restarting: ${String(err)}`)
+      removeFile(part)
+      received = 0
+      hash = createHash('sha256')
+    }
+  }
+
+  if (signal.aborted) return { kind: 'aborted', received }
+
+  if (received >= file.bytes) return { kind: 'ok', digest: hash.digest('hex'), received }
+
+  const headers: Record<string, string> = {}
+  if (received > 0) headers.Range = `bytes=${received}-`
+
+  let response: Response
+  try {
+    response = await fetch(file.url, { headers, signal })
+  } catch {
+    if (signal.aborted) return { kind: 'aborted', received }
+    return {
+      kind: 'error',
+      error: 'Download failed — check your connection and try again.',
+      received
+    }
+  }
+
+  if (!response.ok) {
+    return {
+      kind: 'error',
+      error: `Download failed (HTTP ${response.status}). Try again later.`,
+      received
+    }
+  }
+
+  const append = received > 0 && response.status === 206
+  if (received > 0 && response.status !== 206) {
+    // The server ignored the Range request, so start the file over.
+    removeFile(part)
+    received = 0
+    hash = createHash('sha256')
+  }
+
+  const body = response.body
+  if (!body) {
+    return {
+      kind: 'error',
+      error: 'Download failed — empty response. Try again.',
+      received
+    }
+  }
+
+  let lastTime = Date.now()
+  let lastBytes = received
+  let bytesPerSec = 0
+  let etaSec: number | null = null
+
+  onProgress(offset + received, 0, null)
+
+  const meter = new Transform({
+    transform(chunk, _encoding, callback) {
+      hash.update(chunk)
+      received += chunk.length
+
+      const now = Date.now()
+      const elapsed = (now - lastTime) / 1000
+      if (elapsed >= 0.25) {
+        const rate = (received - lastBytes) / elapsed
+        bytesPerSec = bytesPerSec === 0 ? rate : bytesPerSec * 0.7 + rate * 0.3
+        etaSec =
+          bytesPerSec > 0
+            ? Math.max(0, Math.ceil((total - offset - received) / bytesPerSec))
+            : null
+        onProgress(offset + received, bytesPerSec, etaSec)
+        lastTime = now
+        lastBytes = received
+      }
+
+      callback(null, chunk)
+    }
+  })
+
+  try {
+    await pipeline(
+      Readable.fromWeb(body as unknown as Parameters<typeof Readable.fromWeb>[0]),
+      meter,
+      createWriteStream(part, { flags: append ? 'a' : 'w' })
+    )
+  } catch {
+    if (signal.aborted) return { kind: 'aborted', received }
+    return {
+      kind: 'error',
+      error: 'Download failed — check your connection and try again.',
+      received
+    }
+  }
+
+  return { kind: 'ok', digest: hash.digest('hex'), received }
 }
 
 function fail(entry: ModelEntry, err: unknown, aborted: boolean): void {
@@ -235,131 +469,190 @@ async function downloadOne(entry: ModelEntry): Promise<void> {
 
   const target = filePath(entry)
   const part = `${target}.part`
-  let received = partSize(entry)
-  let hash = createHash('sha256')
 
-  if (received > 0) {
-    try {
-      hash = await hashFile(part)
-    } catch (err) {
-      log.warn('downloads', `could not read partial ${entry.id}, restarting: ${String(err)}`)
-      removeFile(part)
-      received = 0
-      hash = createHash('sha256')
+  const result = await transfer(
+    entry.id,
+    { url: entry.url, bytes: entry.bytes, sha256: entry.sha256 },
+    part,
+    controller.signal,
+    entry.bytes,
+    0,
+    (received, bytesPerSec, etaSec) => {
+      setState(entry.id, { status: 'downloading', receivedBytes: received, bytesPerSec, etaSec })
     }
-  }
+  )
 
-  if (controller.signal.aborted) {
-    controllers.delete(entry.id)
+  controllers.delete(entry.id)
+
+  if (result.kind === 'aborted') {
+    fail(entry, null, true)
     return
   }
 
-  if (received >= entry.bytes) {
-    finish(entry, part, target, hash.digest('hex'))
-    controllers.delete(entry.id)
-    return
-  }
-
-  const headers: Record<string, string> = {}
-  if (received > 0) headers.Range = `bytes=${received}-`
-
-  let response: Response
-  try {
-    response = await fetch(entry.url, { headers, signal: controller.signal })
-  } catch (err) {
-    controllers.delete(entry.id)
-    fail(entry, err, controller.signal.aborted)
-    return
-  }
-
-  if (!response.ok) {
-    controllers.delete(entry.id)
-    log.warn('downloads', `${entry.id} returned HTTP ${response.status}`)
+  if (result.kind === 'error') {
+    const message = result.error ?? 'Download failed — check your connection and try again.'
+    log.warn('downloads', `${entry.id} failed: ${message}`)
     setState(entry.id, {
       status: 'error',
-      error: `Download failed (HTTP ${response.status}). Try again later.`,
-      receivedBytes: received,
+      error: message,
+      receivedBytes: partSize(entry),
       bytesPerSec: 0,
       etaSec: null
     })
     return
   }
 
-  const append = received > 0 && response.status === 206
-  if (received > 0 && response.status !== 206) {
-    // The server ignored the Range request, so start the file over.
-    removeFile(part)
-    received = 0
-    hash = createHash('sha256')
-  }
+  finish(entry, part, target, result.digest ?? '')
+}
 
-  const body = response.body
-  if (!body) {
-    controllers.delete(entry.id)
-    setState(entry.id, {
-      status: 'error',
-      error: 'Download failed — empty response. Try again.',
-      receivedBytes: received,
-      bytesPerSec: 0,
-      etaSec: null
-    })
-    return
-  }
+function runTar(archive: string, dir: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    execFile(
+      tarPath(),
+      ['-xf', archive, '-C', dir],
+      { timeout: 10 * 60 * 1000, windowsHide: true },
+      (err, _stdout, stderr) => {
+        resolve(err ? String(stderr || err.message) : null)
+      }
+    )
+  })
+}
 
-  let lastTime = Date.now()
-  let lastBytes = received
-  let bytesPerSec = 0
-  let etaSec: number | null = null
-
+function unpackFailed(entry: EngineEntry, name: string): void {
   setState(entry.id, {
-    status: 'downloading',
-    receivedBytes: received,
+    status: 'error',
+    error: `Could not unpack ${name}`,
+    receivedBytes: engineBytes(entry),
     bytesPerSec: 0,
     etaSec: null
   })
+}
 
-  const meter = new Transform({
-    transform(chunk, _encoding, callback) {
-      hash.update(chunk)
-      received += chunk.length
+async function installEngine(entry: EngineEntry): Promise<void> {
+  const controller = new AbortController()
+  controllers.set(entry.id, controller)
+  const total = engineBytes(entry)
+  log.info('downloads', `installing ${entry.id} (${entry.files.length} file(s))`)
 
-      const now = Date.now()
-      const elapsed = (now - lastTime) / 1000
-      if (elapsed >= 0.25) {
-        const rate = (received - lastBytes) / elapsed
-        bytesPerSec = bytesPerSec === 0 ? rate : bytesPerSec * 0.7 + rate * 0.3
-        etaSec =
-          bytesPerSec > 0
-            ? Math.max(0, Math.ceil((entry.bytes - received) / bytesPerSec))
-            : null
-        setState(entry.id, {
-          status: 'downloading',
-          receivedBytes: received,
-          bytesPerSec,
-          etaSec
-        })
-        lastTime = now
-        lastBytes = received
+  const parts = entry.files.map((file) => fileSize(enginePart(file)))
+  let completed = 0
+
+  for (let index = 0; index < entry.files.length; index += 1) {
+    const file = entry.files[index]
+    const part = enginePart(file)
+    const pending = parts.slice(index + 1).reduce((sum, size) => sum + size, 0)
+    const offset = completed + pending
+    const result = await transfer(
+      entry.id,
+      file,
+      part,
+      controller.signal,
+      total,
+      offset,
+      (received, bytesPerSec, etaSec) => {
+        setState(entry.id, { status: 'downloading', receivedBytes: received, bytesPerSec, etaSec })
       }
+    )
 
-      callback(null, chunk)
+    if (result.kind === 'aborted') {
+      controllers.delete(entry.id)
+      setState(entry.id, {
+        status: 'missing',
+        receivedBytes: partSize(entry),
+        bytesPerSec: 0,
+        etaSec: null
+      })
+      log.info('downloads', `cancelled ${entry.id}`)
+      return
     }
+
+    if (result.kind === 'error') {
+      controllers.delete(entry.id)
+      const message = result.error ?? 'Download failed — check your connection and try again.'
+      log.warn('downloads', `${entry.id} failed: ${message}`)
+      setState(entry.id, {
+        status: 'error',
+        error: message,
+        receivedBytes: offset + result.received,
+        bytesPerSec: 0,
+        etaSec: null
+      })
+      return
+    }
+
+    if (result.digest !== file.sha256) {
+      removeFile(part)
+      controllers.delete(entry.id)
+      log.error('downloads', `checksum mismatch for ${entry.id} (${basename(part)})`)
+      setState(entry.id, {
+        status: 'error',
+        error: 'Checksum mismatch — file was corrupted, try again',
+        receivedBytes: offset,
+        bytesPerSec: 0,
+        etaSec: null
+      })
+      return
+    }
+
+    completed += file.bytes
+  }
+
+  setState(entry.id, {
+    status: 'extracting',
+    receivedBytes: total,
+    bytesPerSec: 0,
+    etaSec: null
   })
+  log.info('downloads', `extracting ${entry.id}`)
+
+  const dir = engineDir(entry)
+  const tmp = `${dir}.tmp`
 
   try {
-    await pipeline(
-      Readable.fromWeb(body as unknown as Parameters<typeof Readable.fromWeb>[0]),
-      meter,
-      createWriteStream(part, { flags: append ? 'a' : 'w' })
-    )
+    removeDir(tmp)
+    mkdirSync(tmp, { recursive: true })
   } catch (err) {
     controllers.delete(entry.id)
-    fail(entry, err, controller.signal.aborted)
+    log.error('downloads', `could not prepare ${tmp}: ${String(err)}`)
+    unpackFailed(entry, basename(entry.files[0].url))
     return
   }
 
+  for (const file of entry.files) {
+    const failure = await runTar(enginePart(file), tmp)
+    if (failure) {
+      controllers.delete(entry.id)
+      log.error('downloads', `could not unpack ${basename(file.url)}: ${failure}`)
+      removeDir(tmp)
+      unpackFailed(entry, basename(file.url))
+      return
+    }
+  }
+
+  try {
+    removeDir(dir)
+    renameSync(tmp, dir)
+  } catch (err) {
+    controllers.delete(entry.id)
+    log.error('downloads', `could not install ${entry.id}: ${String(err)}`)
+    removeDir(tmp)
+    unpackFailed(entry, basename(entry.files[0].url))
+    return
+  }
+
+  const binary = findBinary(entry)
+  if (binary && process.platform !== 'win32') {
+    try {
+      chmodSync(binary, 0o755)
+    } catch (err) {
+      log.warn('downloads', `could not chmod ${binary}: ${String(err)}`)
+    }
+  }
+
+  for (const file of entry.files) removeFile(enginePart(file))
   controllers.delete(entry.id)
-  finish(entry, part, target, hash.digest('hex'))
+  setState(entry.id, { status: 'installed', receivedBytes: total, bytesPerSec: 0, etaSec: null })
+  log.info('downloads', `installed ${entry.id} (${total} bytes)`)
 }
 
 export function cancelDownload(id: string): void {
@@ -370,7 +663,7 @@ export function cancelDownload(id: string): void {
   if (controller) controller.abort()
   controllers.delete(id)
 
-  const entry = CATALOG.find((m) => m.id === id)
+  const entry = findItem(id)
   if (!entry) return
 
   setState(id, {
@@ -382,15 +675,21 @@ export function cancelDownload(id: string): void {
 }
 
 export async function deleteModel(id: string): Promise<void> {
-  const entry = CATALOG.find((m) => m.id === id)
+  const entry = findItem(id)
   if (!entry) return
 
   cancelDownload(id)
   const job = runningJobs.get(id)
   if (job) await job.catch(() => undefined)
 
-  removeFile(filePath(entry))
-  removeFile(`${filePath(entry)}.part`)
+  if (isEngine(entry)) {
+    removeDir(engineDir(entry))
+    removeDir(`${engineDir(entry)}.tmp`)
+    for (const file of entry.files) removeFile(enginePart(file))
+  } else {
+    removeFile(filePath(entry))
+    removeFile(`${filePath(entry)}.part`)
+  }
 
   setState(id, { status: 'missing', receivedBytes: 0, bytesPerSec: 0, etaSec: null })
 

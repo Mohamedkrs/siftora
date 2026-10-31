@@ -1,7 +1,7 @@
 import { app, dialog, ipcMain, shell } from 'electron'
 import { IPC, type Settings } from '../shared/types'
 import { cancelDownload, deleteModel, downloadModels, listModels, modelsDir } from './downloads'
-import { detectHardware, recommend } from './hardware'
+import { detectHardware, recommend, requiredEngineInfo } from './hardware'
 import { log } from './logger'
 import { getSettings, setSettings } from './settings'
 
@@ -41,6 +41,8 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.getHardware, () => detectHardware())
 
   ipcMain.handle(IPC.getRecommendation, async () => recommend(await detectHardware()))
+
+  ipcMain.handle(IPC.getRequiredEngines, () => requiredEngineInfo())
 
   ipcMain.handle(IPC.listModels, () => listModels())
 

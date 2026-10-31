@@ -1,4 +1,5 @@
 import { CATALOG, type ModelEntry } from '../../../shared/catalog'
+import { ENGINES, engineBytes, engineLabel } from '../../../shared/engines'
 import type { ModelState } from '../../../shared/types'
 import ModelProgress from '../components/ModelProgress'
 import SystemCard from '../components/SystemCard'
@@ -10,8 +11,16 @@ function emptyState(id: string): ModelState {
   return { id, status: 'missing', receivedBytes: 0, bytesPerSec: 0, etaSec: null }
 }
 
+interface CardEntry {
+  id: string
+  bytes: number
+  license: string
+  name?: string
+  description?: string
+}
+
 interface CardProps {
-  entries: ModelEntry[]
+  entries: CardEntry[]
   states: ModelState[]
   title?: string
   description?: string
@@ -29,7 +38,10 @@ function ModelCard(props: CardProps) {
   const installed = props.states.every((state) => state.status === 'installed')
   const active = props.states.filter(
     (state) =>
-      state.status === 'downloading' || state.status === 'queued' || state.status === 'verifying'
+      state.status === 'downloading' ||
+      state.status === 'queued' ||
+      state.status === 'verifying' ||
+      state.status === 'extracting'
   )
   const installedIds = props.entries
     .filter((_, index) => props.states[index].status === 'installed')
@@ -39,6 +51,10 @@ function ModelCard(props: CardProps) {
     .map((entry) => entry.id)
   const totalBytes = props.entries.reduce((sum, entry) => sum + entry.bytes, 0)
   const licenses = Array.from(new Set(props.entries.map((entry) => entry.license))).join(', ')
+  const title =
+    props.title ?? props.entries.map((entry) => entry.name ?? entry.id).join(' + ')
+  const description =
+    props.description ?? props.entries.map((entry) => entry.description ?? '').join(' ')
 
   const remove = (): void => {
     if (!confirm('Delete this model? You can download it again later.')) return
@@ -50,12 +66,10 @@ function ModelCard(props: CardProps) {
       <div className="model-head">
         <div>
           <h3>
-            {props.title ?? props.entries.map((entry) => entry.name).join(' + ')}
+            {title}
             {props.recommended ? <span className="badge">Recommended</span> : null}
           </h3>
-          <p className="model-desc">
-            {props.description ?? props.entries.map((entry) => entry.description).join(' ')}
-          </p>
+          {description ? <p className="model-desc">{description}</p> : null}
         </div>
         <div className="model-meta">
           <span>{formatBytes(totalBytes)}</span>
@@ -125,10 +139,14 @@ function ModelCard(props: CardProps) {
 }
 
 export default function Models() {
-  const { models, hardware, recommendation, download, cancel, remove } = useModels()
+  const { models, hardware, recommendation, requiredEngines, download, cancel, remove } = useModels()
   const { settings, update } = useSettings()
 
-  const stateOf = (entry: ModelEntry): ModelState => models[entry.id] ?? emptyState(entry.id)
+  const stateOf = (entry: { id: string }): ModelState => models[entry.id] ?? emptyState(entry.id)
+
+  const engineEntries = requiredEngines
+    ? ENGINES.filter((entry) => requiredEngines.ids.includes(entry.id))
+    : []
 
   const transcriptionModels = CATALOG.filter((m) => m.kind === 'transcription')
   const llmModels = CATALOG.filter((m) => m.kind === 'llm')
@@ -167,6 +185,36 @@ export default function Models() {
       </div>
 
       <SystemCard />
+
+      <section className="models-section">
+        <h2>Engines</h2>
+        {requiredEngines?.missing.map((name) => (
+          <p key={name} className="model-warning">
+            No ready-made {name} build for this system yet.
+          </p>
+        ))}
+        {engineEntries.map((entry) => (
+          <ModelCard
+            key={entry.id}
+            entries={[
+              {
+                id: entry.id,
+                bytes: engineBytes(entry),
+                license: entry.license,
+                description:
+                  entry.backend === 'cuda'
+                    ? 'Includes NVIDIA CUDA runtime — runs on the GPU, much faster than CPU.'
+                    : undefined
+              }
+            ]}
+            states={[stateOf(entry)]}
+            title={engineLabel(entry)}
+            onDownload={download}
+            onCancel={cancel}
+            onDelete={removeMany}
+          />
+        ))}
+      </section>
 
       <section className="models-section">
         <h2>Transcription</h2>
