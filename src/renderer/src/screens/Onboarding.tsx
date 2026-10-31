@@ -28,8 +28,8 @@ export default function Onboarding() {
   const [step, setStep] = useState(0)
   const [transcription, setTranscription] = useState<string | null>(settings.transcriptionModel)
   const [llm, setLlm] = useState<string | null>(settings.llmModel)
-  const [useVad, setUseVad] = useState(true)
-  const [speakers, setSpeakers] = useState(false)
+  const [useVad, setUseVad] = useState(settings.useVad)
+  const [speakers, setSpeakers] = useState(settings.detectSpeakers)
   const [engineOptions, setEngineOptions] = useState<EngineOption[] | null>(null)
   const [engineBackend, setEngineBackend] = useState(settings.engineBackend)
   const [enginesVersion, setEnginesVersion] = useState(0)
@@ -127,8 +127,19 @@ export default function Onboarding() {
 
   const transcriptionModels = CATALOG.filter((model) => model.kind === 'transcription')
   const llmModels = CATALOG.filter((model) => model.kind === 'llm')
-  const speakerBytes = CATALOG.filter((model) => model.kind === 'diarization').reduce(
-    (sum, model) => sum + model.bytes,
+  const vadEntry = CATALOG.find((model) => model.id === VAD_ID)
+  const vadInstalled = VAD_ID ? models[VAD_ID]?.status === 'installed' : false
+  const sherpa = ENGINES.find(
+    (entry) => entry.engine === 'sherpa' && entry.platform === hardware?.platform && entry.arch === hardware?.arch
+  )
+  const speakerParts = [
+    ...SPEAKER_MODEL_IDS.map((id) => ({ id, bytes: CATALOG.find((model) => model.id === id)?.bytes ?? 0 })),
+    ...(sherpa ? [{ id: sherpa.id, bytes: engineBytes(sherpa) }] : [])
+  ]
+  const speakerBytes = speakerParts.reduce((sum, part) => sum + part.bytes, 0)
+  const speakersInstalled = speakerParts.every((part) => models[part.id]?.status === 'installed')
+  const speakerMissingBytes = speakerParts.reduce(
+    (sum, part) => sum + (models[part.id]?.status === 'installed' ? 0 : part.bytes),
     0
   )
 
@@ -144,7 +155,9 @@ export default function Onboarding() {
     selectedEntries.reduce(
       (sum, entry) => sum + (models[entry.id]?.status === 'installed' ? 0 : entry.bytes),
       0
-    )
+    ) +
+    // Speaker detection also needs its engine, sherpa-onnx.
+    (speakers && sherpa && models[sherpa.id]?.status !== 'installed' ? engineBytes(sherpa) : 0)
   const allInstalled =
     engineEntries.length + selectedEntries.length > 0 &&
     engineEntries.every((entry) => models[entry.id]?.status === 'installed') &&
@@ -154,7 +167,7 @@ export default function Onboarding() {
     hardware ? entry.memoryBytes > hardware.memoryBudgetBytes : false
 
   const finish = (): void => {
-    update({ onboarded: true, transcriptionModel: transcription, llmModel: llm, useVad })
+    update({ onboarded: true, transcriptionModel: transcription, llmModel: llm, useVad, detectSpeakers: speakers })
   }
 
   const skip = (): void => {
@@ -432,11 +445,14 @@ export default function Onboarding() {
                     onChange={(event) => setUseVad(event.target.checked)}
                   />
                   <span className="choice-text">
-                    <strong>Voice detection (recommended)</strong>
+                    <strong>
+                      Voice detection (recommended)
+                      {vadInstalled ? <span className="badge badge-ok">Already downloaded</span> : null}
+                    </strong>
                     <span>
                       Finds the parts with speech before transcribing. Without it, Whisper can
                       invent captions during silence or music (e.g. "Thanks for watching!") and
-                      repeat lines. 0.6 MB.
+                      repeat lines. {vadInstalled ? 'Nothing to download.' : `${formatBytes(vadEntry?.bytes ?? 0)}.`}
                     </span>
                   </span>
                 </label>
@@ -447,10 +463,20 @@ export default function Onboarding() {
                     onChange={(event) => setSpeakers(event.target.checked)}
                   />
                   <span className="choice-text">
-                    <strong>Speaker detection (colored captions per speaker)</strong>
+                    <strong>
+                      Speaker detection (colored captions per speaker)
+                      {speakersInstalled ? (
+                        <span className="badge badge-ok">Already downloaded</span>
+                      ) : null}
+                    </strong>
                     <span>
                       Works out who is speaking when, so each speaker's captions can get their
-                      own color. Optional; you can add it later. {formatBytes(speakerBytes)}.
+                      own color. Optional; you can add it later.{' '}
+                      {speakersInstalled
+                        ? 'Nothing to download.'
+                        : speakerMissingBytes < speakerBytes
+                          ? `${formatBytes(speakerMissingBytes)} left to download.`
+                          : `${formatBytes(speakerBytes)}, including the sherpa-onnx engine.`}
                     </span>
                   </span>
                 </label>
