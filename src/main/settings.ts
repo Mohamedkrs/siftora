@@ -59,6 +59,20 @@ function customModelsOr(value: unknown): CustomModel[] {
   return models
 }
 
+function shortStringOr(value: unknown, max = 200): string | null {
+  return typeof value === 'string' && value.length > 0 && value.length <= max ? value : null
+}
+
+function enginePathsOr(value: unknown): Settings['enginePaths'] {
+  const out: Settings['enginePaths'] = {}
+  if (!isRecord(value)) return out
+  for (const key of ['llama', 'whisper', 'ffmpeg'] as const) {
+    const path = shortStringOr(value[key], 1024)
+    if (path) out[key] = path
+  }
+  return out
+}
+
 function linkedModelsOr(value: unknown): Record<string, string> {
   if (!isRecord(value)) return {}
   const linked: Record<string, string> = {}
@@ -127,7 +141,13 @@ function sanitize(input: unknown): Settings {
     engineBackend:
       ENGINE_BACKENDS.find((backend) => backend === raw.engineBackend) ?? defaults.engineBackend,
     customModels,
-    linkedModels: linkedModelsOr(raw.linkedModels)
+    linkedModels: linkedModelsOr(raw.linkedModels),
+    enginePaths: enginePathsOr(raw.enginePaths),
+    llmProvider: raw.llmProvider === 'ollama' ? 'ollama' : 'app',
+    ollamaModel: shortStringOr(raw.ollamaModel),
+    transcriptionProvider: raw.transcriptionProvider === 'openai-whisper' ? 'openai-whisper' : 'app',
+    openaiWhisperPath: shortStringOr(raw.openaiWhisperPath, 1024),
+    openaiWhisperModel: shortStringOr(raw.openaiWhisperModel)
   }
 }
 

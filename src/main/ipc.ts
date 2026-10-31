@@ -4,6 +4,12 @@ import { cancelDownload, deleteModel, downloadModels, listModels, modelsDir } fr
 import { detectHardware, engineOptions, recommend, requiredEngineInfo } from './hardware'
 import { addCustomModel, removeCustomModel, scanForModels } from './localModels'
 import { log } from './logger'
+import {
+  detectOllama,
+  detectOpenAiWhisper,
+  findSystemEngines,
+  inspectEngineBinary
+} from './systemEngines'
 import { getSettings, setSettings } from './settings'
 
 export function registerIpc(): void {
@@ -46,6 +52,38 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.getRequiredEngines, () => requiredEngineInfo())
 
   ipcMain.handle(IPC.getEngineOptions, () => engineOptions())
+
+  ipcMain.handle(IPC.findSystemEngines, (_event, force: unknown) => findSystemEngines(force === true))
+
+  ipcMain.handle(IPC.pickEngineBinary, async (_event, engine: unknown) => {
+    const result = await dialog.showOpenDialog({
+      title: `Choose ${String(engine)}`,
+      properties: ['openFile'],
+      filters: process.platform === 'win32' ? [{ name: 'Programs', extensions: ['exe'] }] : []
+    })
+    return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0]
+  })
+
+  ipcMain.handle(IPC.useSystemEngine, async (_event, engine: unknown, path: unknown) => {
+    if ((engine !== 'llama' && engine !== 'whisper' && engine !== 'ffmpeg') || typeof path !== 'string') {
+      return { ok: false, problem: 'Invalid request' }
+    }
+    const checked = await inspectEngineBinary(engine, path)
+    if (!checked.usable) return { ok: false, problem: checked.problem ?? 'Not usable' }
+    setSettings({ enginePaths: { ...getSettings().enginePaths, [engine]: path } })
+    log.info('engines', `using system ${engine}: ${path}`)
+    return { ok: true }
+  })
+
+  ipcMain.handle(IPC.stopUsingSystemEngine, (_event, engine: unknown) => {
+    const enginePaths = { ...getSettings().enginePaths }
+    if (engine === 'llama' || engine === 'whisper' || engine === 'ffmpeg') delete enginePaths[engine]
+    setSettings({ enginePaths })
+  })
+
+  ipcMain.handle(IPC.detectOllama, () => detectOllama())
+
+  ipcMain.handle(IPC.detectOpenAiWhisper, () => detectOpenAiWhisper())
 
   ipcMain.handle(IPC.listModels, () => listModels())
 

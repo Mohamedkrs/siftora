@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { cpus, totalmem } from 'node:os'
 import { CATALOG, type ModelEntry } from '../shared/catalog'
 import {
@@ -206,10 +207,26 @@ function resolvedBackend(hw: HardwareInfo, preferred: EngineBackend): Backend {
   return preferred === 'auto' ? hw.backend : preferred
 }
 
+/** Engines covered by something already on the computer, so nothing needs downloading. */
+export function satisfiedEngines(): EngineName[] {
+  const settings = getSettings()
+  return ENGINE_NAMES.filter((name) => {
+    const path = settings.enginePaths[name]
+    if (path && existsSync(path)) return true
+    if (name === 'llama') return settings.llmProvider === 'ollama'
+    if (name === 'whisper') {
+      return settings.transcriptionProvider === 'openai-whisper' && settings.openaiWhisperPath !== null
+    }
+    return false
+  })
+}
+
 /** Engine builds this machine needs, best available per engine for the chosen backend. */
 export function requiredEngines(hw: HardwareInfo, preferred: EngineBackend = 'auto'): string[] {
   const backend = resolvedBackend(hw, preferred)
+  const satisfied = satisfiedEngines()
   return ENGINE_NAMES
+    .filter((name) => !satisfied.includes(name))
     .map((name) => pickEngine(name, process.platform, process.arch, backend))
     .filter((entry): entry is EngineEntry => entry !== null)
     .map((entry) => entry.id)
@@ -223,7 +240,8 @@ export async function requiredEngineInfo(): Promise<RequiredEngines> {
     ids: requiredEngines(hw, preferred),
     missing: ENGINE_NAMES.filter(
       (name) => pickEngine(name, process.platform, process.arch, backend) === null
-    )
+    ),
+    satisfied: satisfiedEngines()
   }
 }
 

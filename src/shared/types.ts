@@ -54,6 +54,36 @@ export const CAPTION_FONTS = [
   { family: 'Bebas Neue', weight: 400 }
 ] as const
 
+export type EngineKind = 'llama' | 'whisper' | 'ffmpeg'
+
+/** An engine binary found on the computer (not installed by the app). */
+export interface SystemEngine {
+  engine: EngineKind
+  path: string
+  version: string | null
+  backend: 'cuda' | 'metal' | 'vulkan' | 'cpu' | 'unknown'
+  usable: boolean
+  problem?: string
+  /** Extra info shown to the user, e.g. "NVIDIA encoder available". */
+  note?: string
+  source: 'PATH' | 'winget' | 'scoop' | 'chocolatey' | 'homebrew' | 'system' | 'chosen'
+}
+
+export interface OllamaInfo {
+  installed: boolean
+  running: boolean
+  version: string | null
+  path: string | null
+  models: { name: string; bytes: number; quantization: string | null; family: string | null; parameterSize: string | null }[]
+}
+
+export interface OpenAiWhisperInfo {
+  path: string | null
+  version: string | null
+  cuda: boolean | null
+  models: string[]
+}
+
 export interface Settings {
   outputDir: string
   layout: Layout
@@ -69,6 +99,13 @@ export interface Settings {
   engineBackend: EngineBackend
   customModels: CustomModel[]
   linkedModels: Record<string, string>
+  /** Engine binaries already on the computer, used instead of downloading. */
+  enginePaths: Partial<Record<EngineKind, string>>
+  llmProvider: 'app' | 'ollama'
+  ollamaModel: string | null
+  transcriptionProvider: 'app' | 'openai-whisper'
+  openaiWhisperPath: string | null
+  openaiWhisperModel: string | null
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -97,7 +134,13 @@ export const DEFAULT_SETTINGS: Settings = {
   useVad: true,
   engineBackend: 'auto',
   customModels: [],
-  linkedModels: {}
+  linkedModels: {},
+  enginePaths: {},
+  llmProvider: 'app',
+  ollamaModel: null,
+  transcriptionProvider: 'app',
+  openaiWhisperPath: null,
+  openaiWhisperModel: null
 }
 
 export interface GpuInfo {
@@ -137,6 +180,8 @@ export type ModelStatus =
 export interface RequiredEngines {
   ids: string[]
   missing: ('whisper' | 'llama' | 'ffmpeg')[]
+  /** Engines covered by something already on the computer (system binary, Ollama, Python Whisper). */
+  satisfied: EngineKind[]
 }
 
 export interface ModelState {
@@ -160,6 +205,12 @@ export interface Api {
   getRecommendation(): Promise<Recommendation>
   getRequiredEngines(): Promise<RequiredEngines>
   getEngineOptions(): Promise<EngineOption[]>
+  findSystemEngines(force?: boolean): Promise<SystemEngine[]>
+  pickEngineBinary(engine: EngineKind): Promise<string | null>
+  useSystemEngine(engine: EngineKind, path: string): Promise<{ ok: boolean; problem?: string }>
+  stopUsingSystemEngine(engine: EngineKind): Promise<void>
+  detectOllama(): Promise<OllamaInfo>
+  detectOpenAiWhisper(): Promise<OpenAiWhisperInfo>
   listModels(): Promise<ModelState[]>
   downloadModels(ids: string[]): Promise<void>
   cancelDownload(id: string): Promise<void>
@@ -173,6 +224,12 @@ export interface Api {
 }
 
 export const IPC = {
+  findSystemEngines: 'engines:find-system',
+  pickEngineBinary: 'engines:pick-binary',
+  useSystemEngine: 'engines:use-system',
+  stopUsingSystemEngine: 'engines:stop-system',
+  detectOllama: 'engines:detect-ollama',
+  detectOpenAiWhisper: 'engines:detect-openai-whisper',
   getSettings: 'settings:get',
   setSettings: 'settings:set',
   pickOutputDir: 'dialog:pick-output-dir',

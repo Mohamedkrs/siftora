@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process'
 import { createHash, type Hash } from 'node:crypto'
 import {
   chmodSync,
+  existsSync,
   createReadStream,
   createWriteStream,
   mkdirSync,
@@ -162,6 +163,8 @@ const BACKEND_ORDER: Backend[] = ['cuda', 'metal', 'vulkan', 'cpu']
 
 /** Binary of the best installed build of `engineName` for this OS/arch. */
 export function enginePath(engineName: EngineName): string | null {
+  const own = getSettings().enginePaths[engineName]
+  if (own && existsSync(own)) return own
   for (const backend of BACKEND_ORDER) {
     const entry = pickEngine(engineName, process.platform, process.arch, backend)
     if (entry && isInstalled(entry)) return findBinary(entry)

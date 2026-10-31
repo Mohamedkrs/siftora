@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { CATALOG, SPEAKER_MODEL_IDS, type ModelEntry } from '../../../shared/catalog'
 import { ENGINES, engineBytes, engineLabel } from '../../../shared/engines'
-import type { EngineOption } from '../../../shared/types'
+import type { EngineOption, Settings } from '../../../shared/types'
 import EngineChoice from '../components/EngineChoice'
 import ExistingModels from '../components/ExistingModels'
+import SystemEngines from '../components/SystemEngines'
 import ModelProgress from '../components/ModelProgress'
 import SystemCard from '../components/SystemCard'
 import { formatBytes } from '../lib/format'
@@ -24,6 +25,14 @@ export default function Onboarding() {
   const [speakers, setSpeakers] = useState(false)
   const [engineOptions, setEngineOptions] = useState<EngineOption[] | null>(null)
   const [engineBackend, setEngineBackend] = useState(settings.engineBackend)
+  const [enginesVersion, setEnginesVersion] = useState(0)
+  const useOllama = settings.llmProvider === 'ollama'
+  const switchToApp = async (patch: Partial<Settings>): Promise<void> => {
+    await window.api.setSettings(patch)
+    await refresh()
+    setEnginesVersion((v) => v + 1)
+  }
+  const usePyWhisper = settings.transcriptionProvider === 'openai-whisper'
 
   useEffect(() => {
     let alive = true
@@ -49,7 +58,7 @@ export default function Onboarding() {
     return () => {
       alive = false
     }
-  }, [hardware])
+  }, [hardware, enginesVersion])
 
   useEffect(() => {
     if (!recommendation) return
@@ -64,8 +73,8 @@ export default function Onboarding() {
 
   const selectedModelIds = (): string[] => {
     const ids: string[] = []
-    if (transcription) ids.push(transcription)
-    if (llm) ids.push(llm)
+    if (transcription && !usePyWhisper) ids.push(transcription)
+    if (llm && !useOllama) ids.push(llm)
     if (useVad && VAD_ID) ids.push(VAD_ID)
     if (speakers) ids.push(...SPEAKER_MODEL_IDS)
     return ids
@@ -194,6 +203,11 @@ export default function Onboarding() {
         {step === 2 ? (
           <>
             <section className="card">
+              <h2>Already on this computer</h2>
+              <SystemEngines autoPickFfmpeg onChange={() => setEnginesVersion((v) => v + 1)} />
+            </section>
+
+            <section className="card">
               <h2>Engines</h2>
               {engineOptions ? (
                 <EngineChoice
@@ -217,6 +231,18 @@ export default function Onboarding() {
               <ExistingModels />
             </section>
 
+            {usePyWhisper ? (
+              <section className="card">
+                <h2>Transcription</h2>
+                <p className="muted">
+                  Using OpenAI Whisper (Python) with model {settings.openaiWhisperModel}.{' '}
+                  <button type="button" className="link-button" onClick={() => void switchToApp({ transcriptionProvider: 'app' })}>
+                    Use the app's models instead
+                  </button>
+                </p>
+              </section>
+            ) : (
+              <>
             <section className="card">
               <h2>Transcription</h2>
               <div className="choice-list">
@@ -282,6 +308,21 @@ export default function Onboarding() {
               </div>
             </section>
 
+              </>
+            )}
+
+            {useOllama ? (
+              <section className="card">
+                <h2>Clip finder AI</h2>
+                <p className="muted">
+                  Using Ollama with {settings.ollamaModel}.{' '}
+                  <button type="button" className="link-button" onClick={() => void switchToApp({ llmProvider: 'app' })}>
+                    Use the app's models instead
+                  </button>
+                </p>
+              </section>
+            ) : (
+              <>
             <section className="card">
               <h2>Clip finder AI</h2>
               <div className="choice-list">
@@ -344,6 +385,9 @@ export default function Onboarding() {
               </div>
             </section>
 
+              </>
+            )}
+
             <section className="card">
               <h2>Extras</h2>
               <div className="choice-list">
@@ -379,7 +423,11 @@ export default function Onboarding() {
               </div>
             </section>
 
-            <p className="muted">Total download: {formatBytes(totalBytes)}</p>
+            <p className="muted">
+              {totalBytes === 0
+                ? 'Nothing to download — using what is already on this computer.'
+                : `Total download: ${formatBytes(totalBytes)}`}
+            </p>
 
             <div className="onboarding-actions">
               <button type="button" className="button" onClick={() => setStep(1)}>

@@ -6,6 +6,7 @@ import EngineChoice from '../components/EngineChoice'
 import ExistingModels from '../components/ExistingModels'
 import ModelProgress from '../components/ModelProgress'
 import SystemCard from '../components/SystemCard'
+import SystemEngines from '../components/SystemEngines'
 import { formatBytes } from '../lib/format'
 import { useModels } from '../state/models'
 import { useSettings } from '../state/settings'
@@ -160,6 +161,8 @@ export default function Models() {
   const { models, hardware, recommendation, requiredEngines, download, cancel, remove } = useModels()
   const { settings, update, refresh } = useSettings()
   const [engineOptions, setEngineOptions] = useState<EngineOption[] | null>(null)
+  // Bumped when the user starts/stops using their own engines, so sizes are recomputed.
+  const [enginesVersion, setEnginesVersion] = useState(0)
 
   useEffect(() => {
     let alive = true
@@ -176,7 +179,7 @@ export default function Models() {
     return () => {
       alive = false
     }
-  }, [hardware])
+  }, [hardware, enginesVersion])
 
   const stateOf = (entry: { id: string }): ModelState => models[entry.id] ?? emptyState(entry.id)
 
@@ -257,6 +260,8 @@ export default function Models() {
 
       <section className="models-section">
         <h2>Engines</h2>
+        <p className="label">Already on this computer</p>
+        <SystemEngines onChange={() => setEnginesVersion((v) => v + 1)} />
         <p className="label">Engine type</p>
         {engineOptions ? (
           <EngineChoice
