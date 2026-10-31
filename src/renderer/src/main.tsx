@@ -4,6 +4,7 @@ import { HashRouter } from 'react-router-dom'
 import App from './App'
 import ErrorBoundary from './components/ErrorBoundary'
 import { SettingsProvider } from './state/settings'
+import './fonts.css'
 import './styles.css'
 
 window.addEventListener('error', (event) => {

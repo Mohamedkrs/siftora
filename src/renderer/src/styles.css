@@ -506,7 +506,6 @@ select {
 .caption-text {
   width: 100%;
   overflow-wrap: anywhere;
-  font-weight: 800;
   line-height: 1.05;
   letter-spacing: 0.01em;
   text-align: center;

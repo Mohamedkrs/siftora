@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { DEFAULT_SETTINGS, type Settings } from '../shared/types'
+import { CAPTION_FONTS, DEFAULT_SETTINGS, type Settings } from '../shared/types'
 import { log } from './logger'
 
 let cache: Settings | null = null
@@ -39,13 +39,13 @@ function sanitize(input: unknown): Settings {
     layout:
       raw.layout === 'blurred' || raw.layout === 'focused' ? raw.layout : defaults.layout,
     subtitle: {
-      font:
-        typeof subtitle.font === 'string' && subtitle.font.trim().length > 0
-          ? subtitle.font.slice(0, 64)
-          : defaults.subtitle.font,
+      font: CAPTION_FONTS.some((f) => f.family === subtitle.font)
+        ? (subtitle.font as string)
+        : defaults.subtitle.font,
       sizePx: clamp(numberOr(subtitle.sizePx, defaults.subtitle.sizePx), 32, 120),
       color: colorOr(subtitle.color, defaults.subtitle.color),
       highlightColor: colorOr(subtitle.highlightColor, defaults.subtitle.highlightColor),
+      outline: typeof subtitle.outline === 'boolean' ? subtitle.outline : defaults.subtitle.outline,
       outlineColor: colorOr(subtitle.outlineColor, defaults.subtitle.outlineColor),
       position:
         subtitle.position === 'top' || subtitle.position === 'middle' || subtitle.position === 'bottom'

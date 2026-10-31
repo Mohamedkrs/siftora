@@ -1,7 +1,7 @@
 import { useState, type DragEvent, type FormEvent } from 'react'
 import NotImplemented from '../components/NotImplemented'
 import { useSettings } from '../state/settings'
-import type { Layout, SubtitleStyle } from '../../../shared/types'
+import { CAPTION_FONTS, type Layout, type SubtitleStyle } from '../../../shared/types'
 
 const PREVIEW_HEIGHT = 420
 
@@ -95,7 +95,9 @@ export default function Create() {
   const words = caption.split(' ')
   const captionSize =
     Math.round((subtitle.sizePx * PREVIEW_HEIGHT * 10) / 1920) / 10
-  const outlineSize = Math.max(1, Math.round(captionSize * 0.08 * 10) / 10)
+  // Stroke is painted under the fill (paint-order), so only the outer half shows; double it.
+  const outlineSize = Math.max(1, Math.round(captionSize * 0.16 * 10) / 10)
+  const fontWeight = CAPTION_FONTS.find((f) => f.family === subtitle.font)?.weight ?? 800
   const captionAlign =
     subtitle.position === 'top'
       ? 'flex-start'
@@ -221,10 +223,11 @@ export default function Create() {
                   value={subtitle.font}
                   onChange={(event) => setSubtitle({ font: event.target.value })}
                 >
-                  <option>Montserrat</option>
-                  <option>Inter</option>
-                  <option>Bebas Neue</option>
-                  <option>Arial</option>
+                  {CAPTION_FONTS.map((f) => (
+                    <option key={f.family} value={f.family} style={{ fontFamily: f.family }}>
+                      {f.family}
+                    </option>
+                  ))}
                 </select>
               </label>
 
@@ -258,9 +261,17 @@ export default function Create() {
               </label>
 
               <label className="field">
-                Outline color
+                <span>
+                  <input
+                    type="checkbox"
+                    checked={subtitle.outline}
+                    onChange={(event) => setSubtitle({ outline: event.target.checked })}
+                  />{' '}
+                  Outline
+                </span>
                 <input
                   type="color"
+                  disabled={!subtitle.outline}
                   value={subtitle.outlineColor}
                   onChange={(event) => setSubtitle({ outlineColor: event.target.value })}
                 />
@@ -320,9 +331,13 @@ export default function Create() {
                     className="caption-text"
                     style={{
                       fontFamily: `"${subtitle.font}", "Arial Black", Arial, sans-serif`,
+                      fontWeight,
                       fontSize: captionSize,
                       color: subtitle.color,
-                      WebkitTextStroke: `${outlineSize}px ${subtitle.outlineColor}`,
+                      WebkitTextStroke: subtitle.outline
+                        ? `${outlineSize}px ${subtitle.outlineColor}`
+                        : undefined,
+                      paintOrder: 'stroke fill',
                       textShadow: '0 2px 8px rgba(0, 0, 0, 0.45)'
                     }}
                   >

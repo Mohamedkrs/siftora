@@ -5,10 +5,19 @@ export interface SubtitleStyle {
   sizePx: number
   color: string
   highlightColor: string
+  outline: boolean
   outlineColor: string
   position: 'bottom' | 'middle' | 'top'
   uppercase: boolean
 }
+
+/** Caption fonts bundled in resources/fonts. `weight` is the weight the captions use. */
+export const CAPTION_FONTS = [
+  { family: 'Montserrat', weight: 800 },
+  { family: 'Poppins', weight: 900 },
+  { family: 'Anton', weight: 400 },
+  { family: 'Bebas Neue', weight: 400 }
+] as const
 
 export interface Settings {
   outputDir: string
@@ -28,6 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
     sizePx: 72,
     color: '#FFFFFF',
     highlightColor: '#FFD400',
+    outline: true,
     outlineColor: '#000000',
     position: 'middle',
     uppercase: true
