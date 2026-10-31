@@ -1,4 +1,4 @@
-# Project Specification — Local AI Viral Clip Finder
+# Project Specification — Siftora (local AI clip finder)
 
 ## 1. Product overview
 

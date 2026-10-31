@@ -46,7 +46,7 @@ export default function App() {
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
-          Viral Clip <span>Finder</span>
+          Sift<span>ora</span>
         </div>
         <nav className="nav" aria-label="Main">
           {navItems.map((item) => (

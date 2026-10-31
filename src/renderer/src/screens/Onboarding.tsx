@@ -163,7 +163,7 @@ export default function Onboarding() {
       <div className="onboarding-inner">
         <div className="onboarding-head">
           <div className="brand">
-            Viral Clip <span>Finder</span>
+            Sift<span>ora</span>
           </div>
           <button type="button" className="onboarding-skip" onClick={skip}>
             Skip setup
@@ -188,7 +188,7 @@ export default function Onboarding() {
             <section className="card">
               <h2>Everything stays on your computer</h2>
               <p>
-                Viral Clip Finder runs entirely on this machine. Your videos and transcripts are
+                Siftora runs entirely on this machine. Your videos and transcripts are
                 never uploaded anywhere. Models are downloaded only when you choose them.
               </p>
             </section>

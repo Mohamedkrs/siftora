@@ -76,7 +76,7 @@ export function listJobs(): Job[] {
 }
 
 function outputRoot(): string {
-  return getSettings().outputDir || join(app.getPath('videos'), 'Viral Clip Finder')
+  return getSettings().outputDir || join(app.getPath('videos'), 'Siftora')
 }
 
 function safeName(name: string): string {

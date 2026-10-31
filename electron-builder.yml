@@ -1,5 +1,5 @@
-appId: app.viralclipfinder
-productName: Viral Clip Finder
+appId: app.siftora
+productName: Siftora
 directories:
   output: release
 files:

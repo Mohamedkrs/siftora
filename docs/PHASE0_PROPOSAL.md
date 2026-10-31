@@ -170,8 +170,8 @@ The orchestrator runs in its own utility process, not Electron's main process, s
 - **Pinned and self-hosted where possible.** Entries are pinned to exact versions and checksums, and app updates can ship a new manifest. Hosting artifacts on our own release storage avoids depending on upstream files staying put.
 - **Install steps match the states in [AI_MODELS.md](AI_MODELS.md):** download → verify checksum → unpack → **validate by running a probe** → installed. A model or engine that fails validation is never marked installed.
 - **Default storage locations (all configurable):**
-  - Windows: models and cache in `%LOCALAPPDATA%\ViralClipFinder\`, config in `%APPDATA%\ViralClipFinder\`.
-  - macOS: `~/Library/Application Support/ViralClipFinder/` and `~/Library/Caches/ViralClipFinder/`.
+  - Windows: models and cache in `%LOCALAPPDATA%\Siftora\`, config in `%APPDATA%\Siftora\`.
+  - macOS: `~/Library/Application Support/Siftora/` and `~/Library/Caches/Siftora/`.
   - Linux: the XDG data, cache, and config directories.
 
 ## 7. Moment discovery (MVP approach)

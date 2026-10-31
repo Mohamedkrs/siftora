@@ -1,4 +1,5 @@
 import { app, BrowserWindow, protocol, shell } from 'electron'
+import { existsSync, renameSync, rmdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { loadEngineList } from './engineList'
 import { loadJobs } from './jobs'
@@ -69,11 +70,30 @@ function createWindow(): void {
   loading.catch((err: unknown) => log.error('main', `Failed to load renderer: ${describe(err)}`))
 }
 
+/**
+ * The app used to be called "Viral Clip Finder", and Electron names the data folder (settings,
+ * jobs, models) after the app. Move the old folder over once; if that fails (e.g. the old app is
+ * still running), keep using it where it is. Runs before anything writes to the data folder.
+ */
+function adoptOldDataFolder(): void {
+  const current = app.getPath('userData')
+  const old = join(app.getPath('appData'), 'Viral Clip Finder')
+  if (existsSync(join(current, 'settings.json')) || !existsSync(join(old, 'settings.json'))) return
+  try {
+    if (existsSync(current)) rmdirSync(current) // only if Electron already made it, and it is empty
+    renameSync(old, current)
+  } catch {
+    app.setPath('userData', old)
+  }
+}
+
+adoptOldDataFolder()
+
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   initLogger()
-  log.info('main', `Viral Clip Finder ${app.getVersion()} starting on ${process.platform}`)
+  log.info('main', `Siftora ${app.getVersion()} starting on ${process.platform}`)
 
   process.on('uncaughtException', (err) => {
     log.error('main', `uncaughtException: ${describe(err)}`)

@@ -1,4 +1,6 @@
-# Local AI Viral Clip Finder — Documentation
+# Siftora
+
+Sift your long videos for the moments worth sharing.
 
 A local-first desktop application that analyzes long-form videos and identifies promising short-form clips for TikTok, Instagram Reels, and YouTube Shorts.
 
