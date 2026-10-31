@@ -24,6 +24,9 @@ extraResources:
 win:
   target: nsis
   icon: resources/icon.ico
+nsis:
+  # Asks on uninstall whether to delete downloaded models and settings (never on updates)
+  include: build/installer.nsh
 mac:
   target: dmg
 linux:
