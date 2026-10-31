@@ -1748,16 +1748,56 @@ select {
   font-size: 11px;
 }
 
-.inline-field {
+/* Buttons beside a found item keep their label on one line */
+.found-row > .button {
+  flex: none;
+  white-space: nowrap;
+}
+
+.title-note {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* A few choices as clickable chips instead of a dropdown */
+.model-chips {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin-top: 6px;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.chips-label {
+  margin-right: 2px;
   color: var(--muted);
   font-size: 12px;
 }
 
-.inline-field select {
-  width: auto;
-  padding: 4px 8px;
+.chip {
+  padding: 4px 11px;
+  background: #1d212b;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: #3a4152;
+}
+
+.chip.selected {
+  background: color-mix(in srgb, var(--accent) 22%, #1d212b);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

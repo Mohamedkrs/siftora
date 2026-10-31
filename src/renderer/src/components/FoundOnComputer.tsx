@@ -298,7 +298,8 @@ function PythonWhisper(props: {
     <div className={props.using ? 'choice selected found-row' : 'choice found-row'}>
       <span className="choice-text">
         <strong>
-          OpenAI Whisper (Python) {info.version ?? ''}
+          OpenAI Whisper (Python)
+          {info.version ? <span className="title-note">version {info.version}</span> : null}
           {info.cuda !== null ? <span className="badge">{info.cuda ? 'GPU' : 'CPU only'}</span> : null}
           <FoundBadge />
         </strong>
@@ -307,22 +308,24 @@ function PythonWhisper(props: {
           than the built-in engine below, with the same accuracy.
         </span>
         {info.models.length > 0 ? (
-          <label className="inline-field">
-            Its model
-            <select
-              value={model}
-              onChange={(event) => {
-                setModel(event.target.value)
-                if (props.using) void props.onSave({ openaiWhisperModel: event.target.value })
-              }}
-            >
-              {info.models.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <span className="model-chips" role="radiogroup" aria-label="OpenAI Whisper model">
+            <span className="chips-label">Its models</span>
+            {info.models.map((name) => (
+              <button
+                key={name}
+                type="button"
+                role="radio"
+                aria-checked={model === name}
+                className={model === name ? 'chip selected' : 'chip'}
+                onClick={() => {
+                  setModel(name)
+                  if (props.using) void props.onSave({ openaiWhisperModel: name })
+                }}
+              >
+                {name}
+              </button>
+            ))}
+          </span>
         ) : (
           <span className="model-warning">No models downloaded by it yet; it fetches one on first use.</span>
         )}
@@ -338,7 +341,7 @@ function PythonWhisper(props: {
           )
         }
       >
-        {props.using ? 'Stop using' : 'Use this'}
+        {props.using ? 'Stop using' : `Use ${model || 'this'}`}
       </button>
     </div>
   )
