@@ -381,8 +381,9 @@ async function renderOne(job: Job, clip: Clip): Promise<void> {
       video: job.videoPath as string,
       clip,
       segments: transcript.segments,
-      style: job.options.subtitle,
-      layout: job.options.layout,
+      // The style on Create now, not the one saved with the job, so restyling + "Render again" works.
+      style: getSettings().subtitle,
+      layout: getSettings().layout,
       workDir: join(jobDir(job.id), 'render'),
       output,
       signal: controller.signal,
