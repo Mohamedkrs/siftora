@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { CAPTION_FONTS, DEFAULT_SETTINGS, type Settings } from '../shared/types'
+import { CAPTION_FONTS, DEFAULT_SETTINGS, SPEAKER_SLOTS, type Settings } from '../shared/types'
 import { log } from './logger'
 
 let cache: Settings | null = null
@@ -44,6 +44,8 @@ function sanitize(input: unknown): Settings {
         : defaults.subtitle.font,
       sizePx: clamp(numberOr(subtitle.sizePx, defaults.subtitle.sizePx), 32, 120),
       color: colorOr(subtitle.color, defaults.subtitle.color),
+      highlight:
+        typeof subtitle.highlight === 'boolean' ? subtitle.highlight : defaults.subtitle.highlight,
       highlightColor: colorOr(subtitle.highlightColor, defaults.subtitle.highlightColor),
       outline: typeof subtitle.outline === 'boolean' ? subtitle.outline : defaults.subtitle.outline,
       outlineColor: colorOr(subtitle.outlineColor, defaults.subtitle.outlineColor),
@@ -52,7 +54,17 @@ function sanitize(input: unknown): Settings {
           ? subtitle.position
           : defaults.subtitle.position,
       uppercase:
-        typeof subtitle.uppercase === 'boolean' ? subtitle.uppercase : defaults.subtitle.uppercase
+        typeof subtitle.uppercase === 'boolean' ? subtitle.uppercase : defaults.subtitle.uppercase,
+      speakerColors:
+        typeof subtitle.speakerColors === 'boolean'
+          ? subtitle.speakerColors
+          : defaults.subtitle.speakerColors,
+      speakerPalette: Array.from({ length: SPEAKER_SLOTS }, (_, i) =>
+        colorOr(
+          Array.isArray(subtitle.speakerPalette) ? subtitle.speakerPalette[i] : undefined,
+          defaults.subtitle.speakerPalette[i]
+        )
+      )
     },
     language:
       typeof raw.language === 'string' && raw.language.trim().length > 0

@@ -602,3 +602,14 @@ select {
     position: static;
   }
 }
+
+.speaker-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.field input[type='color']:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}

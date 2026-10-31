@@ -4,12 +4,18 @@ export interface SubtitleStyle {
   font: string
   sizePx: number
   color: string
+  highlight: boolean
   highlightColor: string
   outline: boolean
   outlineColor: string
   position: 'bottom' | 'middle' | 'top'
   uppercase: boolean
+  /** Color each speaker's lines differently (needs speaker detection). */
+  speakerColors: boolean
+  speakerPalette: string[]
 }
+
+export const SPEAKER_SLOTS = 4
 
 /** Caption fonts bundled in resources/fonts. `weight` is the weight the captions use. */
 export const CAPTION_FONTS = [
@@ -36,11 +42,14 @@ export const DEFAULT_SETTINGS: Settings = {
     font: 'Montserrat',
     sizePx: 72,
     color: '#FFFFFF',
+    highlight: true,
     highlightColor: '#FFD400',
     outline: true,
     outlineColor: '#000000',
     position: 'middle',
-    uppercase: true
+    uppercase: true,
+    speakerColors: false,
+    speakerPalette: ['#FFFFFF', '#4FC3F7', '#FF8A65', '#AED581']
   },
   language: 'auto',
   maxClipSeconds: 60,

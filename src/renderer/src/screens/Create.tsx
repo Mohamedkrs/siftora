@@ -3,6 +3,36 @@ import NotImplemented from '../components/NotImplemented'
 import { useSettings } from '../state/settings'
 import { CAPTION_FONTS, type Layout, type SubtitleStyle } from '../../../shared/types'
 
+// Checkbox and color picker are siblings, not inside one <label>: a label forwards
+// every click to its first control, which made the picker impossible to open.
+function ToggleColor(props: {
+  label: string
+  checked: boolean
+  color: string
+  onToggle: (checked: boolean) => void
+  onColor: (color: string) => void
+}) {
+  return (
+    <div className="field">
+      <label>
+        <input
+          type="checkbox"
+          checked={props.checked}
+          onChange={(event) => props.onToggle(event.target.checked)}
+        />{' '}
+        {props.label}
+      </label>
+      <input
+        type="color"
+        aria-label={`${props.label} color`}
+        disabled={!props.checked}
+        value={props.color}
+        onChange={(event) => props.onColor(event.target.value)}
+      />
+    </div>
+  )
+}
+
 const PREVIEW_HEIGHT = 420
 
 const layoutOptions: Array<{ value: Layout; title: string; description: string }> = [
@@ -38,6 +68,7 @@ export default function Create() {
   const [url, setUrl] = useState('')
   const [urlError, setUrlError] = useState('')
   const [findClicked, setFindClicked] = useState(false)
+  const [previewSpeaker, setPreviewSpeaker] = useState(0)
 
   const subtitle = settings.subtitle
 
@@ -242,40 +273,61 @@ export default function Create() {
                 />
               </label>
 
-              <label className="field">
-                Text color
-                <input
-                  type="color"
-                  value={subtitle.color}
-                  onChange={(event) => setSubtitle({ color: event.target.value })}
-                />
-              </label>
-
-              <label className="field">
-                Highlight color
-                <input
-                  type="color"
-                  value={subtitle.highlightColor}
-                  onChange={(event) => setSubtitle({ highlightColor: event.target.value })}
-                />
-              </label>
-
-              <label className="field">
-                <span>
+              <div className="field">
+                <label>
                   <input
                     type="checkbox"
-                    checked={subtitle.outline}
-                    onChange={(event) => setSubtitle({ outline: event.target.checked })}
+                    checked={subtitle.speakerColors}
+                    onChange={(event) => setSubtitle({ speakerColors: event.target.checked })}
                   />{' '}
-                  Outline
-                </span>
-                <input
-                  type="color"
-                  disabled={!subtitle.outline}
-                  value={subtitle.outlineColor}
-                  onChange={(event) => setSubtitle({ outlineColor: event.target.value })}
-                />
-              </label>
+                  {subtitle.speakerColors ? 'Color per speaker' : 'Text color (or color per speaker)'}
+                </label>
+                {subtitle.speakerColors ? (
+                  <div className="speaker-swatches">
+                    {subtitle.speakerPalette.map((c, i) => (
+                      <input
+                        key={i}
+                        type="color"
+                        title={`Speaker ${i + 1}`}
+                        aria-label={`Speaker ${i + 1} color`}
+                        value={c}
+                        onFocus={() => setPreviewSpeaker(i)}
+                        onChange={(event) => {
+                          setPreviewSpeaker(i)
+                          setSubtitle({
+                            speakerPalette: subtitle.speakerPalette.map((old, j) =>
+                              j === i ? event.target.value : old
+                            )
+                          })
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <input
+                    type="color"
+                    aria-label="Text color"
+                    value={subtitle.color}
+                    onChange={(event) => setSubtitle({ color: event.target.value })}
+                  />
+                )}
+              </div>
+
+              <ToggleColor
+                label="Highlight active word"
+                checked={subtitle.highlight}
+                color={subtitle.highlightColor}
+                onToggle={(highlight) => setSubtitle({ highlight })}
+                onColor={(highlightColor) => setSubtitle({ highlightColor })}
+              />
+
+              <ToggleColor
+                label="Outline"
+                checked={subtitle.outline}
+                color={subtitle.outlineColor}
+                onToggle={(outline) => setSubtitle({ outline })}
+                onColor={(outlineColor) => setSubtitle({ outlineColor })}
+              />
 
               <label className="field">
                 Position
@@ -333,7 +385,9 @@ export default function Create() {
                       fontFamily: `"${subtitle.font}", "Arial Black", Arial, sans-serif`,
                       fontWeight,
                       fontSize: captionSize,
-                      color: subtitle.color,
+                      color: subtitle.speakerColors
+                        ? subtitle.speakerPalette[previewSpeaker]
+                        : subtitle.color,
                       WebkitTextStroke: subtitle.outline
                         ? `${outlineSize}px ${subtitle.outlineColor}`
                         : undefined,
@@ -344,7 +398,11 @@ export default function Create() {
                     {words.map((word, index) => (
                       <span
                         key={`${word}-${index}`}
-                        style={index === 1 ? { color: subtitle.highlightColor } : undefined}
+                        style={
+                          subtitle.highlight && index === 1
+                            ? { color: subtitle.highlightColor }
+                            : undefined
+                        }
                       >
                         {word}
                         {index < words.length - 1 ? ' ' : ''}
