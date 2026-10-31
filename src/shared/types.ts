@@ -41,10 +41,16 @@ export interface SubtitleStyle {
   uppercase: boolean
   /** Color each speaker's lines differently (needs speaker detection). */
   speakerColors: boolean
+  /** Colors for the speakers who talk most (1-8); everyone beyond gets otherSpeakersColor. */
   speakerPalette: string[]
+  otherSpeakersColor: string
 }
 
-export const SPEAKER_SLOTS = 4
+export const MAX_SPEAKER_COLORS = 8
+/** Suggested colors when adding speakers, in order. */
+export const SPEAKER_COLOR_SUGGESTIONS = [
+  '#FFFFFF', '#4FC3F7', '#FF8A65', '#AED581', '#BA68C8', '#FFD54F', '#F06292', '#4DB6AC'
+]
 
 /** Caption fonts bundled in resources/fonts. `weight` is the weight the captions use. */
 export const CAPTION_FONTS = [
@@ -122,7 +128,8 @@ export const DEFAULT_SETTINGS: Settings = {
     position: 'middle',
     uppercase: true,
     speakerColors: false,
-    speakerPalette: ['#FFFFFF', '#4FC3F7', '#FF8A65', '#AED581']
+    speakerPalette: ['#FFFFFF', '#4FC3F7', '#FF8A65', '#AED581'],
+    otherSpeakersColor: '#E0E0E0'
   },
   language: 'auto',
   maxClipSeconds: 60,

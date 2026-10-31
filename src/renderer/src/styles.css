@@ -1035,3 +1035,50 @@ select {
 .choice.disabled a {
   color: var(--accent);
 }
+
+.field.full {
+  grid-column: 1 / -1;
+}
+
+.speaker-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.speaker-swatch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.speaker-swatch input[type='color'] {
+  width: 52px;
+}
+
+.swatch-remove {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.swatch-remove:hover {
+  color: var(--text);
+}
+
+.speaker-other {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.speaker-other input[type='color'] {
+  width: 52px;
+}

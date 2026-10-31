@@ -2,7 +2,13 @@ import { useState, type DragEvent, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { CATALOG, SPEAKER_MODEL_IDS } from '../../../shared/catalog'
 import { formatBytes } from '../lib/format'
-import { CAPTION_FONTS, type Layout, type SubtitleStyle } from '../../../shared/types'
+import {
+  CAPTION_FONTS,
+  MAX_SPEAKER_COLORS,
+  SPEAKER_COLOR_SUGGESTIONS,
+  type Layout,
+  type SubtitleStyle
+} from '../../../shared/types'
 import NotImplemented from '../components/NotImplemented'
 import { useModels } from '../state/models'
 import { useSettings } from '../state/settings'
@@ -328,29 +334,80 @@ export default function Create() {
                 />
               </label>
 
-              <div className="field">
+              <div className={speakerColorsOn ? 'field full' : 'field'}>
                 <span>{speakerColorsOn ? 'Speaker colors (1 = talks most)' : 'Text color'}</span>
                 {speakerColorsOn ? (
-                  <div className="speaker-swatches">
-                    {subtitle.speakerPalette.map((c, i) => (
+                  <>
+                    <div className="speaker-swatches">
+                      {subtitle.speakerPalette.map((c, i) => (
+                        <div key={i} className="speaker-swatch">
+                          <span className="muted">{i + 1}</span>
+                          <input
+                            type="color"
+                            title={`Speaker ${i + 1}`}
+                            aria-label={`Speaker ${i + 1} color`}
+                            value={c}
+                            onFocus={() => setPreviewSpeaker(i)}
+                            onChange={(event) => {
+                              setPreviewSpeaker(i)
+                              setSubtitle({
+                                speakerPalette: subtitle.speakerPalette.map((old, j) =>
+                                  j === i ? event.target.value : old
+                                )
+                              })
+                            }}
+                          />
+                          {subtitle.speakerPalette.length > 1 ? (
+                            <button
+                              type="button"
+                              className="swatch-remove"
+                              aria-label={`Remove speaker ${i + 1}`}
+                              title="Remove"
+                              onClick={() => {
+                                setPreviewSpeaker(0)
+                                setSubtitle({
+                                  speakerPalette: subtitle.speakerPalette.filter((_, j) => j !== i)
+                                })
+                              }}
+                            >
+                              ×
+                            </button>
+                          ) : null}
+                        </div>
+                      ))}
+                      {subtitle.speakerPalette.length < MAX_SPEAKER_COLORS ? (
+                        <button
+                          type="button"
+                          className="button small"
+                          onClick={() => {
+                            const next = subtitle.speakerPalette.length
+                            setPreviewSpeaker(next)
+                            setSubtitle({
+                              speakerPalette: [
+                                ...subtitle.speakerPalette,
+                                SPEAKER_COLOR_SUGGESTIONS[next] ?? '#FFFFFF'
+                              ]
+                            })
+                          }}
+                        >
+                          + Add speaker
+                        </button>
+                      ) : null}
+                    </div>
+                    <label className="speaker-other">
                       <input
-                        key={i}
                         type="color"
-                        title={`Speaker ${i + 1}`}
-                        aria-label={`Speaker ${i + 1} color`}
-                        value={c}
-                        onFocus={() => setPreviewSpeaker(i)}
+                        aria-label="Everyone else color"
+                        value={subtitle.otherSpeakersColor}
+                        onFocus={() => setPreviewSpeaker(-1)}
                         onChange={(event) => {
-                          setPreviewSpeaker(i)
-                          setSubtitle({
-                            speakerPalette: subtitle.speakerPalette.map((old, j) =>
-                              j === i ? event.target.value : old
-                            )
-                          })
+                          setPreviewSpeaker(-1)
+                          setSubtitle({ otherSpeakersColor: event.target.value })
                         }}
                       />
-                    ))}
-                  </div>
+                      Everyone else (speakers beyond {subtitle.speakerPalette.length})
+                    </label>
+                  </>
                 ) : (
                   <input
                     type="color"
@@ -424,7 +481,10 @@ export default function Create() {
             <h2>Live preview</h2>
             {speakerColorsOn ? (
               <div className="speaker-preview-tabs" role="tablist" aria-label="Preview speaker">
-                {subtitle.speakerPalette.map((color, i) => (
+                {[
+                  ...subtitle.speakerPalette.map((color, i) => ({ i, color, label: `Speaker ${i + 1}` })),
+                  { i: -1, color: subtitle.otherSpeakersColor, label: 'Everyone else' }
+                ].map(({ i, color, label }) => (
                   <button
                     key={i}
                     type="button"
@@ -433,7 +493,7 @@ export default function Create() {
                     className={previewSpeaker === i ? 'button small selected' : 'button small'}
                     onClick={() => setPreviewSpeaker(i)}
                   >
-                    <span className="swatch-dot" style={{ background: color }} /> Speaker {i + 1}
+                    <span className="swatch-dot" style={{ background: color }} /> {label}
                   </button>
                 ))}
               </div>
@@ -450,7 +510,7 @@ export default function Create() {
                       fontWeight,
                       fontSize: captionSize,
                       color: speakerColorsOn
-                        ? subtitle.speakerPalette[previewSpeaker]
+                        ? (subtitle.speakerPalette[previewSpeaker] ?? subtitle.otherSpeakersColor)
                         : subtitle.color,
                       WebkitTextStroke: subtitle.outline
                         ? `${outlineSize}px ${subtitle.outlineColor}`

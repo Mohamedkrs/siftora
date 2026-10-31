@@ -5,7 +5,7 @@ import { CATALOG } from '../shared/catalog'
 import {
   CAPTION_FONTS,
   DEFAULT_SETTINGS,
-  SPEAKER_SLOTS,
+  MAX_SPEAKER_COLORS,
   type CustomModel,
   type EngineBackend,
   type Settings
@@ -120,12 +120,13 @@ function sanitize(input: unknown): Settings {
         typeof subtitle.speakerColors === 'boolean'
           ? subtitle.speakerColors
           : defaults.subtitle.speakerColors,
-      speakerPalette: Array.from({ length: SPEAKER_SLOTS }, (_, i) =>
-        colorOr(
-          Array.isArray(subtitle.speakerPalette) ? subtitle.speakerPalette[i] : undefined,
-          defaults.subtitle.speakerPalette[i]
-        )
-      )
+      speakerPalette:
+        Array.isArray(subtitle.speakerPalette) && subtitle.speakerPalette.length > 0
+          ? subtitle.speakerPalette
+              .slice(0, MAX_SPEAKER_COLORS)
+              .map((color, i) => colorOr(color, defaults.subtitle.speakerPalette[i] ?? '#FFFFFF'))
+          : defaults.subtitle.speakerPalette,
+      otherSpeakersColor: colorOr(subtitle.otherSpeakersColor, defaults.subtitle.otherSpeakersColor)
     },
     language:
       typeof raw.language === 'string' && raw.language.trim().length > 0
