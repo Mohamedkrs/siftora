@@ -11,6 +11,8 @@ interface ModelsContextValue {
   hardware: HardwareInfo | null
   recommendation: Recommendation | null
   requiredEngines: RequiredEngines | null
+  checking: boolean
+  recheck: () => void
   download: (ids: string[]) => void
   cancel: (id: string) => void
   remove: (id: string) => void
@@ -23,6 +25,7 @@ export function ModelsProvider({ children }: { children: ReactNode }) {
   const [hardware, setHardware] = useState<HardwareInfo | null>(null)
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null)
   const [requiredEngines, setRequiredEngines] = useState<RequiredEngines | null>(null)
+  const [checking, setChecking] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -74,6 +77,29 @@ export function ModelsProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const recheck = (): void => {
+    setChecking(true)
+    window.api
+      .getHardware(true)
+      .then((info) => {
+        setHardware(info)
+        return Promise.all([
+          window.api.getRecommendation(),
+          window.api.getRequiredEngines(),
+          window.api.listModels()
+        ])
+      })
+      .then(([nextRecommendation, nextEngines, list]) => {
+        setRecommendation(nextRecommendation)
+        setRequiredEngines(nextEngines)
+        setModels(Object.fromEntries(list.map((state) => [state.id, state])))
+      })
+      .catch((err: unknown) => {
+        window.api.log('error', `recheck failed: ${String(err)}`)
+      })
+      .finally(() => setChecking(false))
+  }
+
   const download = (ids: string[]): void => {
     window.api.downloadModels(ids).catch((err: unknown) => {
       window.api.log('error', `downloadModels failed: ${String(err)}`)
@@ -94,7 +120,17 @@ export function ModelsProvider({ children }: { children: ReactNode }) {
 
   return (
     <ModelsContext.Provider
-      value={{ models, hardware, recommendation, requiredEngines, download, cancel, remove }}
+      value={{
+        models,
+        hardware,
+        recommendation,
+        requiredEngines,
+        checking,
+        recheck,
+        download,
+        cancel,
+        remove
+      }}
     >
       {children}
     </ModelsContext.Provider>

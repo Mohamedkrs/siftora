@@ -17,6 +17,12 @@ export interface ModelEntry {
   license: string
   /** Rough memory needed to run it (VRAM on GPU, RAM on CPU), in bytes. */
   memoryBytes: number
+  /**
+   * GGUF header labels (general.architecture / general.size_label). A user's own file with the
+   * same labels (e.g. from Ollama) is the same model in a different packaging, so it is used
+   * in place of this entry.
+   */
+  gguf?: { architecture: string; sizeLabel: string }
   /** Features that need this model; installing a feature means installing all its models. */
   feature?: 'speakers'
 }
@@ -85,7 +91,8 @@ export const CATALOG: ModelEntry[] = [
     bytes: 2497280256,
     sha256: '7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5',
     license: 'Apache-2.0',
-    memoryBytes: 4 * GB
+    memoryBytes: 4 * GB,
+    gguf: { architecture: 'qwen3', sizeLabel: '4B' }
   },
   {
     id: 'qwen3-8b',
@@ -97,7 +104,8 @@ export const CATALOG: ModelEntry[] = [
     bytes: 5027783488,
     sha256: 'd98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785',
     license: 'Apache-2.0',
-    memoryBytes: 7 * GB
+    memoryBytes: 7 * GB,
+    gguf: { architecture: 'qwen3', sizeLabel: '8B' }
   },
   {
     id: 'qwen3.5-9b',
@@ -109,7 +117,8 @@ export const CATALOG: ModelEntry[] = [
     bytes: 5680522464,
     sha256: '03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8',
     license: 'Apache-2.0',
-    memoryBytes: 8 * GB
+    memoryBytes: 8 * GB,
+    gguf: { architecture: 'qwen35', sizeLabel: '9B' }
   },
   {
     id: 'qwen3-14b',
@@ -121,7 +130,8 @@ export const CATALOG: ModelEntry[] = [
     bytes: 9001752960,
     sha256: '500a8806e85ee9c83f3ae08420295592451379b4f8cf2d0f41c15dffeb6b81f0',
     license: 'Apache-2.0',
-    memoryBytes: 11 * GB
+    memoryBytes: 11 * GB,
+    gguf: { architecture: 'qwen3', sizeLabel: '14B' }
   },
   {
     id: 'silero-vad',

@@ -4,6 +4,7 @@ import type { Settings } from '../../../shared/types'
 interface SettingsContextValue {
   settings: Settings
   update: (patch: Partial<Settings>) => void
+  refresh: () => Promise<void>
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
@@ -41,8 +42,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       })
   }
 
+  const refresh = async (): Promise<void> => {
+    try {
+      setSettings(await window.api.getSettings())
+    } catch (err) {
+      window.api.log('error', `getSettings failed: ${String(err)}`)
+    }
+  }
+
   return (
-    <SettingsContext.Provider value={{ settings, update }}>{children}</SettingsContext.Provider>
+    <SettingsContext.Provider value={{ settings, update, refresh }}>
+      {children}
+    </SettingsContext.Provider>
   )
 }
 

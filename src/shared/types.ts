@@ -1,4 +1,33 @@
+import type { Backend } from './engines'
+
 export type Layout = 'blurred' | 'focused'
+
+export type EngineBackend = Backend | 'auto'
+
+export interface CustomModel {
+  id: string
+  kind: 'transcription' | 'llm'
+  name: string
+  path: string
+  bytes: number
+}
+
+export interface EngineOption {
+  backend: Backend
+  label: string
+  bytes: number
+  ids: string[]
+  recommended: boolean
+  available: boolean
+}
+
+export interface ScannedModel {
+  path: string
+  name: string
+  bytes: number
+  kind: 'transcription' | 'llm'
+  source: 'Ollama' | 'LM Studio' | 'Hugging Face' | 'Folder'
+}
 
 export interface SubtitleStyle {
   font: string
@@ -37,6 +66,9 @@ export interface Settings {
   transcriptionModel: string | null
   llmModel: string | null
   useVad: boolean
+  engineBackend: EngineBackend
+  customModels: CustomModel[]
+  linkedModels: Record<string, string>
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -62,7 +94,10 @@ export const DEFAULT_SETTINGS: Settings = {
   onboarded: false,
   transcriptionModel: null,
   llmModel: null,
-  useVad: true
+  useVad: true,
+  engineBackend: 'auto',
+  customModels: [],
+  linkedModels: {}
 }
 
 export interface GpuInfo {
@@ -121,14 +156,19 @@ export interface Api {
   log(level: 'info' | 'warn' | 'error', msg: string): void
   appInfo(): Promise<{ version: string; platform: string; userData: string }>
   getPathForFile(file: File): string
-  getHardware(): Promise<HardwareInfo>
+  getHardware(force?: boolean): Promise<HardwareInfo>
   getRecommendation(): Promise<Recommendation>
   getRequiredEngines(): Promise<RequiredEngines>
+  getEngineOptions(): Promise<EngineOption[]>
   listModels(): Promise<ModelState[]>
   downloadModels(ids: string[]): Promise<void>
   cancelDownload(id: string): Promise<void>
   deleteModel(id: string): Promise<void>
   openModelsFolder(): Promise<void>
+  scanForModels(): Promise<ScannedModel[]>
+  pickModelFile(): Promise<string | null>
+  addCustomModel(path: string, name?: string): Promise<{ id?: string; error?: string }>
+  removeCustomModel(id: string): Promise<void>
   onModelState(cb: (state: ModelState) => void): () => void
 }
 
@@ -142,10 +182,15 @@ export const IPC = {
   getHardware: 'hardware:get',
   getRecommendation: 'hardware:recommendation',
   getRequiredEngines: 'engines:required',
+  getEngineOptions: 'engines:options',
   listModels: 'models:list',
   downloadModels: 'models:download',
   cancelDownload: 'models:cancel',
   deleteModel: 'models:delete',
   openModelsFolder: 'models:open-folder',
+  scanForModels: 'models:scan',
+  pickModelFile: 'dialog:pick-model-file',
+  addCustomModel: 'models:add-custom',
+  removeCustomModel: 'models:remove-custom',
   onModelState: 'models:state'
 } as const

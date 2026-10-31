@@ -2,10 +2,19 @@ import { app } from 'electron'
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { CATALOG } from '../shared/catalog'
-import { CAPTION_FONTS, DEFAULT_SETTINGS, SPEAKER_SLOTS, type Settings } from '../shared/types'
+import {
+  CAPTION_FONTS,
+  DEFAULT_SETTINGS,
+  SPEAKER_SLOTS,
+  type CustomModel,
+  type EngineBackend,
+  type Settings
+} from '../shared/types'
 import { log } from './logger'
 
 let cache: Settings | null = null
+
+const ENGINE_BACKENDS: EngineBackend[] = ['auto', 'cuda', 'metal', 'vulkan', 'cpu']
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -23,10 +32,40 @@ function colorOr(value: unknown, fallback: string): string {
   return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback
 }
 
-function modelIdOr(value: unknown, kind: 'transcription' | 'llm'): string | null {
-  return typeof value === 'string' && CATALOG.some((m) => m.id === value && m.kind === kind)
-    ? value
-    : null
+function modelIdOr(value: unknown, kind: 'transcription' | 'llm', custom: CustomModel[]): string | null {
+  if (typeof value !== 'string') return null
+  if (CATALOG.some((m) => m.id === value && m.kind === kind)) return value
+  if (custom.some((m) => m.id === value && m.kind === kind)) return value
+  return null
+}
+
+function customModelsOr(value: unknown): CustomModel[] {
+  if (!Array.isArray(value)) return []
+  const seen = new Set<string>()
+  const models: CustomModel[] = []
+
+  for (const item of value) {
+    if (!isRecord(item)) continue
+    const { id, kind, name, path, bytes } = item
+    if (typeof id !== 'string' || !id.startsWith('custom-') || seen.has(id)) continue
+    if (kind !== 'transcription' && kind !== 'llm') continue
+    if (typeof name !== 'string' || name.length === 0) continue
+    if (typeof path !== 'string' || path.length === 0) continue
+    if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes <= 0) continue
+    seen.add(id)
+    models.push({ id, kind, name, path, bytes })
+  }
+
+  return models
+}
+
+function linkedModelsOr(value: unknown): Record<string, string> {
+  if (!isRecord(value)) return {}
+  const linked: Record<string, string> = {}
+  for (const [id, path] of Object.entries(value)) {
+    if (typeof path === 'string' && CATALOG.some((model) => model.id === id)) linked[id] = path
+  }
+  return linked
 }
 
 function settingsPath(): string {
@@ -37,6 +76,7 @@ function sanitize(input: unknown): Settings {
   const raw = isRecord(input) ? input : {}
   const subtitle = isRecord(raw.subtitle) ? raw.subtitle : {}
   const defaults = DEFAULT_SETTINGS
+  const customModels = customModelsOr(raw.customModels)
 
   const minClipSeconds = clamp(numberOr(raw.minClipSeconds, defaults.minClipSeconds), 1, 3600)
   const maxClipSeconds = clamp(numberOr(raw.maxClipSeconds, defaults.maxClipSeconds), 1, 3600)
@@ -81,9 +121,13 @@ function sanitize(input: unknown): Settings {
     maxClipSeconds,
     minScore: clamp(numberOr(raw.minScore, defaults.minScore), 0, 10),
     onboarded: typeof raw.onboarded === 'boolean' ? raw.onboarded : defaults.onboarded,
-    transcriptionModel: modelIdOr(raw.transcriptionModel, 'transcription'),
-    llmModel: modelIdOr(raw.llmModel, 'llm'),
-    useVad: typeof raw.useVad === 'boolean' ? raw.useVad : defaults.useVad
+    transcriptionModel: modelIdOr(raw.transcriptionModel, 'transcription', customModels),
+    llmModel: modelIdOr(raw.llmModel, 'llm', customModels),
+    useVad: typeof raw.useVad === 'boolean' ? raw.useVad : defaults.useVad,
+    engineBackend:
+      ENGINE_BACKENDS.find((backend) => backend === raw.engineBackend) ?? defaults.engineBackend,
+    customModels,
+    linkedModels: linkedModelsOr(raw.linkedModels)
   }
 }
 

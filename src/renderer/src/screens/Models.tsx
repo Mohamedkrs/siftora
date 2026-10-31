@@ -1,6 +1,9 @@
+import { useEffect, useState } from 'react'
 import { CATALOG, type ModelEntry } from '../../../shared/catalog'
 import { ENGINES, engineBytes, engineLabel } from '../../../shared/engines'
-import type { ModelState } from '../../../shared/types'
+import type { CustomModel, EngineOption, ModelState } from '../../../shared/types'
+import EngineChoice from '../components/EngineChoice'
+import ExistingModels from '../components/ExistingModels'
 import ModelProgress from '../components/ModelProgress'
 import SystemCard from '../components/SystemCard'
 import { formatBytes } from '../lib/format'
@@ -29,6 +32,7 @@ interface CardProps {
   radioName?: string
   radio?: { checked: boolean; onChange: () => void }
   toggle?: { label: string; checked: boolean; onChange: (checked: boolean) => void }
+  custom?: boolean
   onDownload: (ids: string[]) => void
   onCancel: (id: string) => void
   onDelete: (ids: string[]) => void
@@ -56,8 +60,17 @@ function ModelCard(props: CardProps) {
   const description =
     props.description ?? props.entries.map((entry) => entry.description ?? '').join(' ')
 
+  const { settings } = useSettings()
+  // A catalog model can be satisfied by the user's own file (e.g. from Ollama); never delete it.
+  const linkedFile = props.entries.map((entry) => settings.linkedModels[entry.id]).find(Boolean)
+
   const remove = (): void => {
-    if (!confirm('Delete this model? You can download it again later.')) return
+    if (
+      !props.custom &&
+      !linkedFile &&
+      !confirm('Delete this model? You can download it again later.')
+    )
+      return
     props.onDelete(installedIds)
   }
 
@@ -78,6 +91,11 @@ function ModelCard(props: CardProps) {
       </div>
 
       {props.warning ? <p className="model-warning">May not fit your GPU/RAM</p> : null}
+      {linkedFile ? (
+        <p className="muted" title={linkedFile}>
+          Using your file — nothing to download.
+        </p>
+      ) : null}
 
       {props.states.map((state, index) => (
         <ModelProgress key={state.id} state={state} totalBytes={props.entries[index].bytes} />
@@ -106,7 +124,7 @@ function ModelCard(props: CardProps) {
 
         {installedIds.length > 0 ? (
           <button type="button" className="button" onClick={remove}>
-            Delete
+            {props.custom ? 'Remove' : linkedFile ? 'Stop using my file' : 'Delete'}
           </button>
         ) : null}
 
@@ -140,13 +158,64 @@ function ModelCard(props: CardProps) {
 
 export default function Models() {
   const { models, hardware, recommendation, requiredEngines, download, cancel, remove } = useModels()
-  const { settings, update } = useSettings()
+  const { settings, update, refresh } = useSettings()
+  const [engineOptions, setEngineOptions] = useState<EngineOption[] | null>(null)
+
+  useEffect(() => {
+    let alive = true
+
+    window.api
+      .getEngineOptions()
+      .then((options) => {
+        if (alive) setEngineOptions(options)
+      })
+      .catch((err: unknown) => {
+        window.api.log('error', `getEngineOptions failed: ${String(err)}`)
+      })
+
+    return () => {
+      alive = false
+    }
+  }, [hardware])
 
   const stateOf = (entry: { id: string }): ModelState => models[entry.id] ?? emptyState(entry.id)
 
-  const engineEntries = requiredEngines
-    ? ENGINES.filter((entry) => requiredEngines.ids.includes(entry.id))
+  const recommendedBackend = engineOptions?.find((option) => option.recommended)?.backend
+  const chosenBackend =
+    settings.engineBackend === 'auto' ? recommendedBackend : settings.engineBackend
+  const selectedOption =
+    engineOptions?.find((option) => option.backend === chosenBackend && option.available) ??
+    engineOptions?.find((option) => option.recommended && option.available) ??
+    engineOptions?.[0]
+  const engineBackend = selectedOption?.backend ?? 'cpu'
+
+  const engineEntries = selectedOption
+    ? ENGINES.filter((entry) => selectedOption.ids.includes(entry.id))
     : []
+  const otherInstalled = ENGINES.filter(
+    (entry) =>
+      !selectedOption?.ids.includes(entry.id) && models[entry.id]?.status === 'installed'
+  )
+
+  const customState = (model: CustomModel): ModelState =>
+    models[model.id] ?? {
+      id: model.id,
+      status: 'installed',
+      receivedBytes: model.bytes,
+      bytesPerSec: 0,
+      etaSec: null
+    }
+
+  const removeCustom = (ids: string[]): void => {
+    ids.forEach((id) => {
+      window.api
+        .removeCustomModel(id)
+        .then(() => refresh())
+        .catch((err: unknown) => {
+          window.api.log('error', `removeCustomModel failed: ${String(err)}`)
+        })
+    })
+  }
 
   const transcriptionModels = CATALOG.filter((m) => m.kind === 'transcription')
   const llmModels = CATALOG.filter((m) => m.kind === 'llm')
@@ -188,6 +257,19 @@ export default function Models() {
 
       <section className="models-section">
         <h2>Engines</h2>
+        <p className="label">Engine type</p>
+        {engineOptions ? (
+          <EngineChoice
+            options={engineOptions}
+            value={engineBackend}
+            onChange={(backend) => update({ engineBackend: backend })}
+          />
+        ) : (
+          <div className="loading-row" role="status">
+            <span className="spinner" aria-hidden="true" />
+            Checking available engines…
+          </div>
+        )}
         {requiredEngines?.missing.map((name) => (
           <p key={name} className="model-warning">
             No ready-made {name} build for this system yet.
@@ -214,6 +296,34 @@ export default function Models() {
             onDelete={removeMany}
           />
         ))}
+        {otherInstalled.length > 0 ? (
+          <>
+            <h3>Other installed engines</h3>
+            {otherInstalled.map((entry) => (
+              <ModelCard
+                key={entry.id}
+                entries={[
+                  {
+                    id: entry.id,
+                    bytes: engineBytes(entry),
+                    license: entry.license,
+                    description: 'Installed engine from another choice.'
+                  }
+                ]}
+                states={[stateOf(entry)]}
+                title={engineLabel(entry)}
+                onDownload={download}
+                onCancel={cancel}
+                onDelete={removeMany}
+              />
+            ))}
+          </>
+        ) : null}
+      </section>
+
+      <section className="models-section">
+        <h2>Models already on this computer</h2>
+        <ExistingModels />
       </section>
 
       <section className="models-section">
@@ -235,6 +345,32 @@ export default function Models() {
             onDelete={removeMany}
           />
         ))}
+        {settings.customModels
+          .filter((model) => model.kind === 'transcription')
+          .map((model) => (
+            <ModelCard
+              key={model.id}
+              entries={[
+                {
+                  id: model.id,
+                  bytes: model.bytes,
+                  license: 'Your file',
+                  name: `${model.name} — your file`,
+                  description: 'Custom models are not tested; results may vary.'
+                }
+              ]}
+              states={[customState(model)]}
+              radioName="transcription-model"
+              radio={{
+                checked: settings.transcriptionModel === model.id,
+                onChange: () => update({ transcriptionModel: model.id })
+              }}
+              onDownload={download}
+              onCancel={cancel}
+              onDelete={removeCustom}
+              custom
+            />
+          ))}
       </section>
 
       <section className="models-section">
@@ -256,6 +392,32 @@ export default function Models() {
             onDelete={removeMany}
           />
         ))}
+        {settings.customModels
+          .filter((model) => model.kind === 'llm')
+          .map((model) => (
+            <ModelCard
+              key={model.id}
+              entries={[
+                {
+                  id: model.id,
+                  bytes: model.bytes,
+                  license: 'Your file',
+                  name: `${model.name} — your file`,
+                  description: 'Custom models are not tested; results may vary.'
+                }
+              ]}
+              states={[customState(model)]}
+              radioName="llm-model"
+              radio={{
+                checked: settings.llmModel === model.id,
+                onChange: () => update({ llmModel: model.id })
+              }}
+              onDownload={download}
+              onCancel={cancel}
+              onDelete={removeCustom}
+              custom
+            />
+          ))}
       </section>
 
       <section className="models-section">

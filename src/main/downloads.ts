@@ -71,6 +71,14 @@ function filePath(entry: ModelEntry): string {
   return join(modelsDir(), entry.file)
 }
 
+// Linked files were checked when linked (hash, or GGUF labels for the same model packaged
+// differently, so the size can differ); here we only need the file to still be there.
+function linkedPath(id: string): string | null {
+  const path = getSettings().linkedModels[id]
+  if (!path) return null
+  return fileSize(path) > 0 ? path : null
+}
+
 function fileSize(path: string): number {
   try {
     return statSync(path).size
@@ -94,10 +102,11 @@ function isInstalled(item: Item): boolean {
   }
 
   try {
-    return statSync(filePath(item)).size === item.bytes
+    if (statSync(filePath(item)).size === item.bytes) return true
   } catch {
-    return false
+    // Not downloaded; a linked copy may still exist.
   }
+  return linkedPath(item.id) !== null
 }
 
 function partSize(item: Item): number {
@@ -166,15 +175,13 @@ function tarPath(): string {
   return join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe')
 }
 
+function installedState(id: string, bytes: number): ModelState {
+  return { id, status: 'installed', receivedBytes: bytes, bytesPerSec: 0, etaSec: null }
+}
+
 function initialState(item: Item): ModelState {
   if (isInstalled(item)) {
-    return {
-      id: item.id,
-      status: 'installed',
-      receivedBytes: itemBytes(item),
-      bytesPerSec: 0,
-      etaSec: null
-    }
+    return installedState(item.id, itemBytes(item))
   }
 
   const known = active.get(item.id)
@@ -205,7 +212,28 @@ function setState(id: string, patch: Partial<ModelState>): ModelState {
 }
 
 export function listModels(): ModelState[] {
-  return [...CATALOG, ...ENGINES].map(initialState)
+  const custom = getSettings().customModels.map(
+    (model) => active.get(model.id) ?? installedState(model.id, model.bytes)
+  )
+  return [...[...CATALOG, ...ENGINES].map(initialState), ...custom]
+}
+
+/** Push a model state to the renderer, used by custom-model verification. */
+export function emitModelState(state: ModelState): void {
+  setState(state.id, state)
+}
+
+/** The state a known model shows when it is not mid-download. */
+export function settledState(id: string): ModelState | null {
+  const entry = findItem(id)
+  return entry ? initialState(entry) : null
+}
+
+/** File for a catalog, linked or custom model, or null for an unknown id. */
+export function modelFilePath(id: string): string | null {
+  const entry = CATALOG.find((model) => model.id === id)
+  if (entry) return linkedPath(entry.id) ?? filePath(entry)
+  return getSettings().customModels.find((model) => model.id === id)?.path ?? null
 }
 
 export function downloadModels(ids: string[]): void {
@@ -675,6 +703,26 @@ export function cancelDownload(id: string): void {
 }
 
 export async function deleteModel(id: string): Promise<void> {
+  const settings = getSettings()
+
+  // A linked catalog model is the user's own file, so only forget the link.
+  if (settings.linkedModels[id]) {
+    const linkedModels = { ...settings.linkedModels }
+    delete linkedModels[id]
+    setSettings({ linkedModels })
+    setState(id, { status: 'missing', receivedBytes: 0, bytesPerSec: 0, etaSec: null })
+    clearSelection(id)
+    return
+  }
+
+  const custom = settings.customModels.find((model) => model.id === id)
+  if (custom) {
+    setSettings({ customModels: settings.customModels.filter((model) => model.id !== id) })
+    setState(id, { status: 'missing', receivedBytes: 0, bytesPerSec: 0, etaSec: null })
+    clearSelection(id)
+    return
+  }
+
   const entry = findItem(id)
   if (!entry) return
 
@@ -692,7 +740,10 @@ export async function deleteModel(id: string): Promise<void> {
   }
 
   setState(id, { status: 'missing', receivedBytes: 0, bytesPerSec: 0, etaSec: null })
+  clearSelection(id)
+}
 
+function clearSelection(id: string): void {
   const settings = getSettings()
   const patch: Partial<Settings> = {}
   if (settings.transcriptionModel === id) patch.transcriptionModel = null

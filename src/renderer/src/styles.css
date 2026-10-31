@@ -636,6 +636,12 @@ select {
   font-size: 15px;
 }
 
+.models-section h3 {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .model-card {
   padding: 14px;
   background: #12151c;
@@ -911,6 +917,22 @@ select {
 
 .choice-warning {
   color: #ffd98a;
+}
+
+.remove-link {
+  align-self: center;
+  margin-left: auto;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.remove-link:hover {
+  color: var(--text);
 }
 
 .download-row {

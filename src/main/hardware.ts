@@ -1,8 +1,23 @@
 import { execFile } from 'node:child_process'
 import { cpus, totalmem } from 'node:os'
 import { CATALOG, type ModelEntry } from '../shared/catalog'
-import { pickEngine, type EngineEntry, type EngineName } from '../shared/engines'
-import type { GpuInfo, HardwareInfo, Recommendation, RequiredEngines } from '../shared/types'
+import {
+  ENGINES,
+  engineBytes,
+  pickEngine,
+  type Backend,
+  type EngineEntry,
+  type EngineName
+} from '../shared/engines'
+import type {
+  EngineBackend,
+  EngineOption,
+  GpuInfo,
+  HardwareInfo,
+  Recommendation,
+  RequiredEngines
+} from '../shared/types'
+import { getSettings } from './settings'
 
 const GB = 1024 ** 3
 const MIB = 1024 ** 2
@@ -178,33 +193,92 @@ async function collect(): Promise<HardwareInfo> {
 
 const ENGINE_NAMES: EngineName[] = ['whisper', 'llama', 'ffmpeg']
 
-/** Engine builds this machine needs, best available per engine. */
-export function requiredEngines(hw: HardwareInfo): string[] {
+const ENGINE_LABELS: Record<Backend, string> = {
+  cuda: 'GPU accelerated — NVIDIA CUDA',
+  metal: 'GPU accelerated — Apple Metal',
+  vulkan: 'GPU accelerated — Vulkan',
+  cpu: 'CPU only (works everywhere, slower)'
+}
+
+const BACKEND_CHOICES: Backend[] = ['cuda', 'metal', 'vulkan', 'cpu']
+
+function resolvedBackend(hw: HardwareInfo, preferred: EngineBackend): Backend {
+  return preferred === 'auto' ? hw.backend : preferred
+}
+
+/** Engine builds this machine needs, best available per engine for the chosen backend. */
+export function requiredEngines(hw: HardwareInfo, preferred: EngineBackend = 'auto'): string[] {
+  const backend = resolvedBackend(hw, preferred)
   return ENGINE_NAMES
-    .map((name) => pickEngine(name, process.platform, process.arch, hw.backend))
+    .map((name) => pickEngine(name, process.platform, process.arch, backend))
     .filter((entry): entry is EngineEntry => entry !== null)
     .map((entry) => entry.id)
 }
 
 export async function requiredEngineInfo(): Promise<RequiredEngines> {
   const hw = await detectHardware()
+  const preferred = getSettings().engineBackend
+  const backend = resolvedBackend(hw, preferred)
   return {
-    ids: requiredEngines(hw),
+    ids: requiredEngines(hw, preferred),
     missing: ENGINE_NAMES.filter(
-      (name) => pickEngine(name, process.platform, process.arch, hw.backend) === null
+      (name) => pickEngine(name, process.platform, process.arch, backend) === null
     )
   }
 }
 
-export async function detectHardware(): Promise<HardwareInfo> {
-  if (cached) return cached
-  if (!pending) pending = collect()
+/** One engine choice per backend that has a build for this OS/arch (CPU is always offered). */
+export async function engineOptions(): Promise<EngineOption[]> {
+  const hw = await detectHardware()
+  const appleSilicon = process.platform === 'darwin' && process.arch === 'arm64'
+  const options: EngineOption[] = []
+
+  for (const backend of BACKEND_CHOICES) {
+    const hasBuild = ENGINES.some(
+      (entry) =>
+        entry.platform === process.platform &&
+        entry.arch === process.arch &&
+        entry.backend === backend
+    )
+    if (!hasBuild && backend !== 'cpu') continue
+
+    const ids = requiredEngines(hw, backend)
+    const entries = ids
+      .map((id) => ENGINES.find((entry) => entry.id === id))
+      .filter((entry): entry is EngineEntry => entry !== undefined)
+
+    options.push({
+      backend,
+      label: ENGINE_LABELS[backend],
+      bytes: entries.reduce((sum, entry) => sum + engineBytes(entry), 0),
+      ids,
+      recommended: backend === hw.backend,
+      available:
+        backend === 'cuda' ? hw.cuda.usable : backend === 'metal' ? appleSilicon : true
+    })
+  }
+
+  return options
+}
+
+export async function detectHardware(force = false): Promise<HardwareInfo> {
+  if (force) {
+    cached = null
+    pending = null
+  } else {
+    if (cached) return cached
+    if (pending) return pending
+  }
+
+  const run = collect()
+  pending = run
 
   try {
-    cached = await pending
-    return cached
+    const result = await run
+    if (pending === run) cached = result
+    return result
   } finally {
-    pending = null
+    if (pending === run) pending = null
   }
 }
 

@@ -1,7 +1,8 @@
 import { app, dialog, ipcMain, shell } from 'electron'
 import { IPC, type Settings } from '../shared/types'
 import { cancelDownload, deleteModel, downloadModels, listModels, modelsDir } from './downloads'
-import { detectHardware, recommend, requiredEngineInfo } from './hardware'
+import { detectHardware, engineOptions, recommend, requiredEngineInfo } from './hardware'
+import { addCustomModel, removeCustomModel, scanForModels } from './localModels'
 import { log } from './logger'
 import { getSettings, setSettings } from './settings'
 
@@ -38,11 +39,13 @@ export function registerIpc(): void {
     userData: app.getPath('userData')
   }))
 
-  ipcMain.handle(IPC.getHardware, () => detectHardware())
+  ipcMain.handle(IPC.getHardware, (_event, force: unknown) => detectHardware(force === true))
 
   ipcMain.handle(IPC.getRecommendation, async () => recommend(await detectHardware()))
 
   ipcMain.handle(IPC.getRequiredEngines, () => requiredEngineInfo())
+
+  ipcMain.handle(IPC.getEngineOptions, () => engineOptions())
 
   ipcMain.handle(IPC.listModels, () => listModels())
 
@@ -61,5 +64,32 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.openModelsFolder, async () => {
     await shell.openPath(modelsDir())
+  })
+
+  ipcMain.handle(IPC.scanForModels, () => scanForModels())
+
+  ipcMain.handle(IPC.pickModelFile, async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [
+        { name: 'Model files', extensions: ['gguf', 'bin'] },
+        { name: 'All files', extensions: ['*'] }
+      ]
+    })
+    return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0]
+  })
+
+  ipcMain.handle(IPC.addCustomModel, async (_event, path: unknown, name: unknown) => {
+    if (typeof path !== 'string') return { error: 'No model file selected.' }
+    const label = typeof name === 'string' && name.trim().length > 0 ? name.trim() : undefined
+    try {
+      return { id: await addCustomModel(path, label) }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle(IPC.removeCustomModel, async (_event, id: unknown) => {
+    await removeCustomModel(String(id))
   })
 }

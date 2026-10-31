@@ -5,7 +5,7 @@ import { useModels } from '../state/models'
 const NVIDIA_URL = 'https://www.nvidia.com/Download/index.aspx'
 
 export default function SystemCard() {
-  const { models, hardware, recommendation, requiredEngines } = useModels()
+  const { models, hardware, recommendation, requiredEngines, checking, recheck } = useModels()
 
   if (!hardware) {
     return (
@@ -47,7 +47,7 @@ export default function SystemCard() {
         <dl className="about">
           <dt>GPU</dt>
           <dd>{gpuText}</dd>
-          <dt>CUDA</dt>
+          <dt>CUDA on this PC</dt>
           <dd>{cudaText}</dd>
           <dt>RAM</dt>
           <dd>{formatBytes(hardware.ramBytes)}</dd>
@@ -61,8 +61,10 @@ export default function SystemCard() {
 
         {requiredEngines && hardware.backend !== 'cpu' ? (
           <p className="muted">
-            GPU engine pack:{' '}
-            {enginesInstalled ? 'installed' : `not installed (${formatBytes(engineBytesTotal)})`}
+            GPU-accelerated engines (app download):{' '}
+            {enginesInstalled
+              ? 'installed'
+              : `not downloaded yet (${formatBytes(engineBytesTotal)}) — choose them in Models → Engines`}
           </p>
         ) : null}
 
@@ -73,6 +75,19 @@ export default function SystemCard() {
             ))}
           </ul>
         ) : null}
+
+        <div className="actions spaced">
+          <button type="button" className="button" disabled={checking} onClick={recheck}>
+            {checking ? (
+              <>
+                <span className="spinner" aria-hidden="true" />
+                Checking…
+              </>
+            ) : (
+              'Recheck my system'
+            )}
+          </button>
+        </div>
       </section>
 
       {nvidiaGpu && !hardware.cuda.usable ? (

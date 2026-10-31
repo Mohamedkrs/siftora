@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { CATALOG, SPEAKER_MODEL_IDS, type ModelEntry } from '../../../shared/catalog'
 import { ENGINES, engineBytes, engineLabel } from '../../../shared/engines'
+import type { EngineOption } from '../../../shared/types'
+import EngineChoice from '../components/EngineChoice'
+import ExistingModels from '../components/ExistingModels'
 import ModelProgress from '../components/ModelProgress'
 import SystemCard from '../components/SystemCard'
 import { formatBytes } from '../lib/format'
@@ -12,13 +15,41 @@ const VAD_ID = CATALOG.find((model) => model.kind === 'vad')?.id
 const stepLabels = ['Welcome', 'System check', 'Choose models', 'Download']
 
 export default function Onboarding() {
-  const { models, hardware, recommendation, requiredEngines, download } = useModels()
-  const { settings, update } = useSettings()
+  const { models, hardware, recommendation, download } = useModels()
+  const { settings, update, refresh } = useSettings()
   const [step, setStep] = useState(0)
   const [transcription, setTranscription] = useState<string | null>(settings.transcriptionModel)
   const [llm, setLlm] = useState<string | null>(settings.llmModel)
   const [useVad, setUseVad] = useState(true)
   const [speakers, setSpeakers] = useState(false)
+  const [engineOptions, setEngineOptions] = useState<EngineOption[] | null>(null)
+  const [engineBackend, setEngineBackend] = useState(settings.engineBackend)
+
+  useEffect(() => {
+    let alive = true
+
+    window.api
+      .getEngineOptions()
+      .then((options) => {
+        if (!alive) return
+        setEngineOptions(options)
+        setEngineBackend((current) => {
+          if (options.some((option) => option.backend === current && option.available)) return current
+          return (
+            options.find((option) => option.recommended && option.available)?.backend ??
+            options[0]?.backend ??
+            'cpu'
+          )
+        })
+      })
+      .catch((err: unknown) => {
+        window.api.log('error', `getEngineOptions failed: ${String(err)}`)
+      })
+
+    return () => {
+      alive = false
+    }
+  }, [hardware])
 
   useEffect(() => {
     if (!recommendation) return
@@ -26,10 +57,10 @@ export default function Onboarding() {
     setLlm((current) => current ?? recommendation.llm)
   }, [recommendation])
 
-  const engineEntries = requiredEngines
-    ? ENGINES.filter((entry) => requiredEngines.ids.includes(entry.id))
+  const engineOption = engineOptions?.find((option) => option.backend === engineBackend) ?? null
+  const engineEntries = engineOption
+    ? ENGINES.filter((entry) => engineOption.ids.includes(entry.id))
     : []
-  const engineBytesTotal = engineEntries.reduce((sum, entry) => sum + engineBytes(entry), 0)
 
   const selectedModelIds = (): string[] => {
     const ids: string[] = []
@@ -48,7 +79,20 @@ export default function Onboarding() {
   useEffect(() => {
     if (step !== 3) return
     download(selectedIds())
-  }, [step, requiredEngines])
+  }, [step])
+
+  const removeCustom = async (id: string): Promise<void> => {
+    try {
+      await window.api.removeCustomModel(id)
+      setTranscription((current) =>
+        current === id ? (recommendation?.transcription ?? null) : current
+      )
+      setLlm((current) => (current === id ? (recommendation?.llm ?? null) : current))
+      await refresh()
+    } catch (err) {
+      window.api.log('error', `removeCustomModel failed: ${String(err)}`)
+    }
+  }
 
   const transcriptionModels = CATALOG.filter((model) => model.kind === 'transcription')
   const llmModels = CATALOG.filter((model) => model.kind === 'llm')
@@ -132,6 +176,9 @@ export default function Onboarding() {
           <>
             <SystemCard />
             <div className="onboarding-actions">
+              <button type="button" className="button" onClick={() => setStep(0)}>
+                Back
+              </button>
               <button
                 type="button"
                 className="button primary"
@@ -148,20 +195,26 @@ export default function Onboarding() {
           <>
             <section className="card">
               <h2>Engines</h2>
-              <div className="choice-list">
-                <div className="choice selected">
-                  <span className="choice-text">
-                    <strong>
-                      Engines
-                      {hardware && hardware.backend !== 'cpu' ? ' (GPU accelerated)' : ''}
-                    </strong>
-                    <span>
-                      {formatBytes(engineBytesTotal)} · Required to run transcription and clip
-                      finding.
-                    </span>
-                  </span>
+              {engineOptions ? (
+                <EngineChoice
+                  options={engineOptions}
+                  value={engineBackend}
+                  onChange={(backend) => {
+                    setEngineBackend(backend)
+                    update({ engineBackend: backend })
+                  }}
+                />
+              ) : (
+                <div className="loading-row" role="status">
+                  <span className="spinner" aria-hidden="true" />
+                  Checking available engines…
                 </div>
-              </div>
+              )}
+            </section>
+
+            <section className="card">
+              <h2>Models already on this computer</h2>
+              <ExistingModels />
             </section>
 
             <section className="card">
@@ -194,6 +247,38 @@ export default function Onboarding() {
                     </span>
                   </label>
                 ))}
+                {settings.customModels
+                  .filter((model) => model.kind === 'transcription')
+                  .map((model) => (
+                    <label
+                      key={model.id}
+                      className={transcription === model.id ? 'choice selected' : 'choice'}
+                    >
+                      <input
+                        type="radio"
+                        name="onboarding-transcription"
+                        checked={transcription === model.id}
+                        onChange={() => setTranscription(model.id)}
+                      />
+                      <span className="choice-text">
+                        <strong>{model.name} — your file</strong>
+                        <span>
+                          {formatBytes(model.bytes)} · Custom models are not tested; results may
+                          vary.
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        className="remove-link"
+                        onClick={(event) => {
+                          event.preventDefault()
+                          void removeCustom(model.id)
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </label>
+                  ))}
               </div>
             </section>
 
@@ -224,6 +309,38 @@ export default function Onboarding() {
                     </span>
                   </label>
                 ))}
+                {settings.customModels
+                  .filter((model) => model.kind === 'llm')
+                  .map((model) => (
+                    <label
+                      key={model.id}
+                      className={llm === model.id ? 'choice selected' : 'choice'}
+                    >
+                      <input
+                        type="radio"
+                        name="onboarding-llm"
+                        checked={llm === model.id}
+                        onChange={() => setLlm(model.id)}
+                      />
+                      <span className="choice-text">
+                        <strong>{model.name} — your file</strong>
+                        <span>
+                          {formatBytes(model.bytes)} · Custom models are not tested; results may
+                          vary.
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        className="remove-link"
+                        onClick={(event) => {
+                          event.preventDefault()
+                          void removeCustom(model.id)
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </label>
+                  ))}
               </div>
             </section>
 
@@ -238,7 +355,11 @@ export default function Onboarding() {
                   />
                   <span className="choice-text">
                     <strong>Voice detection (recommended)</strong>
-                    <span>Skips silence and music so Whisper does not invent words.</span>
+                    <span>
+                      Finds the parts with speech before transcribing. Without it, Whisper can
+                      invent captions during silence or music (e.g. "Thanks for watching!") and
+                      repeat lines. 0.6 MB.
+                    </span>
                   </span>
                 </label>
                 <label className={speakers ? 'choice selected' : 'choice'}>
@@ -249,7 +370,10 @@ export default function Onboarding() {
                   />
                   <span className="choice-text">
                     <strong>Speaker detection (colored captions per speaker)</strong>
-                    <span>Adds {formatBytes(speakerBytes)} to the download.</span>
+                    <span>
+                      Works out who is speaking when, so each speaker's captions can get their
+                      own color. Optional; you can add it later. {formatBytes(speakerBytes)}.
+                    </span>
                   </span>
                 </label>
               </div>
@@ -258,10 +382,13 @@ export default function Onboarding() {
             <p className="muted">Total download: {formatBytes(totalBytes)}</p>
 
             <div className="onboarding-actions">
+              <button type="button" className="button" onClick={() => setStep(1)}>
+                Back
+              </button>
               <button
                 type="button"
                 className="button primary"
-                disabled={!transcription || !llm}
+                disabled={!transcription || !llm || !engineOption}
                 onClick={() => setStep(3)}
               >
                 Download selected
@@ -293,6 +420,9 @@ export default function Onboarding() {
             </section>
 
             <div className="onboarding-actions">
+              <button type="button" className="button" onClick={() => setStep(2)}>
+                Back
+              </button>
               <button type="button" className="button" onClick={finish}>
                 Continue in background
               </button>
