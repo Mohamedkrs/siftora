@@ -1,20 +1,67 @@
-# Siftora
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="resources/brand/siftora-horizontal-on-dark.svg">
+    <img src="resources/brand/siftora-horizontal.svg" alt="Siftora" height="72">
+  </picture>
+</p>
 
-Sift your long videos for the moments worth sharing.
+<p align="center"><strong>Sift your long videos for the moments worth sharing.</strong></p>
 
-A local-first desktop application that analyzes long-form videos and identifies promising short-form clips for TikTok, Instagram Reels, and YouTube Shorts.
+Siftora is a free desktop app that turns long videos (podcasts, streams, interviews, vlogs) into vertical clips for TikTok, Instagram Reels and YouTube Shorts. It transcribes the video, finds the moments with a hook, a setup and a payoff, and renders them as 1080×1920 reels with animated captions.
 
-Free and open source (GPL-3.0). Everything runs on your computer; no video or transcript is uploaded.
+Everything runs on your own computer. Your videos and transcripts are never uploaded.
 
-## What it does
+## Features
 
-1. Add videos (files or YouTube links) on **Create**, pick a layout (blurred background or cropped) and a caption style.
-2. The app transcribes them (whisper.cpp, or OpenAI Whisper if you already have it), optionally detects speakers (sherpa-onnx), and an AI model (Qwen via llama.cpp, or your Ollama) picks moments with a hook, setup and payoff.
-3. On **Results**, review the clips by score and render vertical 1080×1920 reels with karaoke captions (FFmpeg + libass).
+- **Finds the moments for you.** A local AI model reads the whole transcript and picks clips with a real payoff, scored and explained. It is told to start where the setup starts, not to treat swearing as a hook, and to quote the payoff word for word, so clips are not cut off or invented.
+- **Accurate captions.** Word-by-word timing from Whisper, voice detection so silence and music do not turn into made-up lines, and four caption fonts with an optional highlight on the spoken word.
+- **Colour per speaker.** Optional speaker detection gives each person their own caption colour.
+- **Preview before you render.** Pick the caption style and layout on a real frame of your clip, drag the captions where you want them, then render one reel or all of them.
+- **Uses what you already have.** Finds Ollama, Python Whisper, FFmpeg and model files on your computer, so you download as little as possible.
+- **Files or YouTube links.**
 
-On first start, onboarding checks your hardware (NVIDIA CUDA, Apple Metal, Vulkan or CPU), recommends models, and finds what you already have (Ollama, Python Whisper, FFmpeg, model files) so you download as little as possible.
+## Requirements
 
-## Running from source
+- **Windows 10 or 11, 64-bit.** macOS and Linux builds exist but are not ready yet; see [Platforms](#platforms).
+- **8 GB of RAM** at least. 16 GB or more is better.
+- **An NVIDIA graphics card is strongly recommended.** It makes Siftora 5–10 times faster. Other graphics cards work through Vulkan, and any computer works on the CPU, more slowly.
+- **3–12 GB of free disk space** for the engines and AI models, depending on which you choose.
+
+## Install
+
+1. Download `Siftora Setup.exe` from the [Releases](../../releases) page.
+2. Run it. Windows may show "Windows protected your PC", because the app is not code-signed yet: choose **More info → Run anyway**.
+3. On first start, Siftora checks your hardware, recommends models that fit it, and shows what it found already on your computer. Then it downloads what is missing.
+
+## How to use it
+
+1. **Create:** drop in a video or paste a YouTube link, then **Find clips**.
+2. **Queue:** follow the progress. Finished steps are saved, so a retry does not start over.
+3. **Results:** review the clips by score, pick a caption style and layout, and render the reels. They are saved in `Videos\Siftora`.
+
+Scores are estimates to help you choose. They do not guarantee that a clip will do well.
+
+## Privacy
+
+- Your videos, transcripts and clips **never leave your computer**. There is no account, no tracking and no analytics.
+- Siftora goes online only to download its engines and AI models (from GitHub and Hugging Face), to check for engine updates, and to download YouTube videos you add.
+- If you point Ollama at another computer (its `OLLAMA_HOST` setting), transcripts are sent to that computer for the clip-finding step.
+
+## Removing Siftora
+
+- **Windows:** uninstall it from **Settings → Apps**. You are asked whether to also delete the downloaded models and settings.
+- **Any system:** **Settings → Storage** in the app shows how much space it uses and can delete the engines and models, or remove all its data before you delete the app.
+
+Your rendered reels are never deleted by either.
+
+## Platforms
+
+| | Windows | Linux | macOS |
+|---|---|---|---|
+| Status | Tested | Should work, untested | Not ready yet |
+| Fast transcription | NVIDIA GPU | CPU only for now | Needs our own build (planned) |
+
+## Building from source
 
 ```sh
 npm install
@@ -22,40 +69,20 @@ node node_modules/electron/install.js   # npm 11 blocks Electron's own install s
 npm run dev
 ```
 
-`npm run typecheck`, `npm run build`, and `npm run dist` (installers via electron-builder) are also available. If you start it from a VS Code extension terminal and Electron behaves like plain Node, unset `ELECTRON_RUN_AS_NODE`.
+Also available: `npm run typecheck`, `npm run build`, and `npm run dist` to build the installer into `release/`. If Electron starts as plain Node from a VS Code terminal, unset `ELECTRON_RUN_AS_NODE`.
 
-The design and decisions are in [docs/PHASE0_PROPOSAL.md](docs/PHASE0_PROPOSAL.md).
+The app is Electron, React and TypeScript. The work happens in `src/main/pipeline`: transcription (`transcribe.ts`), speaker detection (`speakers.ts`), finding moments (`discover.ts`) and rendering (`render.ts`).
 
-## Engine updates
+### Engine updates
 
-Engines (whisper.cpp, llama.cpp, FFmpeg, sherpa-onnx) are downloaded on demand, never bundled. The built-in list in `src/shared/engines.ts` is the fallback; the app also reads a tested list, `engines.json`, from this repo's `engines` release and offers an **Update** on the Models screen when an installed engine has a newer tested version (the old version is kept next to it).
+Engines are downloaded on demand, never bundled. Besides the built-in list in `src/shared/engines.ts`, the app reads a tested list, `engines.json`, from this repository's `engines` release, and offers an **Update** on the Models screen when a newer tested version exists.
 
-That list is maintained by [.github/workflows/engines.yml](.github/workflows/engines.yml): weekly, or on demand, it picks up a new whisper.cpp release, builds the macOS versions upstream does not ship, smoke-tests every build with the app's own flags ([scripts/engines/smoke-whisper.mjs](scripts/engines/smoke-whisper.mjs)), and publishes only if all pass.
+[.github/workflows/engines.yml](.github/workflows/engines.yml) keeps that list current: weekly, or on demand, it picks up a new whisper.cpp release, builds the macOS versions upstream does not ship, smoke-tests every build with the app's own settings ([scripts/engines/smoke-whisper.mjs](scripts/engines/smoke-whisper.mjs)), and publishes only if all pass. To enable it, set `ENGINE_REPO` in `src/shared/engines.ts` to this repository's `owner/repo` and run the workflow once from the Actions tab.
 
-To turn it on, push the repo to GitHub, set `ENGINE_REPO` in `src/shared/engines.ts` to `owner/repo`, and run the workflow once from the Actions tab.
+The original design notes are in [docs/planning](docs/planning).
 
-## Documentation
+## License
 
-- [Project specification](PROJECT_SPEC.md) — product requirements and scope.
-- [Development plan](DEVELOPMENT_PLAN.md) — milestones and acceptance criteria.
-- [Architecture](ARCHITECTURE.md) — proposed application structure and engineering principles.
-- [UI/UX](docs/UI_UX.md) — screens, workflows, and interaction requirements.
-- [AI models](docs/AI_MODELS.md) — model categories, selection, compatibility, and lifecycle.
-- [Processing pipeline](docs/PROCESSING_PIPELINE.md) — analysis stages and job lifecycle.
-- [Viral scoring](docs/VIRAL_SCORING.md) — candidate detection and explainable scoring.
-- [Video storage](docs/VIDEO_STORAGE.md) — original-file references, cache, outputs, and recovery.
+Siftora is free software under the [GNU GPL v3](LICENSE).
 
-## Important product principles
-
-1. **Local-first:** user media and AI analysis remain on the user's machine by default.
-2. **No source duplication:** imported videos are referenced by their original absolute paths and are not copied into the application folder.
-3. **Modular AI:** optional analyzers can be installed independently.
-4. **Hardware-aware:** recommend models based on actual runtime capability and available resources.
-5. **Honest functionality:** never present mock analysis or fake progress as completed functionality.
-6. **Human review:** AI suggestions are editable; scores estimate potential engagement and do not guarantee virality.
-
-## Instructions for a coding agent
-
-Read `PROJECT_SPEC.md` and all relevant documents before implementation. First inspect the existing repository and report its current structure, technology stack, and constraints. Then propose an architecture and phased implementation plan. Do not begin implementation until the user approves that plan.
-
-Treat this documentation as product requirements, not permission to choose arbitrary technologies or introduce large dependencies without explaining their trade-offs.
+It builds on [whisper.cpp](https://github.com/ggml-org/whisper.cpp) and [llama.cpp](https://github.com/ggml-org/llama.cpp) (MIT), [FFmpeg](https://ffmpeg.org) (GPL), [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (Apache 2.0), OpenAI's Whisper models (MIT), Qwen models (Apache 2.0), Silero VAD (MIT), and the caption fonts listed in [resources/fonts](resources/fonts/README.md) (SIL Open Font License). The engines and models are downloaded from their publishers when you need them.

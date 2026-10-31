@@ -2,7 +2,7 @@
 
 **Status:** proposal, awaiting approval. Nothing here is implemented yet.
 
-This document answers the Phase 0 questions in [DEVELOPMENT_PLAN.md](../DEVELOPMENT_PLAN.md): technology stack, packaging, module boundaries, and how the app picks the fastest hardware path on each machine.
+This document answers the Phase 0 questions in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md): technology stack, packaging, module boundaries, and how the app picks the fastest hardware path on each machine.
 
 ## 1. Inputs and assumptions
 
@@ -209,7 +209,7 @@ This is the product's core, so the method is specified up front:
 
 ## 10. Changes to the development plan
 
-1. **Quality question: already answered.** An earlier prototype (Python openai-whisper + Ollama qwen3:14b) rated about 80% of its clips as good on a 25-minute group game-show video. That's enough to build the app. The lessons from it are in §11. [spike/find-clips.ts](../spike/find-clips.ts) stays as a reference for the segment-ID discovery approach.
+1. **Quality question: already answered.** An earlier prototype (Python openai-whisper + Ollama qwen3:14b) rated about 80% of its clips as good on a 25-minute group game-show video. That's enough to build the app. The lessons from it are in §11. [spike/find-clips.ts](../../spike/find-clips.ts) stays as a reference for the segment-ID discovery approach.
 2. **Phase 2 (hardware diagnosis)** follows §3: detect, probe, benchmark, recommend.
 3. **Phase 3 (downloads)** covers engines, GPU runtimes, and FFmpeg, not only model weights.
 4. **YouTube import** moves to after Phase 11 as an optional feature.

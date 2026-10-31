@@ -1,6 +1,6 @@
 // Downloadable models. URLs, sizes and SHA-256 were verified against the hosts on
 // 2026-10-31. Pinned to `resolve/main`; move to self-hosted release assets before 1.0
-// (see docs/PHASE0_PROPOSAL.md, "Signed manifest").
+// (see docs/planning/PHASE0_PROPOSAL.md, "Signed manifest").
 
 export type ModelKind = 'transcription' | 'llm' | 'vad' | 'diarization'
 
