@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { CATALOG } from '../shared/catalog'
 import { CAPTION_FONTS, DEFAULT_SETTINGS, SPEAKER_SLOTS, type Settings } from '../shared/types'
 import { log } from './logger'
 
@@ -20,6 +21,12 @@ function numberOr(value: unknown, fallback: number): number {
 
 function colorOr(value: unknown, fallback: string): string {
   return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback
+}
+
+function modelIdOr(value: unknown, kind: 'transcription' | 'llm'): string | null {
+  return typeof value === 'string' && CATALOG.some((m) => m.id === value && m.kind === kind)
+    ? value
+    : null
 }
 
 function settingsPath(): string {
@@ -72,7 +79,11 @@ function sanitize(input: unknown): Settings {
         : defaults.language,
     minClipSeconds: Math.min(minClipSeconds, maxClipSeconds),
     maxClipSeconds,
-    minScore: clamp(numberOr(raw.minScore, defaults.minScore), 0, 10)
+    minScore: clamp(numberOr(raw.minScore, defaults.minScore), 0, 10),
+    onboarded: typeof raw.onboarded === 'boolean' ? raw.onboarded : defaults.onboarded,
+    transcriptionModel: modelIdOr(raw.transcriptionModel, 'transcription'),
+    llmModel: modelIdOr(raw.llmModel, 'llm'),
+    useVad: typeof raw.useVad === 'boolean' ? raw.useVad : defaults.useVad
   }
 }
 

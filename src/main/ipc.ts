@@ -1,5 +1,7 @@
-import { app, dialog, ipcMain } from 'electron'
+import { app, dialog, ipcMain, shell } from 'electron'
 import { IPC, type Settings } from '../shared/types'
+import { cancelDownload, deleteModel, downloadModels, listModels, modelsDir } from './downloads'
+import { detectHardware, recommend } from './hardware'
 import { log } from './logger'
 import { getSettings, setSettings } from './settings'
 
@@ -35,4 +37,27 @@ export function registerIpc(): void {
     platform: process.platform,
     userData: app.getPath('userData')
   }))
+
+  ipcMain.handle(IPC.getHardware, () => detectHardware())
+
+  ipcMain.handle(IPC.getRecommendation, async () => recommend(await detectHardware()))
+
+  ipcMain.handle(IPC.listModels, () => listModels())
+
+  ipcMain.handle(IPC.downloadModels, (_event, ids: unknown) => {
+    const list = Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []
+    downloadModels(list)
+  })
+
+  ipcMain.handle(IPC.cancelDownload, (_event, id: unknown) => {
+    cancelDownload(String(id))
+  })
+
+  ipcMain.handle(IPC.deleteModel, async (_event, id: unknown) => {
+    await deleteModel(String(id))
+  })
+
+  ipcMain.handle(IPC.openModelsFolder, async () => {
+    await shell.openPath(modelsDir())
+  })
 }

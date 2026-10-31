@@ -1,5 +1,5 @@
-import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import { IPC, type Api } from '../shared/types'
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
+import { IPC, type Api, type ModelState } from '../shared/types'
 
 const api: Api = {
   getSettings: () => ipcRenderer.invoke(IPC.getSettings),
@@ -10,7 +10,19 @@ const api: Api = {
     ipcRenderer.send(IPC.log, level, msg)
   },
   appInfo: () => ipcRenderer.invoke(IPC.appInfo),
-  getPathForFile: (file) => webUtils.getPathForFile(file)
+  getPathForFile: (file) => webUtils.getPathForFile(file),
+  getHardware: () => ipcRenderer.invoke(IPC.getHardware),
+  getRecommendation: () => ipcRenderer.invoke(IPC.getRecommendation),
+  listModels: () => ipcRenderer.invoke(IPC.listModels),
+  downloadModels: (ids) => ipcRenderer.invoke(IPC.downloadModels, ids),
+  cancelDownload: (id) => ipcRenderer.invoke(IPC.cancelDownload, id),
+  deleteModel: (id) => ipcRenderer.invoke(IPC.deleteModel, id),
+  openModelsFolder: () => ipcRenderer.invoke(IPC.openModelsFolder),
+  onModelState: (cb) => {
+    const listener = (_event: IpcRendererEvent, state: ModelState): void => cb(state)
+    ipcRenderer.on(IPC.onModelState, listener)
+    return () => ipcRenderer.removeListener(IPC.onModelState, listener)
+  }
 }
 
 contextBridge.exposeInMainWorld('api', api)

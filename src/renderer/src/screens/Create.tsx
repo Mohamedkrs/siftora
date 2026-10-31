@@ -1,7 +1,10 @@
 import { useState, type DragEvent, type FormEvent } from 'react'
-import NotImplemented from '../components/NotImplemented'
-import { useSettings } from '../state/settings'
+import { CATALOG, SPEAKER_MODEL_IDS } from '../../../shared/catalog'
 import { CAPTION_FONTS, type Layout, type SubtitleStyle } from '../../../shared/types'
+import ModelProgress from '../components/ModelProgress'
+import NotImplemented from '../components/NotImplemented'
+import { useModels } from '../state/models'
+import { useSettings } from '../state/settings'
 
 // Checkbox and color picker are siblings, not inside one <label>: a label forwards
 // every click to its first control, which made the picker impossible to open.
@@ -63,6 +66,7 @@ function displayName(value: string): string {
 
 export default function Create() {
   const { settings, update } = useSettings()
+  const { models, download } = useModels()
   const [videos, setVideos] = useState<string[]>([])
   const [dragging, setDragging] = useState(false)
   const [url, setUrl] = useState('')
@@ -71,6 +75,7 @@ export default function Create() {
   const [previewSpeaker, setPreviewSpeaker] = useState(0)
 
   const subtitle = settings.subtitle
+  const speakersInstalled = SPEAKER_MODEL_IDS.every((id) => models[id]?.status === 'installed')
 
   const addVideos = (paths: string[]): void => {
     const clean = paths.filter((path) => path.trim().length > 0)
@@ -353,6 +358,38 @@ export default function Create() {
               </label>
             </div>
           </section>
+
+          {subtitle.speakerColors && !speakersInstalled ? (
+            <section className="card speaker-prompt">
+              <h2>Speaker detection</h2>
+              <p className="muted">
+                Speaker colors need speaker detection — a one-time 31 MB download.
+              </p>
+              <div className="actions">
+                <button
+                  type="button"
+                  className="button primary"
+                  onClick={() => download(SPEAKER_MODEL_IDS)}
+                >
+                  Download now
+                </button>
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => setSubtitle({ speakerColors: false })}
+                >
+                  Not now
+                </button>
+              </div>
+              {SPEAKER_MODEL_IDS.map((id) => {
+                const state = models[id]
+                const entry = CATALOG.find((model) => model.id === id)
+                return state && entry ? (
+                  <ModelProgress key={id} state={state} totalBytes={entry.bytes} />
+                ) : null
+              })}
+            </section>
+          ) : null}
 
           <div className="actions">
             <button
