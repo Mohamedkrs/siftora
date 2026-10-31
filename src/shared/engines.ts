@@ -5,6 +5,7 @@
 
 export type EngineName = 'llama' | 'whisper' | 'ffmpeg'
 export type Backend = 'cuda' | 'metal' | 'vulkan' | 'cpu'
+export type Platform = 'win32' | 'linux' | 'darwin'
 
 export interface EngineFile {
   url: string
@@ -16,7 +17,7 @@ export interface EngineEntry {
   id: string
   engine: EngineName
   backend: Backend
-  platform: NodeJS.Platform
+  platform: Platform
   arch: 'x64' | 'arm64'
   /** Archives are all extracted into the same engines/<id>/ folder. */
   files: EngineFile[]
@@ -178,7 +179,7 @@ const PREFERENCE: Backend[] = ['cuda', 'metal', 'vulkan', 'cpu']
 /** Best build of `engine` for this machine, given the backend the hardware check chose. */
 export function pickEngine(
   engine: EngineName,
-  platform: NodeJS.Platform,
+  platform: string,
   arch: string,
   backend: Backend
 ): EngineEntry | null {
