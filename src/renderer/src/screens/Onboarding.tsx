@@ -497,9 +497,10 @@ export default function Onboarding() {
                 type="button"
                 className="button primary"
                 disabled={!transcription || !llm || !engineOption}
-                onClick={() => setStep(3)}
+                // Everything is already here: no download step to wait on.
+                onClick={() => (totalBytes === 0 ? finish() : setStep(3))}
               >
-                Download selected
+                {totalBytes === 0 ? 'Finish setup' : `Download ${formatBytes(totalBytes)}`}
               </button>
             </div>
           </>
