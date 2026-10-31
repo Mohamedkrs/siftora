@@ -82,6 +82,11 @@ function ModelCard(props: CardProps) {
           <h3>
             {title}
             {props.recommended ? <span className="badge">Recommended</span> : null}
+            {linkedFile ? (
+              <span className="badge badge-ok">On this computer</span>
+            ) : missingIds.length === 0 && props.entries.length > 0 && !props.custom ? (
+              <span className="badge badge-ok">Already downloaded</span>
+            ) : null}
           </h3>
           {description ? <p className="model-desc">{description}</p> : null}
         </div>

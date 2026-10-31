@@ -26,6 +26,7 @@ export default function Onboarding() {
   const [engineOptions, setEngineOptions] = useState<EngineOption[] | null>(null)
   const [engineBackend, setEngineBackend] = useState(settings.engineBackend)
   const [enginesVersion, setEnginesVersion] = useState(0)
+  const [ollamaModels, setOllamaModels] = useState<string[]>([])
   const useOllama = settings.llmProvider === 'ollama'
   const switchToApp = async (patch: Partial<Settings>): Promise<void> => {
     await window.api.setSettings(patch)
@@ -59,6 +60,25 @@ export default function Onboarding() {
       alive = false
     }
   }, [hardware, enginesVersion])
+
+  useEffect(() => {
+    window.api
+      .detectOllama()
+      .then((info) => setOllamaModels(info.models.map((model) => model.name.toLowerCase())))
+      .catch(() => undefined)
+  }, [])
+
+  /** Badge text when a catalog model is already on this computer (or in the user's Ollama). */
+  const presence = (id: string): string | null => {
+    if (settings.linkedModels[id]) return 'On this computer'
+    if (models[id]?.status === 'installed') return 'Already downloaded'
+    // catalog id "qwen3-14b" ↔ Ollama tag "qwen3:14b"
+    const ollamaName = id.replace(/-(\d+(\.\d+)?b)$/i, ':$1').toLowerCase()
+    if (ollamaModels.some((name) => name === ollamaName || name.startsWith(`${ollamaName}-`))) {
+      return 'In your Ollama'
+    }
+    return null
+  }
 
   useEffect(() => {
     if (!recommendation) return
@@ -263,6 +283,9 @@ export default function Onboarding() {
                         {recommendation?.transcription === entry.id ? (
                           <span className="badge">Recommended</span>
                         ) : null}
+                        {presence(entry.id) ? (
+                          <span className="badge badge-ok">{presence(entry.id)}</span>
+                        ) : null}
                       </strong>
                       <span>
                         {entry.description} · {formatBytes(entry.bytes)}
@@ -339,6 +362,9 @@ export default function Onboarding() {
                         {entry.name}
                         {recommendation?.llm === entry.id ? (
                           <span className="badge">Recommended</span>
+                        ) : null}
+                        {presence(entry.id) ? (
+                          <span className="badge badge-ok">{presence(entry.id)}</span>
                         ) : null}
                       </strong>
                       <span>

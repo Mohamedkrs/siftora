@@ -979,3 +979,9 @@ select {
 .system-engines .field select {
   margin-top: 4px;
 }
+
+.badge-ok {
+  background: rgba(46, 204, 113, 0.15);
+  border-color: rgba(46, 204, 113, 0.45);
+  color: #8ef0b5;
+}
