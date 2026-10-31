@@ -559,7 +559,44 @@ function unpackFailed(entry: EngineEntry, name: string): void {
   })
 }
 
-async function installEngine(entry: EngineEntry): Promise<void> {
+/**
+ * For engines marked `latest`, swap the pinned files for the newest stable build, verified with
+ * the SHA-256 digest GitHub publishes for the asset. Falls back to the pinned files offline.
+ */
+async function withLatestFiles(entry: EngineEntry): Promise<EngineEntry> {
+  if (!entry.latest) return entry
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${entry.latest.repo}/releases/tags/latest`,
+      { headers: { Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(10000) }
+    )
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const release = (await response.json()) as {
+      assets?: { name: string; size: number; digest?: string; browser_download_url: string }[]
+    }
+    const pattern = entry.latest.asset
+    const newest = (release.assets ?? [])
+      .map((asset) => ({ asset, match: pattern.exec(asset.name) }))
+      .filter(({ asset, match }) => match && asset.digest?.startsWith('sha256:'))
+      .sort((a, b) => {
+        const [, aMajor, aMinor] = a.match as RegExpExecArray
+        const [, bMajor, bMinor] = b.match as RegExpExecArray
+        return Number(bMajor) - Number(aMajor) || Number(bMinor) - Number(aMinor)
+      })[0]?.asset
+    if (!newest?.digest) throw new Error('no matching asset')
+    log.info('downloads', `${entry.id}: newest build is ${newest.name}`)
+    return {
+      ...entry,
+      files: [{ url: newest.browser_download_url, bytes: newest.size, sha256: newest.digest.slice(7) }]
+    }
+  } catch (err) {
+    log.warn('downloads', `${entry.id}: could not look up newest build, using pinned: ${String(err)}`)
+    return entry
+  }
+}
+
+async function installEngine(pinned: EngineEntry): Promise<void> {
+  const entry = await withLatestFiles(pinned)
   const controller = new AbortController()
   controllers.set(entry.id, controller)
   const total = engineBytes(entry)

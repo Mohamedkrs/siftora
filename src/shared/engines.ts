@@ -24,6 +24,11 @@ export interface EngineEntry {
   /** Executable to look for (recursively) after extraction, without .exe. */
   binary: string
   license: string
+  /**
+   * Resolve the newest build at install time from this repo's rolling "latest" release; the
+   * asset regex's first two groups are the major/minor version. `files` is the fallback.
+   */
+  latest?: { repo: string; asset: RegExp }
 }
 
 const LLAMA = 'https://github.com/ggml-org/llama.cpp/releases/download/b12020'
@@ -93,7 +98,9 @@ export const ENGINES: EngineEntry[] = [
     arch: 'x64',
     files: [{ url: `${FFMPEG}/ffmpeg-n8.1.3-27-g8dca1586f4-win64-gpl-8.1.zip`, bytes: 194182300, sha256: '401dffcf14c301082e1fc03b0bc876b92ea676bfc521fc56e80a1537d137034f' }],
     binary: 'ffmpeg',
-    license: 'GPL-3.0'
+    license: 'GPL-3.0',
+    // Newest stable branch (n9.0, n9.1, …), not the nightly "master" builds.
+    latest: { repo: 'BtbN/FFmpeg-Builds', asset: /^ffmpeg-n(\d+)\.(\d+)-latest-win64-gpl-[\d.]+\.zip$/ }
   },
 
   // ── Linux x64 ──
@@ -148,7 +155,8 @@ export const ENGINES: EngineEntry[] = [
     arch: 'x64',
     files: [{ url: `${FFMPEG}/ffmpeg-n8.1.3-27-g8dca1586f4-linux64-gpl-8.1.tar.xz`, bytes: 152246308, sha256: '41e9c565594c390622cf968d82fa4135d9e9a11d06c1515644288cbc844e3380' }],
     binary: 'ffmpeg',
-    license: 'GPL-3.0'
+    license: 'GPL-3.0',
+    latest: { repo: 'BtbN/FFmpeg-Builds', asset: /^ffmpeg-n(\d+)\.(\d+)-latest-linux64-gpl-[\d.]+\.tar\.xz$/ }
   },
 
   // ── macOS ── (whisper.cpp and FFmpeg: own builds needed, see TODO above)
