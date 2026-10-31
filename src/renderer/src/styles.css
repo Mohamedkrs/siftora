@@ -985,3 +985,16 @@ select {
   border-color: rgba(46, 204, 113, 0.45);
   color: #8ef0b5;
 }
+
+.found-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.found-row {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}

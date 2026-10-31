@@ -3,8 +3,7 @@ import { CATALOG, SPEAKER_MODEL_IDS, type ModelEntry } from '../../../shared/cat
 import { ENGINES, engineBytes, engineLabel } from '../../../shared/engines'
 import type { EngineOption, Settings } from '../../../shared/types'
 import EngineChoice from '../components/EngineChoice'
-import ExistingModels from '../components/ExistingModels'
-import SystemEngines from '../components/SystemEngines'
+import { FoundEngines, FoundLlms, FoundTranscription, SearchComputerButton } from '../components/FoundOnComputer'
 import ModelProgress from '../components/ModelProgress'
 import SystemCard from '../components/SystemCard'
 import { formatBytes } from '../lib/format'
@@ -224,11 +223,12 @@ export default function Onboarding() {
           <>
             <section className="card">
               <h2>Already on this computer</h2>
-              <SystemEngines autoPickFfmpeg onChange={() => setEnginesVersion((v) => v + 1)} />
+              <SearchComputerButton auto />
             </section>
 
             <section className="card">
               <h2>Engines</h2>
+              <FoundEngines autoPickFfmpeg onChange={() => setEnginesVersion((v) => v + 1)} />
               {engineOptions ? (
                 <EngineChoice
                   options={engineOptions}
@@ -246,11 +246,6 @@ export default function Onboarding() {
               )}
             </section>
 
-            <section className="card">
-              <h2>Models already on this computer</h2>
-              <ExistingModels />
-            </section>
-
             {usePyWhisper ? (
               <section className="card">
                 <h2>Transcription</h2>
@@ -265,6 +260,7 @@ export default function Onboarding() {
               <>
             <section className="card">
               <h2>Transcription</h2>
+              <FoundTranscription onChange={() => setEnginesVersion((v) => v + 1)} />
               <div className="choice-list">
                 {transcriptionModels.map((entry) => (
                   <label
@@ -348,6 +344,7 @@ export default function Onboarding() {
               <>
             <section className="card">
               <h2>Clip finder AI</h2>
+              <FoundLlms onChange={() => setEnginesVersion((v) => v + 1)} />
               <div className="choice-list">
                 {llmModels.map((entry) => (
                   <label key={entry.id} className={llm === entry.id ? 'choice selected' : 'choice'}>

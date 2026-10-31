@@ -3,10 +3,9 @@ import { CATALOG, type ModelEntry } from '../../../shared/catalog'
 import { ENGINES, engineBytes, engineLabel } from '../../../shared/engines'
 import type { CustomModel, EngineOption, ModelState } from '../../../shared/types'
 import EngineChoice from '../components/EngineChoice'
-import ExistingModels from '../components/ExistingModels'
+import { FoundEngines, FoundLlms, FoundTranscription, SearchComputerButton } from '../components/FoundOnComputer'
 import ModelProgress from '../components/ModelProgress'
 import SystemCard from '../components/SystemCard'
-import SystemEngines from '../components/SystemEngines'
 import { formatBytes } from '../lib/format'
 import { useModels } from '../state/models'
 import { useSettings } from '../state/settings'
@@ -262,11 +261,11 @@ export default function Models() {
       </div>
 
       <SystemCard />
+      <SearchComputerButton />
 
       <section className="models-section">
         <h2>Engines</h2>
-        <p className="label">Already on this computer</p>
-        <SystemEngines autoScan={false} onChange={() => setEnginesVersion((v) => v + 1)} />
+        <FoundEngines onChange={() => setEnginesVersion((v) => v + 1)} />
         <p className="label">Engine type</p>
         {engineOptions ? (
           <EngineChoice
@@ -332,12 +331,8 @@ export default function Models() {
       </section>
 
       <section className="models-section">
-        <h2>Models already on this computer</h2>
-        <ExistingModels />
-      </section>
-
-      <section className="models-section">
         <h2>Transcription</h2>
+        <FoundTranscription onChange={() => setEnginesVersion((v) => v + 1)} />
         {transcriptionModels.map((entry) => (
           <ModelCard
             key={entry.id}
@@ -385,6 +380,7 @@ export default function Models() {
 
       <section className="models-section">
         <h2>Clip finder AI</h2>
+        <FoundLlms onChange={() => setEnginesVersion((v) => v + 1)} />
         {llmModels.map((entry) => (
           <ModelCard
             key={entry.id}
