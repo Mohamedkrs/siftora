@@ -12,6 +12,7 @@ import {
 } from '../shared/engines'
 import type {
   EngineBackend,
+  EngineKind,
   EngineOption,
   GpuInfo,
   HardwareInfo,
@@ -192,7 +193,8 @@ async function collect(): Promise<HardwareInfo> {
   }
 }
 
-const ENGINE_NAMES: EngineName[] = ['whisper', 'llama', 'ffmpeg']
+// Core engines every job needs (sherpa is only installed with speaker detection).
+const ENGINE_NAMES: EngineKind[] = ['whisper', 'llama', 'ffmpeg']
 
 const ENGINE_LABELS: Record<Backend, string> = {
   cuda: 'GPU accelerated — NVIDIA CUDA',
@@ -208,7 +210,7 @@ function resolvedBackend(hw: HardwareInfo, preferred: EngineBackend): Backend {
 }
 
 /** Engines covered by something already on the computer, so nothing needs downloading. */
-export function satisfiedEngines(): EngineName[] {
+export function satisfiedEngines(): EngineKind[] {
   const settings = getSettings()
   return ENGINE_NAMES.filter((name) => {
     const path = settings.enginePaths[name]

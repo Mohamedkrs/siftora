@@ -138,10 +138,11 @@ export const CATALOG: ModelEntry[] = [
     kind: 'vad',
     name: 'Silero voice detection',
     description: 'Skips silence and music so Whisper does not invent words.',
-    url: `${SHERPA}/asr-models/silero_vad.onnx`,
-    file: 'silero_vad.onnx',
-    bytes: 643854,
-    sha256: '9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6',
+    // ggml format, for whisper.cpp's built-in voice detection (--vad).
+    url: 'https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin',
+    file: 'ggml-silero-v5.1.2.bin',
+    bytes: 885098,
+    sha256: '29940d98d42b91fbd05ce489f3ecf7c72f0a42f027e4875919a28fb4c04ea2cf',
     license: 'MIT',
     memoryBytes: 50 * MB
   },

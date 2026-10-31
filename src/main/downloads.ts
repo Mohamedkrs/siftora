@@ -16,7 +16,7 @@ import {
 import { basename, join } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { CATALOG, type ModelEntry } from '../shared/catalog'
+import { CATALOG, SPEAKER_MODEL_IDS, type ModelEntry } from '../shared/catalog'
 import {
   ENGINES,
   engineBytes,
@@ -163,7 +163,7 @@ const BACKEND_ORDER: Backend[] = ['cuda', 'metal', 'vulkan', 'cpu']
 
 /** Binary of the best installed build of `engineName` for this OS/arch. */
 export function enginePath(engineName: EngineName): string | null {
-  const own = getSettings().enginePaths[engineName]
+  const own = engineName === 'sherpa' ? undefined : getSettings().enginePaths[engineName]
   if (own && existsSync(own)) return own
   for (const backend of BACKEND_ORDER) {
     const entry = pickEngine(engineName, process.platform, process.arch, backend)
@@ -239,7 +239,12 @@ export function modelFilePath(id: string): string | null {
   return getSettings().customModels.find((model) => model.id === id)?.path ?? null
 }
 
-export function downloadModels(ids: string[]): void {
+export function downloadModels(requested: string[]): void {
+  const sherpa = pickEngine('sherpa', process.platform, process.arch, 'cpu')
+  const ids =
+    sherpa && requested.some((id) => SPEAKER_MODEL_IDS.includes(id)) && !requested.includes(sherpa.id)
+      ? [...requested, sherpa.id]
+      : requested
   for (const id of ids) {
     const entry = findItem(id)
     if (!entry) continue

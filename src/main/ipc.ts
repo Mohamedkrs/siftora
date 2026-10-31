@@ -3,6 +3,7 @@ import { IPC, type Settings } from '../shared/types'
 import { cancelDownload, deleteModel, downloadModels, listModels, modelsDir } from './downloads'
 import { detectHardware, engineOptions, recommend, requiredEngineInfo } from './hardware'
 import { addCustomModel, removeCustomModel, scanForModels } from './localModels'
+import { addJobs, cancelJob, findAgain, listJobs, removeJob, renderClips, retryJob } from './jobs'
 import { log } from './logger'
 import {
   detectOllama,
@@ -98,6 +99,24 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.deleteModel, async (_event, id: unknown) => {
     await deleteModel(String(id))
+  })
+
+  const ids = (value: unknown): string[] =>
+    Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+
+  ipcMain.handle(IPC.addJobs, (_event, sources: unknown) => addJobs(ids(sources)))
+  ipcMain.handle(IPC.listJobs, () => listJobs())
+  ipcMain.handle(IPC.cancelJob, (_event, id: unknown) => cancelJob(String(id)))
+  ipcMain.handle(IPC.removeJob, (_event, id: unknown) => removeJob(String(id)))
+  ipcMain.handle(IPC.retryJob, (_event, id: unknown) => retryJob(String(id)))
+  ipcMain.handle(IPC.findAgain, (_event, id: unknown) => findAgain(String(id)))
+  ipcMain.handle(IPC.renderClips, (_event, jobId: unknown, clipIds: unknown) => renderClips(String(jobId), ids(clipIds)))
+  // Only files the app produced or the user chose are passed here; still, never run programs.
+  ipcMain.handle(IPC.openPath, async (_event, path: unknown) => {
+    if (typeof path === 'string' && !/\.(exe|bat|cmd|com|ps1|sh|app|msi|lnk)$/i.test(path)) await shell.openPath(path)
+  })
+  ipcMain.handle(IPC.showInFolder, (_event, path: unknown) => {
+    if (typeof path === 'string') shell.showItemInFolder(path)
   })
 
   ipcMain.handle(IPC.openModelsFolder, async () => {

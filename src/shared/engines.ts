@@ -3,7 +3,7 @@
 // TODO before 1.0: mirror these on our own releases. BtbN prunes old autobuild tags, and
 // whisper.cpp ships no macOS binaries, so macOS whisper/FFmpeg need our own builds.
 
-export type EngineName = 'llama' | 'whisper' | 'ffmpeg'
+export type EngineName = 'llama' | 'whisper' | 'ffmpeg' | 'sherpa'
 export type Backend = 'cuda' | 'metal' | 'vulkan' | 'cpu'
 export type Platform = 'win32' | 'linux' | 'darwin'
 
@@ -33,9 +33,42 @@ export interface EngineEntry {
 
 const LLAMA = 'https://github.com/ggml-org/llama.cpp/releases/download/b12020'
 const WHISPER = 'https://github.com/ggml-org/whisper.cpp/releases/download/b5454'
+const SHERPA = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1'
 const FFMPEG = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-31-12-59'
 
 export const ENGINES: EngineEntry[] = [
+  // ── sherpa-onnx: speaker detection (only installed with the speaker detection feature) ──
+  {
+    id: 'sherpa-win',
+    engine: 'sherpa',
+    backend: 'cpu',
+    platform: 'win32',
+    arch: 'x64',
+    files: [{ url: `${SHERPA}/sherpa-onnx-v2.0.1-win-x64-shared-MD-Release-no-tts.tar.bz2`, bytes: 20962760, sha256: '11fd6a50b97eed38b54fb16d8219f49b16aa7f6a8e43a042316469ef47652e82' }],
+    binary: 'sherpa-onnx-offline-speaker-diarization',
+    license: 'Apache-2.0'
+  },
+  {
+    id: 'sherpa-linux',
+    engine: 'sherpa',
+    backend: 'cpu',
+    platform: 'linux',
+    arch: 'x64',
+    files: [{ url: `${SHERPA}/sherpa-onnx-v2.0.1-linux-x64-shared-no-tts.tar.bz2`, bytes: 25289904, sha256: 'b3b095f619059d54914027ff38f8a0a132ea3bbc5df32a212a9743a8bd1467b2' }],
+    binary: 'sherpa-onnx-offline-speaker-diarization',
+    license: 'Apache-2.0'
+  },
+  ...(['arm64', 'x64'] as const).map((arch) => ({
+    id: `sherpa-mac-${arch}`,
+    engine: 'sherpa' as const,
+    backend: 'cpu' as const,
+    platform: 'darwin' as const,
+    arch,
+    files: [{ url: `${SHERPA}/sherpa-onnx-v2.0.1-osx-universal2-shared-no-tts.tar.bz2`, bytes: 40097083, sha256: '9021b6f33e8d1657fe5ae7a13e83fc948707f86b749dc7b775680db6451cc2b8' }],
+    binary: 'sherpa-onnx-offline-speaker-diarization',
+    license: 'Apache-2.0'
+  })),
+
   // ── Windows x64 ──
   {
     id: 'llama-win-cuda',
@@ -209,7 +242,8 @@ export function engineBytes(entry: EngineEntry): number {
 const LABELS: Record<EngineName, string> = {
   llama: 'llama.cpp',
   whisper: 'whisper.cpp',
-  ffmpeg: 'FFmpeg'
+  ffmpeg: 'FFmpeg',
+  sherpa: 'sherpa-onnx (speakers)'
 }
 
 /** Display name, e.g. "llama.cpp (CUDA)" or "FFmpeg" for CPU builds. */
