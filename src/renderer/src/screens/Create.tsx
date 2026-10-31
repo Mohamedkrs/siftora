@@ -1,4 +1,4 @@
-import { useState, type DragEvent, type FormEvent } from 'react'
+import { useRef, useState, type DragEvent, type FormEvent, type PointerEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { CATALOG, SPEAKER_MODEL_IDS } from '../../../shared/catalog'
 import { formatBytes } from '../lib/format'
@@ -44,6 +44,12 @@ function ToggleColor(props: {
 }
 
 const PREVIEW_HEIGHT = 420
+// Bottom sits above where Reels/TikTok/Shorts put their buttons and captions.
+const POSITION_PRESETS = [
+  { label: 'Top', y: 15 },
+  { label: 'Middle', y: 50 },
+  { label: 'Bottom', y: 72 }
+]
 
 const layoutOptions: Array<{ value: Layout; title: string; description: string }> = [
   { value: 'blurred', title: 'Blurred background', description: 'Full frame, blurred sides' },
@@ -82,6 +88,8 @@ export default function Create() {
   const [urlError, setUrlError] = useState('')
   const [findClicked, setFindClicked] = useState(false)
   const [previewSpeaker, setPreviewSpeaker] = useState(0)
+  const [dragY, setDragY] = useState<number | null>(null)
+  const frameRef = useRef<HTMLDivElement>(null)
 
   const subtitle = settings.subtitle
   const speakersInstalled = SPEAKER_MODEL_IDS.every((id) => models[id]?.status === 'installed')
@@ -155,12 +163,14 @@ export default function Create() {
   // Stroke is painted under the fill (paint-order), so only the outer half shows; double it.
   const outlineSize = Math.max(1, Math.round(captionSize * 0.16 * 10) / 10)
   const fontWeight = CAPTION_FONTS.find((f) => f.family === subtitle.font)?.weight ?? 800
-  const captionAlign =
-    subtitle.position === 'top'
-      ? 'flex-start'
-      : subtitle.position === 'bottom'
-        ? 'flex-end'
-        : 'center'
+  // Caption height while dragging (not saved until release), else the saved one.
+  const captionY = dragY ?? subtitle.positionY
+  const yFromPointer = (event: PointerEvent<HTMLDivElement>): number => {
+    const rect = frameRef.current?.getBoundingClientRect()
+    if (!rect) return subtitle.positionY
+    const y = Math.min(95, Math.max(5, ((event.clientY - rect.top) / rect.height) * 100))
+    return Math.abs(y - 50) < 2.5 ? 50 : Math.round(y) // snap to the middle
+  }
 
   return (
     <div className="screen">
@@ -434,19 +444,22 @@ export default function Create() {
                 onColor={(outlineColor) => setSubtitle({ outlineColor })}
               />
 
-              <label className="field">
-                Position
-                <select
-                  value={subtitle.position}
-                  onChange={(event) =>
-                    setSubtitle({ position: event.target.value as SubtitleStyle['position'] })
-                  }
-                >
-                  <option value="bottom">Bottom</option>
-                  <option value="middle">Middle</option>
-                  <option value="top">Top</option>
-                </select>
-              </label>
+              <div className="field">
+                Position — {captionY}% from the top
+                <div className="position-presets">
+                  {POSITION_PRESETS.map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      className={subtitle.positionY === preset.y ? 'button small selected' : 'button small'}
+                      onClick={() => setSubtitle({ positionY: preset.y })}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+                <span className="muted">Or drag the caption in the preview.</span>
+              </div>
 
               <label className="field checkbox">
                 <input
@@ -499,10 +512,44 @@ export default function Create() {
               </div>
             ) : null}
             <div className="preview-wrap">
-              <div className={`preview-frame ${settings.layout}`}>
+              <div className={`preview-frame ${settings.layout}`} ref={frameRef}>
                 <div className="preview-backdrop" />
                 <div className="preview-content" />
-                <div className="preview-caption" style={{ alignItems: captionAlign }}>
+                {dragY !== null ? (
+                  <div className="preview-guides" aria-hidden="true">
+                    <div className="guide-zone top" />
+                    <div className="guide-center" />
+                    <div className="guide-zone bottom">May be covered by app buttons</div>
+                  </div>
+                ) : null}
+                <div
+                  className={dragY !== null ? 'preview-caption dragging' : 'preview-caption'}
+                  style={{ top: `${captionY}%` }}
+                  role="slider"
+                  tabIndex={0}
+                  aria-label="Caption position"
+                  aria-valuemin={5}
+                  aria-valuemax={95}
+                  aria-valuenow={captionY}
+                  title="Drag to move the captions"
+                  onPointerDown={(event) => {
+                    event.currentTarget.setPointerCapture(event.pointerId)
+                    setDragY(yFromPointer(event))
+                  }}
+                  onPointerMove={(event) => {
+                    if (dragY !== null) setDragY(yFromPointer(event))
+                  }}
+                  onPointerUp={() => {
+                    if (dragY !== null) setSubtitle({ positionY: dragY })
+                    setDragY(null)
+                  }}
+                  onKeyDown={(event) => {
+                    const step = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0
+                    if (step === 0) return
+                    event.preventDefault()
+                    setSubtitle({ positionY: Math.min(95, Math.max(5, subtitle.positionY + step)) })
+                  }}
+                >
                   <div
                     className="caption-text"
                     style={{

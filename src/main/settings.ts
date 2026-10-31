@@ -110,10 +110,15 @@ function sanitize(input: unknown): Settings {
       highlightColor: colorOr(subtitle.highlightColor, defaults.subtitle.highlightColor),
       outline: typeof subtitle.outline === 'boolean' ? subtitle.outline : defaults.subtitle.outline,
       outlineColor: colorOr(subtitle.outlineColor, defaults.subtitle.outlineColor),
-      position:
-        subtitle.position === 'top' || subtitle.position === 'middle' || subtitle.position === 'bottom'
-          ? subtitle.position
-          : defaults.subtitle.position,
+      // Older settings stored top/middle/bottom; map them to a height.
+      positionY: clamp(
+        numberOr(
+          subtitle.positionY,
+          subtitle.position === 'top' ? 15 : subtitle.position === 'bottom' ? 72 : defaults.subtitle.positionY
+        ),
+        5,
+        95
+      ),
       uppercase:
         typeof subtitle.uppercase === 'boolean' ? subtitle.uppercase : defaults.subtitle.uppercase,
       speakerColors:

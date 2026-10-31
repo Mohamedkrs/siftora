@@ -37,7 +37,8 @@ export interface SubtitleStyle {
   highlightColor: string
   outline: boolean
   outlineColor: string
-  position: 'bottom' | 'middle' | 'top'
+  /** Vertical center of the captions, in % of the frame height (5-95). */
+  positionY: number
   uppercase: boolean
   /** Color each speaker's lines differently (needs speaker detection). */
   speakerColors: boolean
@@ -125,7 +126,7 @@ export const DEFAULT_SETTINGS: Settings = {
     highlightColor: '#FFD400',
     outline: true,
     outlineColor: '#000000',
-    position: 'middle',
+    positionY: 50,
     uppercase: true,
     speakerColors: false,
     speakerPalette: ['#FFFFFF', '#4FC3F7', '#FF8A65', '#AED581'],
