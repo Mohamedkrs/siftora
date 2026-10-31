@@ -11,7 +11,7 @@ function scoreClass(score: number): string {
 }
 
 function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: number; stale: boolean }) {
-  const { render } = useJobs()
+  const { render, deleteReel } = useJobs()
   const [showText, setShowText] = useState(false)
   const done = clip.render.status === 'done' && clip.render.path
   const busy = clip.render.status === 'queued' || clip.render.status === 'rendering'
@@ -90,6 +90,17 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
               </button>
               <button type="button" className="button" onClick={() => render(job.id, [clip.id])}>
                 Render again
+              </button>
+              <button
+                type="button"
+                className="button danger"
+                onClick={() => {
+                  if (confirm('Delete this reel? The video file goes to the Recycle Bin; the clip stays here.')) {
+                    deleteReel(job.id, clip.id)
+                  }
+                }}
+              >
+                Delete reel
               </button>
             </>
           ) : busy ? (

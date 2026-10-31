@@ -10,6 +10,7 @@ interface JobsContextValue {
   retry: (id: string) => void
   findAgain: (id: string) => void
   render: (jobId: string, clipIds: string[]) => void
+  deleteReel: (jobId: string, clipId: string) => void
 }
 
 const JobsContext = createContext<JobsContextValue | null>(null)
@@ -38,7 +39,8 @@ export function JobsProvider({ children }: { children: ReactNode }) {
     },
     retry: (id) => void window.api.retryJob(id),
     findAgain: (id) => void window.api.findAgain(id),
-    render: (jobId, clipIds) => void window.api.renderClips(jobId, clipIds)
+    render: (jobId, clipIds) => void window.api.renderClips(jobId, clipIds),
+    deleteReel: (jobId, clipId) => void window.api.deleteReel(jobId, clipId)
   }
 
   return <JobsContext.Provider value={value}>{children}</JobsContext.Provider>

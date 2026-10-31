@@ -50,6 +50,7 @@ const api: Api = {
   retryJob: (id) => ipcRenderer.invoke(IPC.retryJob, id),
   findAgain: (id) => ipcRenderer.invoke(IPC.findAgain, id),
   renderClips: (jobId, clipIds) => ipcRenderer.invoke(IPC.renderClips, jobId, clipIds),
+  deleteReel: (jobId, clipId) => ipcRenderer.invoke(IPC.deleteReel, jobId, clipId),
   openPath: (path) => ipcRenderer.invoke(IPC.openPath, path),
   showInFolder: (path) => ipcRenderer.invoke(IPC.showInFolder, path),
   onJobUpdate: (cb) => {

@@ -1,7 +1,7 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, shell } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
-import { basename, extname, join } from 'node:path'
+import { basename, extname, join, resolve, sep } from 'node:path'
 import { SPEAKER_MODEL_IDS } from '../shared/catalog'
 import { pickEngine } from '../shared/engines'
 import type { Clip, Job, JobOptions } from '../shared/jobs'
@@ -341,6 +341,19 @@ export function renderClips(jobId: string, clipIds: string[]): void {
   }
   update(job)
   void renderNext()
+}
+
+/** Moves a rendered reel to the Recycle Bin / Trash; the clip stays and can be rendered again. */
+export async function deleteReel(jobId: string, clipId: string): Promise<void> {
+  const job = jobs.get(jobId)
+  const clip = job?.clips.find((c) => c.id === clipId)
+  if (!job || !clip || clip.render.status !== 'done') return
+  const path = clip.render.path
+  // Only ever a file the app rendered into this video's output folder.
+  const norm = (p: string): string => (process.platform === 'win32' ? resolve(p).toLowerCase() : resolve(p))
+  if (path && existsSync(path) && norm(path).startsWith(norm(job.outputDir) + sep)) await shell.trashItem(path)
+  clip.render = { status: 'idle', progress: 0 }
+  update(job)
 }
 
 async function renderNext(): Promise<void> {

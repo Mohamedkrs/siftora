@@ -1390,3 +1390,11 @@ select {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.button.danger {
+  color: var(--danger);
+}
+
+.button.danger:hover:not(:disabled) {
+  border-color: var(--danger);
+}
