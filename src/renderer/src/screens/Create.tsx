@@ -1,7 +1,9 @@
 import { useState, type DragEvent, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CATALOG, SPEAKER_MODEL_IDS } from '../../../shared/catalog'
-import { formatBytes } from '../lib/format'
+import { mediaUrl } from '../../../shared/jobs'
+import VideoCard from '../components/VideoCard'
+import { formatBytes, formatClock } from '../lib/format'
 import { useJobs } from '../state/jobs'
 import { useModels } from '../state/models'
 import { useSettings } from '../state/settings'
@@ -22,38 +24,114 @@ function isYouTubeUrl(value: string): boolean {
   }
 }
 
-function displayName(value: string): string {
-  if (/^https?:\/\//i.test(value)) return value
-  return value.split(/[\\/]/).pop() ?? value
+function fileName(path: string): string {
+  return path.split(/[\\/]/).pop() ?? path
+}
+
+function folderOf(path: string): string {
+  const parts = path.split(/[\\/]/)
+  return parts.slice(0, -1).join(path.includes('\\') ? '\\' : '/')
 }
 
 const VAD_ID = 'silero-vad'
 
+const BACKEND_LABELS: Record<string, string> = {
+  cuda: 'NVIDIA GPU',
+  metal: 'Apple GPU',
+  vulkan: 'GPU (Vulkan)',
+  cpu: 'CPU'
+}
+
+interface VideoInfo {
+  durationMs: number
+  width: number
+  height: number
+}
+
+/** A video waiting to be analysed: a frame, its name, length and resolution once known. */
+function VideoRow(props: {
+  source: string
+  info?: VideoInfo
+  onInfo: (info: VideoInfo) => void
+  onRemove: () => void
+}) {
+  const youtube = isYouTubeUrl(props.source)
+  return (
+    <li className="video-row">
+      <span className="video-row-thumb">
+        {youtube ? (
+          <span className="video-row-yt" aria-hidden="true">
+            ▶
+          </span>
+        ) : (
+          <video
+            src={mediaUrl(props.source)}
+            muted
+            preload="metadata"
+            onLoadedMetadata={(event) => {
+              const video = event.currentTarget
+              props.onInfo({ durationMs: video.duration * 1000, width: video.videoWidth, height: video.videoHeight })
+              video.currentTime = Math.min(30, video.duration * 0.1) // a frame past any intro card
+            }}
+          />
+        )}
+      </span>
+      <span className="video-row-text">
+        <strong title={props.source}>{youtube ? props.source : fileName(props.source)}</strong>
+        <span className="muted">
+          {youtube
+            ? 'YouTube · downloaded when it starts'
+            : [
+                props.info ? formatClock(props.info.durationMs) : null,
+                props.info?.height ? `${props.info.height}p` : null,
+                folderOf(props.source)
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+        </span>
+      </span>
+      <button type="button" className="icon-button" aria-label={`Remove ${fileName(props.source)}`} onClick={props.onRemove}>
+        ×
+      </button>
+    </li>
+  )
+}
+
 export default function Create() {
   const { settings, update } = useSettings()
-  const { models } = useModels()
+  const { models, hardware } = useModels()
+  const { jobs, add } = useJobs()
+  const navigate = useNavigate()
   const [videos, setVideos] = useState<string[]>([])
+  const [info, setInfo] = useState<Record<string, VideoInfo>>({})
   const [dragging, setDragging] = useState(false)
   const [url, setUrl] = useState('')
   const [urlError, setUrlError] = useState('')
-  const { add } = useJobs()
-  const navigate = useNavigate()
+  const [starting, setStarting] = useState(false)
+
   const speakersInstalled = SPEAKER_MODEL_IDS.every((id) => models[id]?.status === 'installed')
   const vadInstalled = models[VAD_ID]?.status === 'installed'
-
-  /** Hint shown under a detection option whose models are not downloaded yet. */
-  const notDownloaded = (bytes: number) => (
-    <span className="model-warning">
-      Not downloaded yet ({formatBytes(bytes)}) — download it in <Link to="/models">Models</Link>.
-    </span>
-  )
   const bytesOf = (ids: string[]): number =>
     ids.reduce((sum, id) => sum + (CATALOG.find((model) => model.id === id)?.bytes ?? 0), 0)
 
+  const modelName = (id: string | null): string | null =>
+    id ? (CATALOG.find((m) => m.id === id)?.name ?? settings.customModels.find((m) => m.id === id)?.name ?? id) : null
+  const backend = settings.engineBackend === 'auto' ? hardware?.backend : settings.engineBackend
+  const runsOn = backend ? BACKEND_LABELS[backend] : null
+  const transcriber =
+    settings.transcriptionProvider === 'openai-whisper'
+      ? `OpenAI Whisper (Python)${settings.openaiWhisperModel ? ` · ${settings.openaiWhisperModel}` : ''}`
+      : modelName(settings.transcriptionModel)
+  const finder =
+    settings.llmProvider === 'ollama' ? (settings.ollamaModel ? `Ollama · ${settings.ollamaModel}` : null) : modelName(settings.llmModel)
+
+  const recent = jobs.filter((job) => job.stage === 'done').slice(0, 4)
+  const totalMs = videos.reduce((sum, video) => sum + (info[video]?.durationMs ?? 0), 0)
+  const youtubeCount = videos.filter(isYouTubeUrl).length
+
   const addVideos = (paths: string[]): void => {
     const clean = paths.filter((path) => path.trim().length > 0)
-    if (clean.length === 0) return
-    setVideos((current) => Array.from(new Set([...current, ...clean])))
+    if (clean.length > 0) setVideos((current) => Array.from(new Set([...current, ...clean])))
   }
 
   const browse = async (): Promise<void> => {
@@ -64,164 +142,282 @@ export default function Create() {
     }
   }
 
-  const onDrop = (event: DragEvent<HTMLDivElement>): void => {
+  const onDrop = (event: DragEvent<HTMLElement>): void => {
     event.preventDefault()
     setDragging(false)
-
-    const paths = Array.from(event.dataTransfer.files).flatMap((file) => {
-      try {
-        const path = window.api.getPathForFile(file)
-        return path ? [path] : []
-      } catch {
-        return []
-      }
-    })
-
-    addVideos(paths)
+    addVideos(
+      Array.from(event.dataTransfer.files).flatMap((file) => {
+        try {
+          const path = window.api.getPathForFile(file)
+          return path ? [path] : []
+        } catch {
+          return []
+        }
+      })
+    )
   }
 
   const addUrl = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault()
     const value = url.trim()
-
     if (!isYouTubeUrl(value)) {
-      setUrlError('Enter a valid youtube.com or youtu.be URL.')
+      setUrlError('Paste a youtube.com or youtu.be link.')
       return
     }
-
     setUrlError('')
     setUrl('')
     addVideos([value])
   }
 
+  const start = (): void => {
+    setStarting(true)
+    void add(videos)
+      .then(() => {
+        setVideos([])
+        navigate('/queue')
+      })
+      .finally(() => setStarting(false))
+  }
+
   return (
-    <div className="screen">
+    <div className="screen wide">
       <div className="screen-head">
         <h1>Create</h1>
-        <p>Add videos and choose how they are analysed. Pick the caption style later on Results, with a real frame to preview.</p>
+        <p>Add long videos and Siftora finds the moments worth turning into shorts.</p>
       </div>
 
-      <div className="create-main narrow">
-          <section className="card">
-            <div
-              className={dragging ? 'drop-zone dragging' : 'drop-zone'}
-              role="button"
-              tabIndex={0}
-              onClick={() => void browse()}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  void browse()
-                }
-              }}
-              onDragOver={(event) => {
-                event.preventDefault()
-                setDragging(true)
-              }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={onDrop}
-            >
-              <strong>Drop videos here or click to browse</strong>
-              <span>mp4, mov, mkv, webm, avi, m4v</span>
+      <div className="create-layout">
+        <div className="create-main">
+          <section
+            className={dragging ? 'card add-videos dragging' : 'card add-videos'}
+            onDragOver={(event) => {
+              event.preventDefault()
+              setDragging(true)
+            }}
+            onDragLeave={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false)
+            }}
+            onDrop={onDrop}
+          >
+            <button type="button" className="add-drop" onClick={() => void browse()}>
+              <svg className="add-icon" viewBox="0 0 48 48" aria-hidden="true">
+                <rect x="6" y="10" width="36" height="28" rx="6" fill="none" stroke="currentColor" strokeWidth="2.5" />
+                <path d="M21 19 L29 24 L21 29 Z" fill="currentColor" />
+              </svg>
+              <strong>{dragging ? 'Drop to add' : 'Drop videos here or click to browse'}</strong>
+              <span className="muted">mp4, mov, mkv, webm, avi, m4v · stays on your computer</span>
+            </button>
+            <div className="add-or" aria-hidden="true">
+              <span>or</span>
             </div>
-
-            {videos.length > 0 ? (
-              <ul className="file-list">
-                {videos.map((video) => (
-                  <li className="file-item" key={video}>
-                    <span className="file-name" title={video}>
-                      {displayName(video)}
-                      {isYouTubeUrl(video) ? <span className="tag">YouTube</span> : null}
-                    </span>
-                    <button
-                      type="button"
-                      className="button ghost small"
-                      onClick={() =>
-                        setVideos((current) => current.filter((item) => item !== video))
-                      }
-                    >
-                      Remove
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="hint">No videos selected yet.</p>
-            )}
-          </section>
-
-          <section className="card">
-            <h2>YouTube</h2>
             <form className="url-row" onSubmit={addUrl}>
               <input
+                id="youtube-url"
                 type="text"
                 value={url}
                 onChange={(event) => setUrl(event.target.value)}
-                placeholder="https://www.youtube.com/watch?v=…"
-                aria-label="YouTube URL"
+                placeholder="Paste a YouTube link…"
+                aria-label="YouTube link"
               />
               <button type="submit" className="button">
                 Add
               </button>
             </form>
             {urlError ? <p className="error">{urlError}</p> : null}
-            <div className="spaced">
-            </div>
           </section>
 
-          <section className="card">
-            <h2>Detection</h2>
-            <div className="choice-list">
-              <label className={settings.useVad && vadInstalled ? 'choice selected' : vadInstalled ? 'choice' : 'choice disabled'}>
+          {videos.length > 0 ? (
+            <section className="card">
+              <div className="section-head">
+                <h2>
+                  {videos.length} {videos.length === 1 ? 'video' : 'videos'} ready
+                </h2>
+                <button type="button" className="link-button" onClick={() => setVideos([])}>
+                  Clear all
+                </button>
+              </div>
+              <ul className="video-rows">
+                {videos.map((video) => (
+                  <VideoRow
+                    key={video}
+                    source={video}
+                    info={info[video]}
+                    onInfo={(next) => setInfo((current) => ({ ...current, [video]: next }))}
+                    onRemove={() => setVideos((current) => current.filter((item) => item !== video))}
+                  />
+                ))}
+              </ul>
+            </section>
+          ) : (
+            <ol className="steps" aria-label="How it works">
+              <li>
+                <span className="step-dot one" aria-hidden="true" />
+                <strong>Add a long video</strong>
+                <span className="muted">A podcast, stream, interview or vlog. Files or YouTube links.</span>
+              </li>
+              <li>
+                <span className="step-dot two" aria-hidden="true" />
+                <strong>Siftora finds the moments</strong>
+                <span className="muted">It transcribes, follows the speakers and picks clips with a hook and a payoff.</span>
+              </li>
+              <li>
+                <span className="step-dot three" aria-hidden="true" />
+                <strong>Style and render</strong>
+                <span className="muted">Review the clips by score, pick a caption style and render vertical reels.</span>
+              </li>
+            </ol>
+          )}
+
+          {recent.length > 0 ? (
+            <section className="recent">
+              <div className="section-head">
+                <h2>Recent</h2>
+                <Link to="/results">All results</Link>
+              </div>
+              <nav className="video-strip" aria-label="Recent videos">
+                {recent.map((job) => (
+                  <VideoCard key={job.id} job={job} selected={false} onSelect={() => navigate(`/results?job=${job.id}`)} />
+                ))}
+              </nav>
+            </section>
+          ) : null}
+        </div>
+
+        <aside className="create-side-panels">
+          <section className="card side-panel">
+            <h2>How Siftora will work</h2>
+            <dl className="plan">
+              <div>
+                <dt>Transcribe</dt>
+                <dd className={transcriber ? undefined : 'model-warning'}>
+                  {transcriber ?? 'No model chosen'}
+                  {transcriber && runsOn && settings.transcriptionProvider !== 'openai-whisper' ? <span className="muted"> · {runsOn}</span> : null}
+                </dd>
+              </div>
+              <div>
+                <dt>Find moments</dt>
+                <dd className={finder ? undefined : 'model-warning'}>
+                  {finder ?? 'No model chosen'}
+                  {finder && runsOn && settings.llmProvider !== 'ollama' ? <span className="muted"> · {runsOn}</span> : null}
+                </dd>
+              </div>
+              <div>
+                <dt>Speakers</dt>
+                <dd>{settings.detectSpeakers && speakersInstalled ? 'Detected, for per-speaker colors' : 'Off'}</dd>
+              </div>
+            </dl>
+            <Link to="/models" className="side-link">
+              Change models →
+            </Link>
+          </section>
+
+          <section className="card side-panel">
+            <h2>Clips</h2>
+            <div className="clip-length">
+              <label className="field">
+                Shortest (s)
+                <input
+                  id="min-clip"
+                  type="number"
+                  min={5}
+                  max={settings.maxClipSeconds}
+                  value={settings.minClipSeconds}
+                  onChange={(event) => {
+                    const value = Number(event.target.value)
+                    if (Number.isFinite(value)) update({ minClipSeconds: value })
+                  }}
+                />
+              </label>
+              <label className="field">
+                Longest (s)
+                <input
+                  id="max-clip"
+                  type="number"
+                  min={settings.minClipSeconds}
+                  max={600}
+                  value={settings.maxClipSeconds}
+                  onChange={(event) => {
+                    const value = Number(event.target.value)
+                    if (Number.isFinite(value)) update({ maxClipSeconds: value })
+                  }}
+                />
+              </label>
+            </div>
+            <label className="field">
+              Keep clips scoring at least {Math.round(settings.minScore * 10)}
+              <input
+                id="min-score"
+                type="range"
+                min={0}
+                max={10}
+                step={0.5}
+                value={settings.minScore}
+                onChange={(event) => update({ minScore: Number(event.target.value) })}
+              />
+            </label>
+
+            <div className="toggles">
+              <label className={vadInstalled ? 'toggle' : 'toggle disabled'}>
                 <input
                   type="checkbox"
                   disabled={!vadInstalled}
                   checked={settings.useVad && vadInstalled}
                   onChange={(event) => update({ useVad: event.target.checked })}
                 />
-                <span className="choice-text">
+                <span>
                   <strong>Voice detection</strong>
-                  <span>Skips silence and music so Whisper does not invent captions. Recommended.</span>
-                  {vadInstalled ? null : notDownloaded(bytesOf([VAD_ID]))}
+                  <span className="muted">
+                    {vadInstalled ? (
+                      'Skips silence and music, so no invented captions.'
+                    ) : (
+                      <>
+                        Not downloaded ({formatBytes(bytesOf([VAD_ID]))}). Get it in <Link to="/models">Models</Link>.
+                      </>
+                    )}
+                  </span>
                 </span>
               </label>
-              <label
-                className={settings.detectSpeakers && speakersInstalled ? 'choice selected' : speakersInstalled ? 'choice' : 'choice disabled'}
-              >
+              <label className={speakersInstalled ? 'toggle' : 'toggle disabled'}>
                 <input
                   type="checkbox"
                   disabled={!speakersInstalled}
                   checked={settings.detectSpeakers && speakersInstalled}
                   onChange={(event) => update({ detectSpeakers: event.target.checked })}
                 />
-                <span className="choice-text">
+                <span>
                   <strong>Speaker detection</strong>
-                  <span>Works out who is speaking, so each speaker's captions can get their own color.</span>
-                  {speakersInstalled ? null : notDownloaded(bytesOf(SPEAKER_MODEL_IDS))}
+                  <span className="muted">
+                    {speakersInstalled ? (
+                      'Lets each speaker get their own caption color.'
+                    ) : (
+                      <>
+                        Not downloaded ({formatBytes(bytesOf(SPEAKER_MODEL_IDS))}). Get it in <Link to="/models">Models</Link>.
+                      </>
+                    )}
+                  </span>
                 </span>
               </label>
             </div>
-            <p className="muted">Each video keeps the detection options it was added with.</p>
+            <p className="muted small">Each video keeps the settings it was added with.</p>
           </section>
+        </aside>
+      </div>
 
-          <div className="actions">
-            <button
-              type="button"
-              className="button primary"
-              disabled={videos.length === 0}
-              onClick={() => {
-                void add(videos).then(() => {
-                  setVideos([])
-                  navigate('/queue')
-                })
-              }}
-            >
-              Find clips
-            </button>
-            {videos.length === 0 ? (
-              <span className="muted">Add at least one video to continue.</span>
-            ) : null}
-          </div>
+      <div className="start-bar">
+        <span className="muted">
+          {videos.length === 0
+            ? 'Add a video to start.'
+            : [
+                `${videos.length} ${videos.length === 1 ? 'video' : 'videos'}`,
+                totalMs > 0 ? `${formatClock(totalMs)} of video` : null,
+                youtubeCount > 0 ? `${youtubeCount} from YouTube` : null
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+        </span>
+        <button type="button" className="button primary large" disabled={videos.length === 0 || starting} onClick={start}>
+          {videos.length > 1 ? `Find clips in ${videos.length} videos` : 'Find clips'} →
+        </button>
       </div>
     </div>
   )

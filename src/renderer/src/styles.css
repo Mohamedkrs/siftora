@@ -175,66 +175,6 @@ select {
   top: 0;
 }
 
-.drop-zone {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 150px;
-  padding: 28px;
-  background: rgba(124, 92, 255, 0.04);
-  border: 2px dashed var(--border);
-  border-radius: 10px;
-  text-align: center;
-  cursor: pointer;
-  transition:
-    border-color 0.15s,
-    background 0.15s;
-}
-
-.drop-zone:hover,
-.drop-zone.dragging {
-  background: rgba(124, 92, 255, 0.09);
-  border-color: var(--accent);
-}
-
-.drop-zone strong {
-  font-size: 15px;
-}
-
-.drop-zone span {
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.file-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 14px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.file-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 9px 12px;
-  background: #12151c;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
-.file-name {
-  overflow: hidden;
-  font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .tag {
   margin-left: 8px;
   padding: 1px 6px;
@@ -1278,10 +1218,6 @@ select {
   }
 }
 
-.create-main.narrow {
-  max-width: 760px;
-}
-
 /* Real clip frame behind the caption preview (Results). */
 .preview-video {
   position: absolute;
@@ -1397,4 +1333,352 @@ select {
 
 .button.danger:hover:not(:disabled) {
   border-color: var(--danger);
+}
+
+/* ── Create ── */
+
+.screen.wide {
+  max-width: 1240px;
+}
+
+.create-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .create-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.section-head h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.section-head a {
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+/* One place to add videos: a big drop target, then the YouTube link. */
+.add-videos {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.add-videos.dragging {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+}
+
+.add-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 36px 16px;
+  background: #12151c;
+  border: 1.5px dashed #343a49;
+  border-radius: 10px;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.add-drop:hover,
+.add-videos.dragging .add-drop {
+  border-color: var(--accent);
+}
+
+.add-drop strong {
+  font-size: 15px;
+}
+
+.add-icon {
+  width: 44px;
+  height: 44px;
+  margin-bottom: 4px;
+  color: var(--accent);
+}
+
+.add-or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.add-or::before,
+.add-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* Videos waiting to be analysed */
+.video-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.video-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  background: #12151c;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.video-row-thumb {
+  flex: 0 0 112px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #0a0c10;
+  border-radius: 6px;
+}
+
+.video-row-thumb video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.video-row-yt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #ff4e45;
+  font-size: 20px;
+}
+
+.video-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.video-row-text strong,
+.video-row-text .muted {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.video-row-text .muted {
+  font-size: 12px;
+}
+
+.icon-button {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  border-color: var(--border);
+  color: var(--text);
+}
+
+/* Empty state: what happens after you add a video */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.steps li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.steps .muted {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* The logo's colours, top row to the reel */
+.step-dot {
+  width: 10px;
+  height: 10px;
+  margin: 2px 0 6px; /* same 18 px as the taller bar in step 3, so the titles line up */
+  border-radius: 50%;
+}
+
+.step-dot.one {
+  background: #7b61ff;
+}
+
+.step-dot.two {
+  background: #f0437a;
+}
+
+.step-dot.three {
+  width: 8px;
+  height: 14px;
+  margin: 0 0 4px;
+  border-radius: 4px;
+  background: #ff7a1a;
+}
+
+@media (max-width: 760px) {
+  .steps {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Side panels */
+.create-side-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.side-panel h2 {
+  margin: 0;
+}
+
+.plan {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+
+.plan div {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.plan dt {
+  color: var(--muted);
+}
+
+.plan dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.side-link {
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.clip-length {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toggle {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.toggle input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.toggle > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toggle .muted {
+  font-size: 12px;
+}
+
+.toggle.disabled {
+  cursor: default;
+}
+
+.toggle.disabled strong {
+  color: var(--muted);
+}
+
+.muted.small {
+  margin: 0;
+  font-size: 12px;
+}
+
+/* Find clips: always in reach at the bottom of the screen */
+.start-bar {
+  position: sticky;
+  bottom: -56px; /* sits on the content area's bottom edge, under its padding */
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 16px;
+  margin: 0 -32px -56px;
+  padding: 14px 32px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--border);
+}
+
+.button.large {
+  padding: 11px 20px;
+  font-size: 14px;
 }

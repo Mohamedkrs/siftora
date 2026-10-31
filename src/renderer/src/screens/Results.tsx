@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { mediaUrl, renderStyleKey, type Clip, type Job } from '../../../shared/jobs'
 import CaptionStyle from '../components/CaptionStyle'
+import VideoCard from '../components/VideoCard'
 import { formatClock } from '../lib/format'
 import { useJobs } from '../state/jobs'
 import { useSettings } from '../state/settings'
@@ -122,41 +123,6 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
         {clip.render.status === 'error' ? <p className="error">{clip.render.error}</p> : null}
       </div>
     </article>
-  )
-}
-
-/** One finished video in the strip above the clips: a frame, its title and how far along it is. */
-function VideoCard({ job, selected, onSelect }: { job: Job; selected: boolean; onSelect: () => void }) {
-  const best = [...job.clips].sort((a, b) => b.score - a.score)[0]
-  const rendered = job.clips.filter((clip) => clip.render.status === 'done').length
-  return (
-    <button
-      type="button"
-      className={selected ? 'video-card selected' : 'video-card'}
-      aria-pressed={selected}
-      onClick={onSelect}
-      title={job.title}
-    >
-      <span className="video-card-frame">
-        {job.videoPath ? (
-          <video
-            src={mediaUrl(job.videoPath)}
-            muted
-            preload="metadata"
-            onLoadedMetadata={(event) => {
-              event.currentTarget.currentTime = (best?.start ?? 0) / 1000 + 1.5
-            }}
-          />
-        ) : null}
-      </span>
-      <span className="video-card-text">
-        <strong>{job.title}</strong>
-        <span className="muted">
-          {job.clips.length} clips{rendered > 0 ? ` · ${rendered} reels` : ''}
-          {job.durationMs ? ` · ${formatClock(job.durationMs)}` : ''}
-        </span>
-      </span>
-    </button>
   )
 }
 
