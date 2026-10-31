@@ -11,7 +11,7 @@ import SettingsScreen from './screens/Settings'
 import { isActive, useJobs } from './state/jobs'
 import { useModels } from './state/models'
 import { useSettings } from './state/settings'
-import logo from '../../../resources/brand/siftora-horizontal-on-dark.svg'
+import logo from '../../../resources/brand/siftora-horizontal-small-on-dark.svg'
 
 const navItems = [
   { to: '/create', label: 'Create' },

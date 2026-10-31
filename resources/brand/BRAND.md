@@ -11,6 +11,7 @@
 | `siftora-symbol-mono.svg` | One-colour version (violet); recolour to black or white as needed |
 | `siftora-app-icon.svg` | Symbol on the dark rounded tile; source of `resources/icon.png` |
 | `siftora-horizontal.svg` / `-on-dark.svg` | Symbol + wordmark side by side, for light / dark backgrounds |
+| `siftora-horizontal-small.svg` / `-small-on-dark.svg` | Same with the simpler symbol, for small sizes such as the app's sidebar |
 | `siftora-stacked.svg` | Symbol above the wordmark |
 | `favicon.ico` | 16/32/48 px, from the small version |
 
@@ -26,11 +27,13 @@
 
 ## Wordmark
 
-"siftora", lowercase, in Poppins Black (SIL Open Font License, which allows use in a logo), converted to outlines, with slightly tightened letter spacing. Always use the SVG files; don't retype the name in a font.
+"siftora", lowercase, in **Sora Bold** (SIL Open Font License, which allows use in a logo), converted to outlines, with the font's kerning and letter spacing tightened by 0.035 em. Always use the SVG files; don't retype the name in a font.
+
+In the horizontal lockups the symbol is 1.13 times the text size, centred on the text, with a gap of 0.39 times the text size.
 
 ## Rules
 
 - **Clear space:** keep at least one dot's diameter of empty space around the logo.
-- **Minimum size:** use the full symbol at 48 px and up; below that, use `siftora-symbol-small.svg`. The horizontal lockup needs at least 120 px of width.
+- **Minimum size:** use the full symbol at 48 px and up; below that, use `siftora-symbol-small.svg`. Horizontal lockups need at least 100 px of width; below 48 px tall, use the `-small` lockups.
 - **Backgrounds:** white, light neutrals, or the ink colour `#16131F`. On photos or busy backgrounds, use the app-icon tile or the one-colour white version.
 - **Don't:** reorder or recolour the rows, add gradients or shadows, stretch the logo, rotate it, or change the number of dots.

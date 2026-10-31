@@ -9,7 +9,7 @@ import SystemCard from '../components/SystemCard'
 import { formatBytes } from '../lib/format'
 import { useModels } from '../state/models'
 import { useSettings } from '../state/settings'
-import logo from '../../../../resources/brand/siftora-horizontal-on-dark.svg'
+import logo from '../../../../resources/brand/siftora-horizontal-small-on-dark.svg'
 
 const VAD_ID = CATALOG.find((model) => model.kind === 'vad')?.id
 
