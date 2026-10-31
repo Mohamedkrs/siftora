@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { StorageUsage } from '../../../shared/types'
+import { useDialog } from '../components/Dialog'
 import { formatBytes } from '../lib/format'
 import { useSettings } from '../state/settings'
 
@@ -16,6 +17,7 @@ function StorageSection() {
   const [usage, setUsage] = useState<StorageUsage | null>(null)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null)
+  const dialog = useDialog()
 
   const load = (): void => {
     window.api
@@ -36,7 +38,13 @@ function StorageSection() {
   const downloads = usage ? usage.engines + usage.models : 0
 
   const deleteDownloads = async (): Promise<void> => {
-    if (!confirm(`Delete the downloaded engines and AI models (${formatBytes(downloads)})?\n\nYour settings and results stay. You can download them again from Models.`)) return
+    const ok = await dialog.confirm({
+      title: 'Delete the downloaded engines and AI models?',
+      message: `Frees ${formatBytes(downloads)}. Your settings and results stay, and you can download them again from Models.`,
+      confirmLabel: 'Delete',
+      danger: true
+    })
+    if (!ok) return
     setBusy(true)
     const outcome = await window.api.deleteDownloads()
     setBusy(false)
@@ -46,11 +54,27 @@ function StorageSection() {
 
   const removeAll = async (): Promise<void> => {
     if (!usage) return
-    if (!confirm(`Remove all Siftora data (${formatBytes(usage.total)})?\n\nThis deletes the engines, AI models, settings, results and transcripts, then closes Siftora. Use it before deleting the app. Your rendered reels in the Videos folder are not touched.`)) return
+    const ok = await dialog.confirm({
+      title: 'Remove all Siftora data?',
+      message: `This deletes ${formatBytes(usage.total)}: the engines, AI models, settings, results and transcripts, then closes Siftora. Use it before deleting the app.\n\nYour rendered reels in the Videos folder are not touched.`,
+      confirmLabel: 'Remove everything',
+      danger: true
+    })
+    if (!ok) return
     setBusy(true)
     const outcome = await window.api.removeAllData()
     setBusy(false)
-    if (!outcome.ok) setNote({ text: outcome.problem ?? 'Could not remove the data.', error: true })
+    if (!outcome.ok || !outcome.removed) {
+      setNote({ text: outcome.problem ?? 'Could not remove the data.', error: true })
+      return
+    }
+    const removed = outcome.removed
+    await dialog.notice({
+      title: `Removed ${formatBytes(removed.total)} of Siftora data`,
+      message: `Engines ${formatBytes(removed.engines)}, AI models ${formatBytes(removed.models)}, results and transcripts ${formatBytes(removed.results)}, settings and cache ${formatBytes(removed.other)}.\n\nSiftora will now close. Your rendered reels were not touched. You can delete the app itself now.`,
+      confirmLabel: 'Close Siftora'
+    })
+    void window.api.quitAfterRemoval()
   }
 
   return (

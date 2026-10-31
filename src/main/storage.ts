@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog } from 'electron'
+import { app } from 'electron'
 import { spawn } from 'node:child_process'
 import { readdir, rm, lstat } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
@@ -72,12 +72,14 @@ function isOwnDataFolder(folder: string): boolean {
   return basename(folder) === 'Siftora' && resolve(dirname(folder)) === resolve(app.getPath('appData'))
 }
 
+let removed = false
+
 /**
  * Removes everything in the data folder, for before deleting the app (macOS and Linux have no
- * uninstaller). What can go now goes now; the rest (files Electron keeps open) is removed by a
- * small helper right after the app quits. Rendered reels in Videos are not touched.
+ * uninstaller). What can go now goes now; quitAfterRemoval() then quits and removes the rest
+ * (files Electron keeps open). Rendered reels in Videos are not touched.
  */
-export async function removeAllData(): Promise<{ ok: boolean; problem?: string }> {
+export async function removeAllData(): Promise<{ ok: boolean; problem?: string; removed?: StorageUsage }> {
   if (isBusy() || isDownloading()) return { ok: false, problem: BUSY }
   const folder = root()
   if (!isOwnDataFolder(folder)) {
@@ -88,20 +90,16 @@ export async function removeAllData(): Promise<{ ok: boolean; problem?: string }
   for (const part of ['engines', 'models', 'jobs', 'settings.json']) {
     await rm(join(folder, part), { recursive: true, force: true }).catch(() => undefined)
   }
+  removed = true
+  log.info('storage', `removed all data (${usage.total} bytes)`)
+  return { ok: true, removed: usage }
+}
 
-  const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
-  const message = {
-    type: 'info' as const,
-    title: 'Siftora data removed',
-    message: `Removed ${formatSize(usage.total)} of Siftora data.`,
-    detail:
-      `Engines ${formatSize(usage.engines)}, AI models ${formatSize(usage.models)}, results and transcripts ` +
-      `${formatSize(usage.results)}, settings and cache ${formatSize(usage.other)}.\n\n` +
-      'Siftora will now close. Your rendered reels in the Videos folder were not touched. You can delete the app itself now.'
-  }
-  await (win ? dialog.showMessageBox(win, message) : dialog.showMessageBox(message))
-
-  // After the app has exited, remove what is left (Electron's cache and lock files).
+/** After removeAllData: quit, then a small helper deletes what is left once the app has exited. */
+export function quitAfterRemoval(): void {
+  if (!removed) return
+  const folder = root()
+  if (!isOwnDataFolder(folder)) return
   const helper =
     process.platform === 'win32'
       ? spawn('cmd.exe', ['/d', '/s', '/c', `"ping -n 3 127.0.0.1 >nul & rmdir /s /q "${folder}""`], {
@@ -112,7 +110,5 @@ export async function removeAllData(): Promise<{ ok: boolean; problem?: string }
         })
       : spawn('/bin/sh', ['-c', 'sleep 2; rm -rf -- "$0"', folder], { detached: true, stdio: 'ignore' })
   helper.unref()
-  log.info('storage', 'removed all data, quitting')
   app.quit()
-  return { ok: true }
 }

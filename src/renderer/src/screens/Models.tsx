@@ -3,6 +3,7 @@ import { CATALOG, type ModelEntry } from '../../../shared/catalog'
 import { ENGINES, engineBytes, engineLabel } from '../../../shared/engines'
 import type { CustomModel, EngineOption, ModelState, ScannedModel } from '../../../shared/types'
 import EngineChoice from '../components/EngineChoice'
+import { useDialog } from '../components/Dialog'
 import {
   copySource,
   FoundEngines,
@@ -83,11 +84,17 @@ function ModelCard(props: CardProps) {
   // A catalog model can be satisfied by the user's own file (e.g. from Ollama); never delete it.
   const linkedFile = props.entries.map((entry) => settings.linkedModels[entry.id]).find(Boolean)
 
-  const remove = (): void => {
+  const dialog = useDialog()
+  const remove = async (): Promise<void> => {
     if (
       !props.custom &&
       !linkedFile &&
-      !confirm('Delete this model? You can download it again later.')
+      !(await dialog.confirm({
+        title: `Delete ${title}?`,
+        message: `Frees ${formatBytes(totalBytes)}. You can download it again later.`,
+        confirmLabel: 'Delete',
+        danger: true
+      }))
     )
       return
     props.onDelete(installedIds)
@@ -177,7 +184,7 @@ function ModelCard(props: CardProps) {
         ) : null}
 
         {installedIds.length > 0 ? (
-          <button type="button" className="button" onClick={remove}>
+          <button type="button" className="button" onClick={() => void remove()}>
             {props.custom ? 'Remove' : linkedFile ? 'Stop using my file' : 'Delete'}
           </button>
         ) : null}
@@ -211,6 +218,7 @@ function ModelCard(props: CardProps) {
 }
 
 export default function Models() {
+  const dialog = useDialog()
   const { models, hardware, recommendation, requiredEngines, download, cancel, remove } = useModels()
   const { settings, update, refresh } = useSettings()
   const [engineOptions, setEngineOptions] = useState<EngineOption[] | null>(null)
@@ -398,10 +406,14 @@ export default function Models() {
                 type="button"
                 className="button danger"
                 onClick={() => {
-                  const what = `${notInUse.length} unused ${notInUse.length === 1 ? 'engine' : 'engines'} (${formatBytes(notInUseBytes)})`
-                  if (confirm(`Delete ${what}? You can download them again later.`)) {
-                    removeMany(notInUse.map((entry) => entry.id))
-                  }
+                  void dialog
+                    .confirm({
+                      title: `Delete ${notInUse.length} unused ${notInUse.length === 1 ? 'engine' : 'engines'}?`,
+                      message: `Frees ${formatBytes(notInUseBytes)}. Siftora only uses them for another engine type, and you can download them again later.`,
+                      confirmLabel: 'Delete',
+                      danger: true
+                    })
+                    .then((ok) => ok && removeMany(notInUse.map((entry) => entry.id)))
                 }}
               >
                 Delete all unused ({formatBytes(notInUseBytes)})

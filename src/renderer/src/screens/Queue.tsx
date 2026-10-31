@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { STAGE_LABELS, type Job } from '../../../shared/jobs'
 import { formatClock } from '../lib/format'
+import { useDialog } from '../components/Dialog'
 import { isActive, useJobs } from '../state/jobs'
 
 function shortSource(source: string): string {
@@ -9,6 +10,7 @@ function shortSource(source: string): string {
 
 function JobCard({ job }: { job: Job }) {
   const { cancel, remove, retry, findAgain } = useJobs()
+  const dialog = useDialog()
   const navigate = useNavigate()
   const active = isActive(job)
   const finished = ['done', 'error', 'cancelled'].includes(job.stage)
@@ -70,7 +72,14 @@ function JobCard({ job }: { job: Job }) {
             type="button"
             className="button"
             onClick={() => {
-              if (confirm('Remove this job? Rendered reels stay in the output folder.')) remove(job.id)
+              void dialog
+                .confirm({
+                  title: `Remove "${job.title}" from the queue?`,
+                  message: 'Its saved analysis is deleted. Rendered reels stay in the output folder.',
+                  confirmLabel: 'Remove',
+                  danger: true
+                })
+                .then((ok) => ok && remove(job.id))
             }}
           >
             Remove

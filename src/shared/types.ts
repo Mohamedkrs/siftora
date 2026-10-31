@@ -252,8 +252,10 @@ export interface Api {
   openDataFolder(): Promise<void>
   /** Deletes downloaded engines and models; settings and results stay. */
   deleteDownloads(): Promise<{ ok: boolean; problem?: string; freed?: number }>
-  /** Removes all app data and quits (for before deleting the app). */
-  removeAllData(): Promise<{ ok: boolean; problem?: string }>
+  /** Removes all app data (for before deleting the app); call quitAfterRemoval next. */
+  removeAllData(): Promise<{ ok: boolean; problem?: string; removed?: StorageUsage }>
+  /** Quits and removes what was left in the data folder (files Electron keeps open). */
+  quitAfterRemoval(): Promise<void>
   scanForModels(): Promise<ScannedModel[]>
   pickModelFile(): Promise<string | null>
   addCustomModel(path: string, name?: string): Promise<{ id?: string; error?: string }>
@@ -306,6 +308,7 @@ export const IPC = {
   openDataFolder: 'storage:open-folder',
   deleteDownloads: 'storage:delete-downloads',
   removeAllData: 'storage:remove-all',
+  quitAfterRemoval: 'storage:quit-after-removal',
   scanForModels: 'models:scan',
   pickModelFile: 'dialog:pick-model-file',
   addCustomModel: 'models:add-custom',

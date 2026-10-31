@@ -32,6 +32,7 @@ const api: Api = {
   openDataFolder: () => ipcRenderer.invoke(IPC.openDataFolder),
   deleteDownloads: () => ipcRenderer.invoke(IPC.deleteDownloads),
   removeAllData: () => ipcRenderer.invoke(IPC.removeAllData),
+  quitAfterRemoval: () => ipcRenderer.invoke(IPC.quitAfterRemoval),
   scanForModels: () => ipcRenderer.invoke(IPC.scanForModels),
   pickModelFile: () => ipcRenderer.invoke(IPC.pickModelFile),
   addCustomModel: (path, name) => ipcRenderer.invoke(IPC.addCustomModel, path, name),

@@ -1886,3 +1886,79 @@ select {
   padding-top: 12px;
   border-top: 1px solid var(--border);
 }
+
+/* In-app dialogs (replace the system's grey confirm boxes) */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(8, 9, 12, 0.66);
+  backdrop-filter: blur(3px);
+  animation: dialog-fade 0.12s ease-out;
+}
+
+.dialog {
+  width: min(440px, 100%);
+  padding: 22px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  animation: dialog-rise 0.14s ease-out;
+}
+
+.dialog h2 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  line-height: 1.35;
+  text-wrap: balance;
+}
+
+.dialog p {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.button.danger-solid {
+  background: #d9465f;
+  border-color: transparent;
+  color: #fff;
+  font-weight: 600;
+}
+
+.button.danger-solid:hover:not(:disabled) {
+  background: #c23a52;
+}
+
+@keyframes dialog-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes dialog-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog-backdrop,
+  .dialog {
+    animation: none;
+  }
+}

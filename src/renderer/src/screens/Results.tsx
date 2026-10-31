@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { mediaUrl, renderStyleKey, type Clip, type Job } from '../../../shared/jobs'
 import CaptionStyle from '../components/CaptionStyle'
+import { useDialog } from '../components/Dialog'
 import VideoCard from '../components/VideoCard'
 import { formatClock } from '../lib/format'
 import { useJobs } from '../state/jobs'
@@ -13,6 +14,7 @@ function scoreClass(score: number): string {
 
 function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: number; stale: boolean }) {
   const { render, deleteReel } = useJobs()
+  const dialog = useDialog()
   const [showText, setShowText] = useState(false)
   const done = clip.render.status === 'done' && clip.render.path
   const busy = clip.render.status === 'queued' || clip.render.status === 'rendering'
@@ -96,9 +98,14 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
                 type="button"
                 className="button danger"
                 onClick={() => {
-                  if (confirm('Delete this reel? The video file goes to the Recycle Bin; the clip stays here.')) {
-                    deleteReel(job.id, clip.id)
-                  }
+                  void dialog
+                    .confirm({
+                      title: 'Delete this reel?',
+                      message: 'The video file goes to the Recycle Bin. The clip stays here, so you can render it again.',
+                      confirmLabel: 'Delete reel',
+                      danger: true
+                    })
+                    .then((ok) => ok && deleteReel(job.id, clip.id))
                 }}
               >
                 Delete reel
@@ -128,6 +135,7 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
 
 export default function Results() {
   const { jobs, render, findAgain, deleteJob } = useJobs()
+  const dialog = useDialog()
   const { settings } = useSettings()
   const [params, setParams] = useSearchParams()
   const doneJobs = jobs.filter((job) => job.stage === 'done')
@@ -154,11 +162,18 @@ export default function Results() {
     const what = [`${clips.length} clips`, reels > 0 ? `${reels} rendered ${reels === 1 ? 'reel' : 'reels'} (to the Recycle Bin)` : null]
       .filter(Boolean)
       .join(' and ')
-    if (!confirm(`Delete "${job.title}"?
-
-This removes its ${what}, and the transcript and analysis. Your original video file is not touched.`)) return
-    setParams({})
-    deleteJob(job.id)
+    void dialog
+      .confirm({
+        title: `Delete "${job.title}"?`,
+        message: `This removes its ${what}, and the transcript and analysis.\n\nYour original video file is not touched.`,
+        confirmLabel: 'Delete',
+        danger: true
+      })
+      .then((ok) => {
+        if (!ok) return
+        setParams({})
+        deleteJob(job.id)
+      })
   }
   const styleKey = renderStyleKey(settings.subtitle, settings.layout)
   const isStale = (clip: Clip): boolean => clip.render.status === 'done' && clip.render.style !== styleKey
