@@ -1,4 +1,4 @@
-import type { Backend } from './engines'
+import type { Backend, EngineEntry } from './engines'
 
 export type Layout = 'blurred' | 'focused'
 
@@ -207,6 +207,8 @@ export interface ModelState {
   bytesPerSec: number
   etaSec: number | null
   error?: string
+  /** Installed engine with a newer tested version available (the version). */
+  update?: string
 }
 
 export interface Api {
@@ -237,6 +239,9 @@ export interface Api {
   addCustomModel(path: string, name?: string): Promise<{ id?: string; error?: string }>
   removeCustomModel(id: string): Promise<void>
   onModelState(cb: (state: ModelState) => void): () => void
+  /** Tested engine builds published for this app (see ENGINE_LIST_URL), and changes to them. */
+  getEngineList(): Promise<EngineEntry[]>
+  onEngineList(cb: (entries: EngineEntry[]) => void): () => void
   /** Queue videos (file paths or YouTube URLs) with the current settings. */
   addJobs(sources: string[]): Promise<Job[]>
   listJobs(): Promise<Job[]>
@@ -278,6 +283,8 @@ export const IPC = {
   addCustomModel: 'models:add-custom',
   removeCustomModel: 'models:remove-custom',
   onModelState: 'models:state',
+  getEngineList: 'engines:list',
+  onEngineList: 'engines:list-changed',
   addJobs: 'jobs:add',
   listJobs: 'jobs:list',
   cancelJob: 'jobs:cancel',

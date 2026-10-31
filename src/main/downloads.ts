@@ -8,9 +8,11 @@ import {
   createWriteStream,
   mkdirSync,
   readdirSync,
+  readFileSync,
   renameSync,
   rmSync,
   statSync,
+  writeFileSync,
   type Dirent
 } from 'node:fs'
 import { basename, join } from 'node:path'
@@ -18,6 +20,7 @@ import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { CATALOG, SPEAKER_MODEL_IDS, type ModelEntry } from '../shared/catalog'
 import {
+  builtInVersion,
   ENGINES,
   engineBytes,
   pickEngine,
@@ -182,9 +185,22 @@ function installedState(id: string, bytes: number): ModelState {
   return { id, status: 'installed', receivedBytes: bytes, bytesPerSec: 0, etaSec: null }
 }
 
+const VERSION_FILE = '.vcf-version'
+
+/** Version written at install; installs from before that are the built-in version. */
+function installedVersion(entry: EngineEntry): string | undefined {
+  try {
+    return readFileSync(join(engineDir(entry), VERSION_FILE), 'utf8').trim() || undefined
+  } catch {
+    return builtInVersion(entry.id)
+  }
+}
+
 function initialState(item: Item): ModelState {
   if (isInstalled(item)) {
-    return installedState(item.id, itemBytes(item))
+    const state = installedState(item.id, itemBytes(item))
+    if (isEngine(item) && item.version && installedVersion(item) !== item.version) state.update = item.version
+    return state
   }
 
   const known = active.get(item.id)
@@ -221,6 +237,16 @@ export function listModels(): ModelState[] {
   return [...[...CATALOG, ...ENGINES].map(initialState), ...custom]
 }
 
+/** Re-send engine states after the engine list changed, so updates show up. */
+export function refreshEngineStates(): void {
+  for (const entry of ENGINES) {
+    const known = active.get(entry.id)
+    if (known && known.status !== 'installed' && known.status !== 'missing' && known.status !== 'error') continue
+    active.delete(entry.id)
+    broadcast(initialState(entry))
+  }
+}
+
 /** Push a model state to the renderer, used by custom-model verification. */
 export function emitModelState(state: ModelState): void {
   setState(state.id, state)
@@ -251,7 +277,7 @@ export function downloadModels(requested: string[]): void {
 
     const state = initialState(entry)
     if (
-      state.status === 'installed' ||
+      (state.status === 'installed' && !state.update) ||
       state.status === 'queued' ||
       state.status === 'downloading' ||
       state.status === 'verifying' ||
@@ -703,12 +729,19 @@ async function installEngine(pinned: EngineEntry): Promise<void> {
   }
 
   try {
-    removeDir(dir)
+    // An update keeps the version it replaces next to it, so going back needs no download.
+    if (existsSync(dir)) {
+      removeDir(`${dir}.previous`)
+      renameSync(dir, `${dir}.previous`)
+    }
     renameSync(tmp, dir)
+    writeFileSync(join(dir, VERSION_FILE), entry.version ?? '')
   } catch (err) {
     controllers.delete(entry.id)
     log.error('downloads', `could not install ${entry.id}: ${String(err)}`)
     removeDir(tmp)
+    // Most likely the engine is running (Windows locks it); the old version is still in place.
+    if (!existsSync(dir) && existsSync(`${dir}.previous`)) renameSync(`${dir}.previous`, dir)
     unpackFailed(entry, basename(entry.files[0].url))
     return
   }
@@ -778,6 +811,7 @@ export async function deleteModel(id: string): Promise<void> {
   if (isEngine(entry)) {
     removeDir(engineDir(entry))
     removeDir(`${engineDir(entry)}.tmp`)
+    removeDir(`${engineDir(entry)}.previous`)
     for (const file of entry.files) removeFile(enginePart(file))
   } else {
     removeFile(filePath(entry))

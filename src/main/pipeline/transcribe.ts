@@ -44,16 +44,48 @@ function tokensToWords(tokens: { text?: string; t_dtw?: number; offsets: { from:
     } else {
       const last = words[words.length - 1]
       last.text += token.text
-      last.end = token.offsets.to
+      // Punctuation tokens are often timed after a pause; they must not stretch the word.
+      if (/[\p{L}\p{N}]/u.test(token.text)) last.end = token.offsets.to
     }
   }
   return words.filter((word) => word.text.length > 0)
 }
 
+/** One kept stretch of speech: where it is in the original audio and in the trimmed audio (ms). */
+interface VadSpan {
+  orig: number
+  origEnd: number
+  vad: number
+  vadEnd: number
+}
+
+const VAD_SPAN = /vad_segment_info: orig_start: ([\d.]+), orig_end: ([\d.]+), vad_start: ([\d.]+), vad_end: ([\d.]+)/
+
+/**
+ * Trimmed-audio time → original time, using the spans whisper.cpp logs with --vad. `edge` says
+ * whether it is a word's start or end: in the short padding gap between two spans, an end
+ * belongs to the speech before it and a start to the speech after it.
+ */
+export function vadToOriginal(spans: VadSpan[], ms: number, edge: 'start' | 'end'): number {
+  if (spans.length === 0) return ms
+  if (ms <= spans[0].vad) return spans[0].orig - (spans[0].vad - ms)
+  for (let i = 0; i < spans.length; i += 1) {
+    const span = spans[i]
+    if (ms <= span.vadEnd) return span.orig + (ms - span.vad)
+    const next = spans[i + 1]
+    if (next && ms < next.vad) {
+      return edge === 'end' ? span.origEnd + (ms - span.vadEnd) : next.orig - (next.vad - ms)
+    }
+  }
+  const last = spans[spans.length - 1]
+  return last.origEnd + (ms - last.vadEnd)
+}
+
 /**
  * With --vad, whisper.cpp maps segment times back to the original timeline but leaves token
- * times in the silence-trimmed one, so words drift earlier as the video goes on. Stretch each
- * segment's words onto the segment's own span. Words already inside it are left alone.
+ * times in the silence-trimmed one, so words drift earlier as the video goes on. Transcripts
+ * are now mapped exactly (vadToOriginal); this fallback, for transcripts saved before that,
+ * stretches each segment's words onto the segment's own span. Words inside it are left alone.
  */
 export function fitWordsToSegments(segments: Segment[]): Segment[] {
   for (const segment of segments) {
@@ -85,11 +117,17 @@ export async function transcribeWhisperCpp(opts: {
   const dtw = opts.modelId ? DTW_PRESETS[opts.modelId] : undefined
   if (dtw) args.push('-dtw', dtw)
   if (opts.vadModel) args.push('--vad', '-vm', opts.vadModel)
+  const spans: VadSpan[] = []
   await run(opts.binary, args, {
     signal: opts.signal,
     onStderr: (line) => {
       const match = line.match(/progress =\s*(\d+)%/)
       if (match) opts.onProgress(Number(match[1]) / 100)
+      const span = line.match(VAD_SPAN)
+      if (span) {
+        const [orig, origEnd, vad, vadEnd] = span.slice(1).map((value) => Math.round(Number(value) * 1000))
+        spans.push({ orig, origEnd, vad, vadEnd })
+      }
     }
   })
   const raw = JSON.parse(readFileSync(`${base}.json`, 'utf8')) as {
@@ -102,7 +140,11 @@ export async function transcribeWhisperCpp(opts: {
       start: item.offsets.from,
       end: item.offsets.to,
       text: item.text.trim(),
-      words: tokensToWords(item.tokens ?? [])
+      words: tokensToWords(item.tokens ?? []).map((word) => ({
+        ...word,
+        start: Math.round(vadToOriginal(spans, word.start, 'start')),
+        end: Math.round(vadToOriginal(spans, word.end, 'end'))
+      }))
     }))
     .filter((segment) => segment.text.length > 0)
   return { language: raw.result?.language ?? opts.language, segments: cleanLoops(fitWordsToSegments(segments)) }

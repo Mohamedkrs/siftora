@@ -1,3 +1,4 @@
+import type { EngineEntry } from '../shared/engines'
 import type { Job } from '../shared/jobs'
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
 import { IPC, type Api, type ModelState } from '../shared/types'
@@ -31,6 +32,12 @@ const api: Api = {
   pickModelFile: () => ipcRenderer.invoke(IPC.pickModelFile),
   addCustomModel: (path, name) => ipcRenderer.invoke(IPC.addCustomModel, path, name),
   removeCustomModel: (id) => ipcRenderer.invoke(IPC.removeCustomModel, id),
+  getEngineList: () => ipcRenderer.invoke(IPC.getEngineList),
+  onEngineList: (cb) => {
+    const listener = (_event: IpcRendererEvent, entries: EngineEntry[]) => cb(entries)
+    ipcRenderer.on(IPC.onEngineList, listener)
+    return () => ipcRenderer.removeListener(IPC.onEngineList, listener)
+  },
   onModelState: (cb) => {
     const listener = (_event: IpcRendererEvent, state: ModelState): void => cb(state)
     ipcRenderer.on(IPC.onModelState, listener)

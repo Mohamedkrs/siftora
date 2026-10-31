@@ -1,5 +1,6 @@
 import { app, dialog, ipcMain, shell } from 'electron'
 import { IPC, type Settings } from '../shared/types'
+import { currentEngineList } from './engineList'
 import { cancelDownload, deleteModel, downloadModels, listModels, modelsDir } from './downloads'
 import { detectHardware, engineOptions, recommend, requiredEngineInfo } from './hardware'
 import { addCustomModel, removeCustomModel, scanForModels } from './localModels'
@@ -88,6 +89,7 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.listModels, () => listModels())
 
+  ipcMain.handle(IPC.getEngineList, () => currentEngineList())
   ipcMain.handle(IPC.downloadModels, (_event, ids: unknown) => {
     const list = Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []
     downloadModels(list)

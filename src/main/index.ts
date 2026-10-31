@@ -1,5 +1,6 @@
 import { app, BrowserWindow, protocol, shell } from 'electron'
 import { join } from 'node:path'
+import { loadEngineList } from './engineList'
 import { loadJobs } from './jobs'
 import { serveMedia } from './media'
 import { registerIpc } from './ipc'
@@ -99,6 +100,7 @@ if (!app.requestSingleInstanceLock()) {
       protocol.handle('vcf-media', serveMedia)
       registerIpc()
       loadJobs()
+      loadEngineList()
       createWindow()
 
       app.on('activate', () => {

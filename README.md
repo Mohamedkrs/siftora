@@ -24,6 +24,14 @@ npm run dev
 
 The design and decisions are in [docs/PHASE0_PROPOSAL.md](docs/PHASE0_PROPOSAL.md).
 
+## Engine updates
+
+Engines (whisper.cpp, llama.cpp, FFmpeg, sherpa-onnx) are downloaded on demand, never bundled. The built-in list in `src/shared/engines.ts` is the fallback; the app also reads a tested list, `engines.json`, from this repo's `engines` release and offers an **Update** on the Models screen when an installed engine has a newer tested version (the old version is kept next to it).
+
+That list is maintained by [.github/workflows/engines.yml](.github/workflows/engines.yml): weekly, or on demand, it picks up a new whisper.cpp release, builds the macOS versions upstream does not ship, smoke-tests every build with the app's own flags ([scripts/engines/smoke-whisper.mjs](scripts/engines/smoke-whisper.mjs)), and publishes only if all pass.
+
+To turn it on, push the repo to GitHub, set `ENGINE_REPO` in `src/shared/engines.ts` to `owner/repo`, and run the workflow once from the Actions tab.
+
 ## Documentation
 
 - [Project specification](PROJECT_SPEC.md) — product requirements and scope.

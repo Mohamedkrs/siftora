@@ -53,6 +53,7 @@ function ModelCard(props: CardProps) {
   const missingIds = props.entries
     .filter((_, index) => props.states[index].status !== 'installed')
     .map((entry) => entry.id)
+  const updates = props.states.filter((state) => state.status === 'installed' && state.update)
   const totalBytes = props.entries.reduce((sum, entry) => sum + entry.bytes, 0)
   const licenses = Array.from(new Set(props.entries.map((entry) => entry.license))).join(', ')
   const title =
@@ -102,6 +103,13 @@ function ModelCard(props: CardProps) {
         </p>
       ) : null}
 
+      {updates.length > 0 && active.length === 0 ? (
+        <p className="muted">
+          Update available ({updates.map((state) => state.update).join(', ')}), tested with this app. The current
+          version is kept, in case you need to go back.
+        </p>
+      ) : null}
+
       {props.states.map((state, index) => (
         <ModelProgress key={state.id} state={state} totalBytes={props.entries[index].bytes} />
       ))}
@@ -114,6 +122,16 @@ function ModelCard(props: CardProps) {
             onClick={() => props.onDownload(missingIds)}
           >
             Download
+          </button>
+        ) : null}
+
+        {updates.length > 0 && active.length === 0 ? (
+          <button
+            type="button"
+            className="button primary"
+            onClick={() => props.onDownload(updates.map((state) => state.id))}
+          >
+            Update
           </button>
         ) : null}
 
