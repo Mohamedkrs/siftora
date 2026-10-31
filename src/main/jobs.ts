@@ -396,7 +396,7 @@ async function renderOne(job: Job, clip: Clip): Promise<void> {
         update(job)
       }
     })
-    clip.render = { status: 'done', progress: 1, path: output, style: renderStyleKey(style, layout) }
+    clip.render = { status: 'done', progress: 1, path: output, style: renderStyleKey(style, layout), at: Date.now() }
   } catch (err) {
     log.error('render', `${job.title} / ${clip.title}: ${String(err)}`)
     clip.render = { status: 'error', progress: 0, error: err instanceof Error ? err.message : String(err) }

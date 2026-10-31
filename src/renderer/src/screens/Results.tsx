@@ -20,7 +20,13 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
     <article className="card clip-card">
       <div className="clip-media">
         {done ? (
-          <video className="clip-reel" src={mediaUrl(clip.render.path as string)} controls preload="metadata" />
+          <video
+            key={clip.render.at}
+            className="clip-reel"
+            src={`${mediaUrl(clip.render.path as string)}?v=${clip.render.at ?? 0}`}
+            controls
+            preload="metadata"
+          />
         ) : job.videoPath ? (
           <video
             className="clip-source"

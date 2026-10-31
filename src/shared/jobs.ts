@@ -50,8 +50,11 @@ export interface Clip {
   notes: string[]
   /** Transcript text of the clip. */
   text: string
-  /** style: renderStyleKey() of the look it was rendered with, to flag reels that are out of date. */
-  render: { status: RenderStatus; progress: number; path?: string; error?: string; style?: string }
+  /**
+   * style: renderStyleKey() of the look it was rendered with, to flag reels that are out of date.
+   * at: when it finished; re-renders overwrite the same file, so the player URL needs it to reload.
+   */
+  render: { status: RenderStatus; progress: number; path?: string; error?: string; style?: string; at?: number }
 }
 
 export function renderStyleKey(subtitle: SubtitleStyle, layout: Layout): string {
