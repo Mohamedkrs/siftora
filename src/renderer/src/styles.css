@@ -998,3 +998,40 @@ select {
   justify-content: space-between;
   gap: 12px;
 }
+
+.detect-download {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.speaker-preview-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.speaker-preview-tabs .selected {
+  border-color: var(--accent);
+}
+
+.swatch-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  vertical-align: -1px;
+}
+
+.choice.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.choice.disabled a {
+  color: var(--accent);
+}

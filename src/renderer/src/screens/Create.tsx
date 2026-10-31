@@ -1,7 +1,8 @@
 import { useState, type DragEvent, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { CATALOG, SPEAKER_MODEL_IDS } from '../../../shared/catalog'
+import { formatBytes } from '../lib/format'
 import { CAPTION_FONTS, type Layout, type SubtitleStyle } from '../../../shared/types'
-import ModelProgress from '../components/ModelProgress'
 import NotImplemented from '../components/NotImplemented'
 import { useModels } from '../state/models'
 import { useSettings } from '../state/settings'
@@ -64,9 +65,11 @@ function displayName(value: string): string {
   return value.split(/[\\/]/).pop() ?? value
 }
 
+const VAD_ID = 'silero-vad'
+
 export default function Create() {
   const { settings, update } = useSettings()
-  const { models, download } = useModels()
+  const { models } = useModels()
   const [videos, setVideos] = useState<string[]>([])
   const [dragging, setDragging] = useState(false)
   const [url, setUrl] = useState('')
@@ -76,6 +79,18 @@ export default function Create() {
 
   const subtitle = settings.subtitle
   const speakersInstalled = SPEAKER_MODEL_IDS.every((id) => models[id]?.status === 'installed')
+  const vadInstalled = models[VAD_ID]?.status === 'installed'
+  // Speaker colors only apply once speaker detection is downloaded.
+  const speakerColorsOn = subtitle.speakerColors && speakersInstalled
+
+  /** Hint shown under a detection option whose models are not downloaded yet. */
+  const notDownloaded = (bytes: number) => (
+    <span className="model-warning">
+      Not downloaded yet ({formatBytes(bytes)}) — download it in <Link to="/models">Models</Link>.
+    </span>
+  )
+  const bytesOf = (ids: string[]): number =>
+    ids.reduce((sum, id) => sum + (CATALOG.find((model) => model.id === id)?.bytes ?? 0), 0)
 
   const addVideos = (paths: string[]): void => {
     const clean = paths.filter((path) => path.trim().length > 0)
@@ -219,6 +234,41 @@ export default function Create() {
           </section>
 
           <section className="card">
+            <h2>Detection</h2>
+            <div className="choice-list">
+              <label className={settings.useVad && vadInstalled ? 'choice selected' : vadInstalled ? 'choice' : 'choice disabled'}>
+                <input
+                  type="checkbox"
+                  disabled={!vadInstalled}
+                  checked={settings.useVad && vadInstalled}
+                  onChange={(event) => update({ useVad: event.target.checked })}
+                />
+                <span className="choice-text">
+                  <strong>Voice detection</strong>
+                  <span>Skips silence and music so Whisper does not invent captions. Recommended.</span>
+                  {vadInstalled ? null : notDownloaded(bytesOf([VAD_ID]))}
+                </span>
+              </label>
+              <label
+                className={subtitle.speakerColors && speakersInstalled ? 'choice selected' : speakersInstalled ? 'choice' : 'choice disabled'}
+              >
+                <input
+                  type="checkbox"
+                  disabled={!speakersInstalled}
+                  checked={subtitle.speakerColors && speakersInstalled}
+                  onChange={(event) => setSubtitle({ speakerColors: event.target.checked })}
+                />
+                <span className="choice-text">
+                  <strong>Speaker detection</strong>
+                  <span>Works out who is speaking so each speaker's captions get their own color.</span>
+                  {speakersInstalled ? null : notDownloaded(bytesOf(SPEAKER_MODEL_IDS))}
+                </span>
+              </label>
+            </div>
+            <p className="muted">Each job keeps the options it was started with.</p>
+          </section>
+
+          <section className="card">
             <h2>Layout</h2>
             <div className="layout-grid">
               {layoutOptions.map((option) => (
@@ -279,15 +329,8 @@ export default function Create() {
               </label>
 
               <div className="field">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={subtitle.speakerColors}
-                    onChange={(event) => setSubtitle({ speakerColors: event.target.checked })}
-                  />{' '}
-                  {subtitle.speakerColors ? 'Color per speaker' : 'Text color (or color per speaker)'}
-                </label>
-                {subtitle.speakerColors ? (
+                <span>{speakerColorsOn ? 'Speaker colors (1 = talks most)' : 'Text color'}</span>
+                {speakerColorsOn ? (
                   <div className="speaker-swatches">
                     {subtitle.speakerPalette.map((c, i) => (
                       <input
@@ -359,38 +402,6 @@ export default function Create() {
             </div>
           </section>
 
-          {subtitle.speakerColors && !speakersInstalled ? (
-            <section className="card speaker-prompt">
-              <h2>Speaker detection</h2>
-              <p className="muted">
-                Speaker colors need speaker detection — a one-time 31 MB download.
-              </p>
-              <div className="actions">
-                <button
-                  type="button"
-                  className="button primary"
-                  onClick={() => download(SPEAKER_MODEL_IDS)}
-                >
-                  Download now
-                </button>
-                <button
-                  type="button"
-                  className="button"
-                  onClick={() => setSubtitle({ speakerColors: false })}
-                >
-                  Not now
-                </button>
-              </div>
-              {SPEAKER_MODEL_IDS.map((id) => {
-                const state = models[id]
-                const entry = CATALOG.find((model) => model.id === id)
-                return state && entry ? (
-                  <ModelProgress key={id} state={state} totalBytes={entry.bytes} />
-                ) : null
-              })}
-            </section>
-          ) : null}
-
           <div className="actions">
             <button
               type="button"
@@ -411,6 +422,22 @@ export default function Create() {
         <aside className="create-side">
           <section className="card">
             <h2>Live preview</h2>
+            {speakerColorsOn ? (
+              <div className="speaker-preview-tabs" role="tablist" aria-label="Preview speaker">
+                {subtitle.speakerPalette.map((color, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    role="tab"
+                    aria-selected={previewSpeaker === i}
+                    className={previewSpeaker === i ? 'button small selected' : 'button small'}
+                    onClick={() => setPreviewSpeaker(i)}
+                  >
+                    <span className="swatch-dot" style={{ background: color }} /> Speaker {i + 1}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <div className="preview-wrap">
               <div className={`preview-frame ${settings.layout}`}>
                 <div className="preview-backdrop" />
@@ -422,7 +449,7 @@ export default function Create() {
                       fontFamily: `"${subtitle.font}", "Arial Black", Arial, sans-serif`,
                       fontWeight,
                       fontSize: captionSize,
-                      color: subtitle.speakerColors
+                      color: speakerColorsOn
                         ? subtitle.speakerPalette[previewSpeaker]
                         : subtitle.color,
                       WebkitTextStroke: subtitle.outline
