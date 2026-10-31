@@ -1539,11 +1539,11 @@ select {
   line-height: 1.45;
 }
 
-/* The logo's colours, top row to the reel */
+/* The logo's three colours, top to bottom */
 .step-dot {
   width: 10px;
   height: 10px;
-  margin: 2px 0 6px; /* same 18 px as the taller bar in step 3, so the titles line up */
+  margin-bottom: 6px;
   border-radius: 50%;
 }
 
@@ -1556,10 +1556,6 @@ select {
 }
 
 .step-dot.three {
-  width: 8px;
-  height: 14px;
-  margin: 0 0 4px;
-  border-radius: 4px;
   background: #ff7a1a;
 }
 
