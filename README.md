@@ -77,6 +77,14 @@ Also available: `npm run typecheck`, `npm run build`, and `npm run dist` to buil
 
 The app is Electron, React and TypeScript. The work happens in `src/main/pipeline`: transcription (`transcribe.ts`), speaker detection (`speakers.ts`), finding moments (`discover.ts`) and rendering (`render.ts`).
 
+### Releasing
+
+1. Set the new version in `package.json` and commit it.
+2. Tag it and push the tag: `git tag v0.2.0` then `git push --tags`.
+3. [.github/workflows/release.yml](.github/workflows/release.yml) builds the installer on a clean Windows machine and attaches `Siftora-Setup.exe` to a draft release. Review it, add notes and publish it; the **Download for Windows** button then serves the new version.
+
+Running the workflow by hand from the Actions tab only builds the installer, as a download on the run, without releasing anything.
+
 ### Engine updates
 
 Engines are downloaded on demand, never bundled. Besides the built-in list in `src/shared/engines.ts`, the app reads a tested list, `engines.json`, from this repository's `engines` release, and offers an **Update** on the Models screen when a newer tested version exists.
