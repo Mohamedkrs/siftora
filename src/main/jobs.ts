@@ -1,20 +1,23 @@
 import { app, BrowserWindow, shell } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
-import { basename, extname, join, resolve, sep } from 'node:path'
-import { SPEAKER_MODEL_IDS } from '../shared/catalog'
+import { basename, dirname, extname, join, resolve, sep } from 'node:path'
+import { CATALOG, REACTION_MODEL_IDS, llamaTooOld, SPEAKER_MODEL_IDS } from '../shared/catalog'
 import { pickEngine } from '../shared/engines'
 import type { Clip, Job, JobOptions } from '../shared/jobs'
 import { IPC, type YoutubeChoice } from '../shared/types'
 import { downloadModels, enginePath, listModels, modelFilePath } from './downloads'
+import { readGgufInfo } from './gguf'
 import { log } from './logger'
 import { findMoments, ollamaClient, startLlamaServer, type LlmClient } from './pipeline/discover'
+import { detectReactions, type ReactionLevels } from './pipeline/reactions'
 import { renderClip } from './pipeline/render'
 import { Cancelled, ffmpegPaths, run } from './pipeline/run'
 import { assignSpeakers, detectSpeakers } from './pipeline/speakers'
 import { DEFAULT_YOUTUBE_HEIGHT, renderStyleKey } from '../shared/jobs'
 import { fitWordsToSegments, transcribePython, transcribeWhisperCpp, type Transcript } from './pipeline/transcribe'
 import { getSettings } from './settings'
+import { ownLlamaBuild } from './systemEngines'
 import { downloadYoutube, isYoutubeUrl } from './youtube'
 
 const jobs = new Map<string, Job>()
@@ -94,6 +97,7 @@ export function addJobs(sources: string[], links: Record<string, YoutubeChoice> 
     useVad: settings.useVad,
     speakers: settings.detectSpeakers,
     speakersWhen: settings.speakersWhen,
+    reactions: settings.detectReactions,
     subtitle: settings.subtitle,
     layout: settings.layout,
     language: settings.language,
@@ -134,7 +138,14 @@ export function cancelJob(id: string): void {
   if (job.stage === 'queued') update(job, { stage: 'cancelled', message: undefined })
 }
 
+/** Takes a video off the Queue. A finished one keeps its results on Results; others are deleted. */
 export function removeJob(id: string): void {
+  const job = jobs.get(id)
+  if (job?.stage === 'done') update(job, { hiddenFromQueue: true })
+  else forgetJob(id)
+}
+
+function forgetJob(id: string): void {
   cancelJob(id)
   jobs.delete(id)
   rmSync(jobDir(id), { recursive: true, force: true })
@@ -166,7 +177,7 @@ export async function deleteJob(id: string): Promise<void> {
   } catch {
     // Folder already gone, or the user keeps other files there.
   }
-  removeJob(id)
+  forgetJob(id)
 }
 
 export function retryJob(id: string): void {
@@ -181,7 +192,7 @@ export function findAgain(id: string): void {
   const job = jobs.get(id)
   if (!job || job.stage !== 'done') return
   rmSync(join(jobDir(id), 'clips.json'), { force: true })
-  update(job, { stage: 'queued', progress: 0, clips: [], message: undefined })
+  update(job, { stage: 'queued', progress: 0, clips: [], message: undefined, hiddenFromQueue: undefined })
   void work()
 }
 
@@ -309,15 +320,50 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
       update(job, { speakerCount: cached.count })
     } else {
       update(job, { stage: 'speakers', progress: 0, message: undefined })
-      const turns = await speakerTurns(wav, signal, (message) => update(job, { message }))
-      update(job, { message: 'Listening for who speaks when — this takes a few minutes…' })
+      const turns = await speakerTurns(
+        wav,
+        signal,
+        (message) => update(job, { message }),
+        'Listening for who speaks when — this takes a few minutes…'
+      )
       const count = assignSpeakers(transcript.segments, turns)
       writeFileSync(speakersFile, JSON.stringify({ count, speakers: transcript.segments.map((s) => s.speaker ?? null) }))
       update(job, { speakerCount: count })
     }
   }
 
-  // 5. Moments
+  // 5. Reactions (cached, optional; depends only on the audio)
+  let reactions: ReactionLevels | undefined
+  if (job.options.reactions) {
+    const reactionsFile = join(dir, 'reactions.json')
+    reactions = readJson<ReactionLevels>(reactionsFile) ?? undefined
+    if (!reactions) {
+      update(job, { stage: 'reactions', progress: 0, message: undefined })
+      const engine = await sherpaEngine(signal, (message) => update(job, { message }))
+      // Same sherpa-onnx package as speaker detection, a different program in it.
+      const binary = join(dirname(engine), `sherpa-onnx-offline-audio-tagging${process.platform === 'win32' ? '.exe' : ''}`)
+      if (!existsSync(binary)) throw new Error('This sherpa-onnx build has no audio tagging program.')
+      const [model, labels] = REACTION_MODEL_IDS.map((id) => modelFilePath(id))
+      if (!model || !labels || !existsSync(model) || !existsSync(labels)) {
+        throw new Error('Reaction detection models are not downloaded. Get them on the Models screen.')
+      }
+      update(job, { message: undefined })
+      const onProgress = progressUpdater(job)
+      reactions = await detectReactions({
+        ffmpeg,
+        binary,
+        model,
+        labels,
+        wav,
+        workDir: dir,
+        signal,
+        onProgress: (fraction) => onProgress(fraction)
+      })
+      writeFileSync(reactionsFile, JSON.stringify(reactions))
+    }
+  }
+
+  // 6. Moments
   update(job, { stage: 'find', progress: 0, message: 'Starting the AI model…' })
   let client: LlmClient
   if (settings.llmProvider === 'ollama' && settings.ollamaModel) {
@@ -327,6 +373,8 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
     const model = settings.llmModel ? modelFilePath(settings.llmModel) : null
     if (!binary) throw new Error('llama.cpp is not installed. Install it from the Models screen.')
     if (!model) throw new Error('No clip finder AI model selected. Choose one on the Models screen.')
+    const tooOld = llamaTooOld(modelArchitecture(settings.llmModel as string, model), await ownLlamaBuild())
+    if (tooOld) throw new Error(tooOld)
     client = await startLlamaServer(binary, model, signal)
   }
   try {
@@ -338,6 +386,10 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
       minClipSeconds: job.options.minClipSeconds,
       maxClipSeconds: job.options.maxClipSeconds,
       minScore: job.options.minScore,
+      replay: readJson<{ heatmap?: { start_time: number; end_time: number; value: number }[] }>(
+        join(dir, 'video.info.json')
+      )?.heatmap?.map((p) => ({ start: p.start_time * 1000, end: p.end_time * 1000, value: p.value })),
+      reactions,
       signal,
       onProgress: (fraction) => onProgress(fraction, 'Reading the transcript…')
     })
@@ -348,8 +400,14 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
   }
 }
 
-async function speakerTurns(wav: string, signal: AbortSignal, onMessage: (message: string) => void): ReturnType<typeof detectSpeakers> {
-  const binary = await speakerEngine(signal, onMessage)
+async function speakerTurns(
+  wav: string,
+  signal: AbortSignal,
+  onMessage: (message: string) => void,
+  working = 'Finding who speaks…'
+): ReturnType<typeof detectSpeakers> {
+  const binary = await sherpaEngine(signal, onMessage)
+  onMessage(working)
   const [segmentation, embedding] = SPEAKER_MODEL_IDS.map((id) => modelFilePath(id))
   if (!segmentation || !embedding || !existsSync(segmentation) || !existsSync(embedding)) {
     throw new Error('Speaker detection models are not downloaded. Get them on the Models screen.')
@@ -389,25 +447,35 @@ async function clipSpeakers(
   writeFileSync(file, JSON.stringify(inClip.map((s) => s.speaker ?? null)))
 }
 
-/** sherpa-onnx comes with the speaker detection feature; fetch it if it is missing. */
-async function speakerEngine(signal: AbortSignal, onMessage: (message: string) => void): Promise<string> {
+function modelArchitecture(id: string, path: string): string | undefined {
+  const known = CATALOG.find((entry) => entry.id === id)?.gguf?.architecture
+  if (known) return known
+  try {
+    return readGgufInfo(path).architecture
+  } catch {
+    return undefined // unreadable: llama-server will say what is wrong
+  }
+}
+
+/** sherpa-onnx runs speaker and reaction detection; fetch it if it is missing. */
+async function sherpaEngine(signal: AbortSignal, onMessage: (message: string) => void): Promise<string> {
   const existing = enginePath('sherpa')
   if (existing) return existing
   const entry = pickEngine('sherpa', process.platform, process.arch, 'cpu')
-  if (!entry) throw new Error('Speaker detection is not available on this system yet.')
-  onMessage('Downloading the speaker detection engine…')
+  if (!entry) throw new Error('Speaker and reaction detection are not available on this system yet.')
+  onMessage('Downloading the audio analysis engine (sherpa-onnx)…')
   downloadModels([entry.id])
   for (;;) {
     if (signal.aborted) throw new Cancelled()
     const state = listModels().find((model) => model.id === entry.id)
     if (state?.status === 'installed') break
     if (state?.status === 'error' || state?.status === 'missing') {
-      throw new Error(state.error ?? 'Could not download the speaker detection engine.')
+      throw new Error(state.error ?? 'Could not download the audio analysis engine (sherpa-onnx).')
     }
     await new Promise((resolve) => setTimeout(resolve, 1000))
   }
   const path = enginePath('sherpa')
-  if (!path) throw new Error('Speaker detection engine was installed but not found.')
+  if (!path) throw new Error('The audio analysis engine (sherpa-onnx) was installed but not found.')
   return path
 }
 

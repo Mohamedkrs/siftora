@@ -44,6 +44,8 @@ export interface ScannedModel {
 }
 
 export interface SubtitleStyle {
+  /** Burn captions into the reels at all. */
+  enabled: boolean
   font: string
   sizePx: number
   color: string
@@ -138,6 +140,8 @@ export interface Settings {
   useVad: boolean
   /** Run speaker detection on new videos (needed for per-speaker caption colors). */
   detectSpeakers: boolean
+  /** Listen for reactions (laughter, cheering, gasps…) in new videos; clips that got one score higher. */
+  detectReactions: boolean
   /** video = whole video up front (slow, the AI sees who speaks); clip = each clip at render (fast). */
   speakersWhen: 'video' | 'clip'
   engineBackend: EngineBackend
@@ -158,6 +162,7 @@ export const DEFAULT_SETTINGS: Settings = {
   outputDir: '',
   layout: 'blurred',
   subtitle: {
+    enabled: true,
     font: 'Montserrat',
     sizePx: 72,
     color: '#FFFFFF',
@@ -180,6 +185,7 @@ export const DEFAULT_SETTINGS: Settings = {
   llmModel: null,
   useVad: true,
   detectSpeakers: false,
+  detectReactions: false,
   speakersWhen: 'video',
   engineBackend: 'auto',
   customModels: [],
@@ -258,6 +264,8 @@ export interface Api {
   getRecommendation(): Promise<Recommendation>
   getRequiredEngines(): Promise<RequiredEngines>
   getEngineOptions(): Promise<EngineOption[]>
+  /** Build of the user's own llama-server, or null when Siftora's own engine is used. */
+  ownLlamaBuild(): Promise<number | null>
   findSystemEngines(force?: boolean): Promise<SystemEngine[]>
   pickEngineBinary(engine: EngineKind): Promise<string | null>
   useSystemEngine(engine: EngineKind, path: string): Promise<{ ok: boolean; problem?: string }>
@@ -290,6 +298,7 @@ export interface Api {
   addJobs(sources: string[], links?: Record<string, YoutubeChoice>): Promise<Job[]>
   listJobs(): Promise<Job[]>
   cancelJob(id: string): Promise<void>
+  /** Finished videos are only hidden from the Queue; others are deleted. */
   removeJob(id: string): Promise<void>
   retryJob(id: string): Promise<void>
   /** Run moment discovery again on the cached transcript ("Find moments again"). */
@@ -334,6 +343,7 @@ export const IPC = {
   getRecommendation: 'hardware:recommendation',
   getRequiredEngines: 'engines:required',
   getEngineOptions: 'engines:options',
+  ownLlamaBuild: 'engines:own-llama-build',
   listModels: 'models:list',
   downloadModels: 'models:download',
   cancelDownload: 'models:cancel',

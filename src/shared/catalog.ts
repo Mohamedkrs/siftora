@@ -2,7 +2,7 @@
 // 2026-10-31. Pinned to `resolve/main`; move to self-hosted release assets before 1.0
 // (see docs/planning/PHASE0_PROPOSAL.md, "Signed manifest").
 
-export type ModelKind = 'transcription' | 'llm' | 'vad' | 'diarization'
+export type ModelKind = 'transcription' | 'llm' | 'vad' | 'diarization' | 'tagging'
 
 export interface ModelEntry {
   id: string
@@ -24,7 +24,7 @@ export interface ModelEntry {
    */
   gguf?: { architecture: string; sizeLabel: string }
   /** Features that need this model; installing a feature means installing all its models. */
-  feature?: 'speakers'
+  feature?: 'speakers' | 'reactions'
 }
 
 const GB = 1024 ** 3
@@ -172,7 +172,48 @@ export const CATALOG: ModelEntry[] = [
     license: 'Apache-2.0',
     memoryBytes: 300 * MB,
     feature: 'speakers'
+  },
+  {
+    id: 'ced-tiny-audio-tagging',
+    kind: 'tagging',
+    name: 'Sound events (CED tiny)',
+    description: 'Hears laughter, cheering, shouting, crying and gasps in the audio.',
+    url: 'https://huggingface.co/k2-fsa/sherpa-onnx-ced-tiny-audio-tagging-2024-04-19/resolve/main/model.int8.onnx',
+    file: 'ced-tiny-audio-tagging.int8.onnx',
+    bytes: 6133417,
+    sha256: '73aa22e783115f6a4ae169b36089907e07d0fd44795595eddea9c1bfc74cc945',
+    license: 'Apache-2.0',
+    memoryBytes: 100 * MB,
+    feature: 'reactions'
+  },
+  {
+    id: 'audioset-labels',
+    kind: 'tagging',
+    name: 'Sound event names (AudioSet)',
+    description: 'The names of the 527 sounds the model can hear.',
+    url: 'https://huggingface.co/k2-fsa/sherpa-onnx-ced-tiny-audio-tagging-2024-04-19/resolve/main/class_labels_indices.csv',
+    file: 'audioset-class-labels.csv',
+    bytes: 14675,
+    sha256: 'cdd1049833c4b86127c2773ac0d14a2754b6a6d0d1798002ed5c66e699708429',
+    license: 'CC-BY-4.0',
+    memoryBytes: 0,
+    feature: 'reactions'
   }
 ]
 
 export const SPEAKER_MODEL_IDS = CATALOG.filter((m) => m.feature === 'speakers').map((m) => m.id)
+/** Model first, then its label file. */
+export const REACTION_MODEL_IDS = CATALOG.filter((m) => m.feature === 'reactions').map((m) => m.id)
+
+/** First llama.cpp build that runs each GGUF architecture, for architectures newer than any build we accept. */
+export const MIN_LLAMA_BUILD_FOR_ARCH: Record<string, number> = {
+  qwen35: 7990 // github.com/ggml-org/llama.cpp/releases/tag/b7990 "support qwen3.5 series"
+}
+
+/** Why the user's own llama.cpp `build` cannot run a model of `architecture`; null when it can or is unknown. */
+export function llamaTooOld(architecture: string | undefined, build: number | null): string | null {
+  if (!architecture || build === null || !Object.hasOwn(MIN_LLAMA_BUILD_FOR_ARCH, architecture)) return null
+  const min = MIN_LLAMA_BUILD_FOR_ARCH[architecture]
+  if (build >= min) return null
+  return `Your llama.cpp (build ${build}) is too old for this model, it needs build ${min} or newer. Update it, or stop using it on the Models screen so Siftora uses its own.`
+}

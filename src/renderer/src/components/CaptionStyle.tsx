@@ -135,8 +135,19 @@ export default function CaptionStyle(props: {
         </section>
 
         <section>
-          <h3>Captions</h3>
-          <div className="field-grid">
+          <div className="captions-head">
+            <h3>Captions</h3>
+            <label className="captions-switch">
+              <input
+                type="checkbox"
+                role="switch"
+                checked={subtitle.enabled}
+                onChange={(event) => setSubtitle({ enabled: event.target.checked })}
+              />
+              {subtitle.enabled ? 'On' : 'Off'}
+            </label>
+          </div>
+          <div className={subtitle.enabled ? 'field-grid' : 'field-grid captions-off'}>
             <label className="field">
               Font
               <select value={subtitle.font} onChange={(event) => setSubtitle({ font: event.target.value })}>
@@ -338,6 +349,7 @@ export default function CaptionStyle(props: {
                 <div className="guide-zone bottom">May be covered by app buttons</div>
               </div>
             ) : null}
+            {subtitle.enabled ? (
             <div
               className={dragY !== null ? 'preview-caption dragging' : 'preview-caption'}
               style={{ top: `${captionY}%` }}
@@ -391,6 +403,7 @@ export default function CaptionStyle(props: {
                 ))}
               </div>
             </div>
+            ) : null}
           </div>
         </div>
       </aside>

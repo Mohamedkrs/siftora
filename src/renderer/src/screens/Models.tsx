@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CATALOG, type ModelEntry } from '../../../shared/catalog'
+import { CATALOG, llamaTooOld, type ModelEntry } from '../../../shared/catalog'
 import { ENGINES, engineBytes, engineLabel } from '../../../shared/engines'
 import type { CustomModel, EngineOption, ModelState, ScannedModel } from '../../../shared/types'
 import EngineChoice from '../components/EngineChoice'
@@ -16,7 +16,7 @@ import ModelProgress from '../components/ModelProgress'
 import SystemCard from '../components/SystemCard'
 import { formatBytes } from '../lib/format'
 import { useModels } from '../state/models'
-import { useSettings } from '../state/settings'
+import { useOwnLlamaBuild, useSettings } from '../state/settings'
 
 function emptyState(id: string): ModelState {
   return { id, status: 'missing', receivedBytes: 0, bytesPerSec: 0, etaSec: null }
@@ -40,6 +40,8 @@ interface CardProps {
   /** A copy of this model found on the computer, offered instead of the download. */
   localCopy?: { file: ScannedModel; busy: boolean; onUse: () => void }
   warning?: boolean
+  /** Why this model cannot run here, e.g. the user's llama.cpp is too old. */
+  problem?: string | null
   radioName?: string
   radio?: { checked: boolean; onChange: () => void }
   toggle?: { label: string; checked: boolean; onChange: (checked: boolean) => void }
@@ -123,6 +125,7 @@ function ModelCard(props: CardProps) {
       </div>
 
       {props.warning ? <p className="model-warning">May not fit your GPU/RAM</p> : null}
+      {props.problem ? <p className="model-warning">{props.problem}</p> : null}
       {props.localCopy && missingIds.length > 0 ? (
         <p className="found-copy">
           <span className="badge badge-ok">Found in {copySource(props.localCopy.file)}</span> Use that file, nothing to
@@ -225,6 +228,7 @@ export default function Models() {
   // Bumped when the user starts/stops using their own engines, so sizes are recomputed.
   const [enginesVersion, setEnginesVersion] = useState(0)
   const copies = useLocalCopies(() => setEnginesVersion((v) => v + 1))
+  const llamaBuild = useOwnLlamaBuild()
   const localCopy = (id: string): CardProps['localCopy'] => {
     const file = copies.copyFor(id)
     return file ? { file, busy: copies.busy === id, onUse: () => void copies.use(id) } : undefined
@@ -298,6 +302,13 @@ export default function Models() {
   const llmModels = CATALOG.filter((m) => m.kind === 'llm')
   const vadModels = CATALOG.filter((m) => m.kind === 'vad')
   const speakerModels = CATALOG.filter((m) => m.kind === 'diarization')
+  const reactionModels = CATALOG.filter((m) => m.kind === 'tagging')
+  const installed = (entries: { id: string }[]): boolean => entries.every((entry) => models[entry.id]?.status === 'installed')
+  // sherpa-onnx runs both features: keep it while the other one still needs it.
+  const removeFeature =
+    (other: ModelEntry[]) =>
+    (ids: string[]): void =>
+      removeMany(installed(other) ? ids.filter((id) => id !== sherpa?.id) : ids)
 
   const tooBig = (entries: ModelEntry[]): boolean => {
     if (!hardware) return false
@@ -495,6 +506,7 @@ export default function Models() {
             recommended={recommendation?.llm === entry.id}
             localCopy={localCopy(entry.id)}
             warning={tooBig([entry])}
+            problem={llamaTooOld(entry.gguf?.architecture, llamaBuild)}
             radioName="llm-model"
             radio={{
               checked: settings.llmProvider !== 'ollama' && settings.llmModel === entry.id,
@@ -579,7 +591,31 @@ export default function Models() {
           }}
           onDownload={download}
           onCancel={cancel}
-          onDelete={removeMany}
+          onDelete={removeFeature(reactionModels)}
+        />
+      </section>
+
+      <section className="models-section">
+        <div className="section-intro">
+          <h2>Reaction detection</h2>
+          <p>Listens for laughter, cheering, shouting, crying and gasps, so moments that got a reaction rank higher. Optional.</p>
+        </div>
+        <ModelCard
+          entries={[
+            ...reactionModels,
+            ...(sherpa ? [{ id: sherpa.id, bytes: engineBytes(sherpa), license: sherpa.license }] : [])
+          ]}
+          states={[...reactionModels, ...(sherpa ? [sherpa] : [])].map(stateOf)}
+          title="Reaction detection"
+          description="A small sound model plus sherpa-onnx, the engine that runs it (shared with speaker detection)."
+          toggle={{
+            label: 'Listen for reactions in new videos',
+            checked: settings.detectReactions,
+            onChange: (detectReactions) => update({ detectReactions })
+          }}
+          onDownload={download}
+          onCancel={cancel}
+          onDelete={removeFeature(speakerModels)}
         />
       </section>
     </div>

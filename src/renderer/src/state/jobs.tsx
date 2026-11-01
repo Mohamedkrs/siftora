@@ -37,7 +37,8 @@ export function JobsProvider({ children }: { children: ReactNode }) {
     },
     cancel: (id) => void window.api.cancelJob(id),
     remove: (id) => {
-      setJobs((current) => current.filter((job) => job.id !== id))
+      // A finished video stays (hidden from the Queue); its update arrives from main.
+      setJobs((current) => current.filter((job) => job.id !== id || job.stage === 'done'))
       void window.api.removeJob(id)
     },
     retry: (id) => void window.api.retryJob(id),

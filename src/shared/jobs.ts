@@ -7,6 +7,7 @@ export type JobStage =
   | 'audio'
   | 'transcribe'
   | 'speakers'
+  | 'reactions'
   | 'find' // moment discovery with the LLM
   | 'done'
   | 'error'
@@ -18,6 +19,8 @@ export interface JobOptions {
   speakers: boolean
   /** Missing on older jobs = 'video'. */
   speakersWhen?: 'video' | 'clip'
+  /** Missing on older jobs = off. */
+  reactions?: boolean
   subtitle: SubtitleStyle
   layout: Layout
   language: string
@@ -90,6 +93,8 @@ export interface Job {
   clips: Clip[]
   /** Folder the rendered reels go to. */
   outputDir: string
+  /** Removed from the Queue but kept, with its clips, on Results. */
+  hiddenFromQueue?: boolean
 }
 
 /** URL the renderer can use in <video src> for a local file (served by the main process). */
@@ -103,6 +108,7 @@ export const STAGE_LABELS: Record<JobStage, string> = {
   audio: 'Preparing audio',
   transcribe: 'Transcribing',
   speakers: 'Detecting speakers',
+  reactions: 'Listening for reactions',
   find: 'Finding moments',
   done: 'Done',
   error: 'Failed',

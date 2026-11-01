@@ -89,6 +89,7 @@ export async function downloadYoutube(
       '--ffmpeg-location', dirname(ffmpeg),
       '-f', maxHeight > 0 ? `bv*[height<=${maxHeight}]+ba/b[height<=${maxHeight}]/b` : 'bv*+ba/b',
       '--merge-output-format', 'mp4',
+      '--write-info-json', // video.info.json: has YouTube's "Most replayed" heatmap
       '-o', join(dir, 'video.%(ext)s'),
       url
     ],

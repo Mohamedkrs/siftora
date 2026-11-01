@@ -101,6 +101,7 @@ function sanitize(input: unknown): Settings {
     layout:
       raw.layout === 'blurred' || raw.layout === 'focused' ? raw.layout : defaults.layout,
     subtitle: {
+      enabled: typeof subtitle.enabled === 'boolean' ? subtitle.enabled : defaults.subtitle.enabled,
       font: CAPTION_FONTS.some((f) => f.family === subtitle.font)
         ? (subtitle.font as string)
         : defaults.subtitle.font,
@@ -153,6 +154,7 @@ function sanitize(input: unknown): Settings {
         ? raw.detectSpeakers
         : subtitle.speakerColors === true,
     speakersWhen: raw.speakersWhen === 'clip' ? 'clip' : 'video',
+    detectReactions: typeof raw.detectReactions === 'boolean' ? raw.detectReactions : defaults.detectReactions,
     engineBackend:
       ENGINE_BACKENDS.find((backend) => backend === raw.engineBackend) ?? defaults.engineBackend,
     customModels,

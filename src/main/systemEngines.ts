@@ -1,10 +1,11 @@
 import { app } from 'electron'
 import { execFile } from 'node:child_process'
-import { existsSync, readdirSync, realpathSync } from 'node:fs'
+import { existsSync, readdirSync, realpathSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, dirname, join, sep } from 'node:path'
 import type { EngineKind, OllamaInfo, OpenAiWhisperInfo, SystemEngine } from '../shared/types'
 import { log } from './logger'
+import { getSettings } from './settings'
 
 const BINARIES: Record<EngineKind, string> = {
   llama: 'llama-server',
@@ -110,11 +111,27 @@ async function inspectFfmpeg(path: string): Promise<Omit<SystemEngine, 'source'>
   return { ...base, usable: true, note }
 }
 
-async function inspectLlama(path: string): Promise<Omit<SystemEngine, 'source'>> {
-  const base: Omit<SystemEngine, 'source'> = { engine: 'llama', path, version: null, backend: 'unknown', usable: false }
+async function llamaBuildOf(path: string): Promise<number | null> {
   const version = await run(path, ['--version'])
   const build = Number(version.out.match(/\(build (\d+)/)?.[1] ?? NaN)
-  if (!Number.isFinite(build)) return { ...base, problem: 'Does not run or is not llama-server' }
+  return Number.isFinite(build) ? build : null
+}
+
+const builds = new Map<string, number | null>()
+
+/** Build of the user's own llama-server; null when Siftora's own engine (always new enough) is used. */
+export async function ownLlamaBuild(): Promise<number | null> {
+  const path = getSettings().enginePaths.llama
+  if (!path || !existsSync(path)) return null
+  const key = `${path}|${statSync(path).mtimeMs}` // an updated binary gets checked again
+  if (!builds.has(key)) builds.set(key, await llamaBuildOf(path))
+  return builds.get(key) ?? null
+}
+
+async function inspectLlama(path: string): Promise<Omit<SystemEngine, 'source'>> {
+  const base: Omit<SystemEngine, 'source'> = { engine: 'llama', path, version: null, backend: 'unknown', usable: false }
+  const build = await llamaBuildOf(path)
+  if (build === null) return { ...base, problem: 'Does not run or is not llama-server' }
   base.version = `build ${build}`
   if (build < MIN_LLAMA_BUILD) return { ...base, problem: `Too old (build ${build}), needs ${MIN_LLAMA_BUILD}+` }
 

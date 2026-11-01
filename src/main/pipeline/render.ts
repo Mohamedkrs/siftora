@@ -128,15 +128,15 @@ export async function renderClip(opts: {
     if (!existsSync(join(fontsDir, file))) copyFileSync(join(fontsSource(), file), join(fontsDir, file))
   }
   const assName = `clip-${clip.start}.ass`
-  writeFileSync(join(opts.workDir, assName), buildAss(clip, opts.segments, opts.style))
+  if (opts.style.enabled) writeFileSync(join(opts.workDir, assName), buildAss(clip, opts.segments, opts.style))
 
-  const subtitles = `subtitles=${assName}:fontsdir=fonts`
+  const subtitles = opts.style.enabled ? `,subtitles=${assName}:fontsdir=fonts` : ''
   const filter =
     opts.layout === 'focused'
-      ? `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},${subtitles}[v]`
+      ? `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}${subtitles}[v]`
       : // Blurred background: blur a small copy (fast), scale it up, overlay the full frame centred.
         `[0:v]split[a][b];[a]scale=270:480:force_original_aspect_ratio=increase,crop=270:480,boxblur=10:2,scale=${W}:${H}[bg];` +
-        `[b]scale=${W}:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,${subtitles}[v]`
+        `[b]scale=${W}:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2${subtitles}[v]`
 
   const lengthMs = clip.end - clip.start
   await run(

@@ -75,9 +75,12 @@ function JobCard({ job }: { job: Job }) {
               void dialog
                 .confirm({
                   title: `Remove "${job.title}" from the queue?`,
-                  message: 'Its saved analysis is deleted. Rendered reels stay in the output folder.',
+                  message:
+                    job.stage === 'done'
+                      ? 'Its clips stay on Results. To delete them, use Delete there.'
+                      : 'Its saved progress is deleted.',
                   confirmLabel: 'Remove',
-                  danger: true
+                  danger: job.stage !== 'done'
                 })
                 .then((ok) => ok && remove(job.id))
             }}
@@ -91,7 +94,8 @@ function JobCard({ job }: { job: Job }) {
 }
 
 export default function Queue() {
-  const { jobs } = useJobs()
+  const { jobs: all } = useJobs()
+  const jobs = all.filter((job) => !job.hiddenFromQueue)
   return (
     <div className="screen">
       <div className="screen-head">

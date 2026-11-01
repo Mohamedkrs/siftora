@@ -18,7 +18,7 @@ import {
 import { basename, join } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { CATALOG, SPEAKER_MODEL_IDS, type ModelEntry } from '../shared/catalog'
+import { CATALOG, REACTION_MODEL_IDS, SPEAKER_MODEL_IDS, type ModelEntry } from '../shared/catalog'
 import {
   builtInVersion,
   ENGINES,
@@ -279,7 +279,9 @@ export function modelFilePath(id: string): string | null {
 export function downloadModels(requested: string[]): void {
   const sherpa = pickEngine('sherpa', process.platform, process.arch, 'cpu')
   const ids =
-    sherpa && requested.some((id) => SPEAKER_MODEL_IDS.includes(id)) && !requested.includes(sherpa.id)
+    sherpa &&
+    requested.some((id) => SPEAKER_MODEL_IDS.includes(id) || REACTION_MODEL_IDS.includes(id)) &&
+    !requested.includes(sherpa.id)
       ? [...requested, sherpa.id]
       : requested
   for (const id of ids) {

@@ -89,6 +89,23 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   )
 }
 
+/** Build of the user's own llama-server (null = Siftora's own), re-checked when they switch engines. */
+export function useOwnLlamaBuild(): number | null {
+  const { settings } = useSettings()
+  const [build, setBuild] = useState<number | null>(null)
+  useEffect(() => {
+    let alive = true
+    window.api
+      .ownLlamaBuild()
+      .then((value) => alive && setBuild(value))
+      .catch((err: unknown) => window.api.log('warn', `ownLlamaBuild failed: ${String(err)}`))
+    return () => {
+      alive = false
+    }
+  }, [settings.enginePaths.llama])
+  return build
+}
+
 export function useSettings(): SettingsContextValue {
   const value = useContext(SettingsContext)
   if (!value) throw new Error('useSettings must be used inside SettingsProvider')

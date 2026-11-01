@@ -1,13 +1,13 @@
 import { useState, type DragEvent, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { CATALOG, SPEAKER_MODEL_IDS } from '../../../shared/catalog'
+import { CATALOG, REACTION_MODEL_IDS, llamaTooOld, SPEAKER_MODEL_IDS } from '../../../shared/catalog'
 import { DEFAULT_YOUTUBE_HEIGHT, mediaUrl } from '../../../shared/jobs'
 import type { YoutubeChoice, YoutubeInfo } from '../../../shared/types'
 import VideoCard from '../components/VideoCard'
 import { formatBytes, formatClock } from '../lib/format'
 import { useJobs } from '../state/jobs'
 import { useModels } from '../state/models'
-import { useSettings } from '../state/settings'
+import { useOwnLlamaBuild, useSettings } from '../state/settings'
 
 function isYouTubeUrl(value: string): boolean {
   try {
@@ -149,6 +149,7 @@ export default function Create() {
   const [starting, setStarting] = useState(false)
 
   const speakersInstalled = SPEAKER_MODEL_IDS.every((id) => models[id]?.status === 'installed')
+  const reactionsInstalled = REACTION_MODEL_IDS.every((id) => models[id]?.status === 'installed')
   const vadInstalled = models[VAD_ID]?.status === 'installed'
   const bytesOf = (ids: string[]): number =>
     ids.reduce((sum, id) => sum + (CATALOG.find((model) => model.id === id)?.bytes ?? 0), 0)
@@ -161,6 +162,11 @@ export default function Create() {
     settings.transcriptionProvider === 'openai-whisper'
       ? `OpenAI Whisper (Python)${settings.openaiWhisperModel ? ` · ${settings.openaiWhisperModel}` : ''}`
       : modelName(settings.transcriptionModel)
+  const llamaBuild = useOwnLlamaBuild()
+  const finderProblem =
+    settings.llmProvider === 'ollama'
+      ? null
+      : llamaTooOld(CATALOG.find((m) => m.id === settings.llmModel)?.gguf?.architecture, llamaBuild)
   const finder =
     settings.llmProvider === 'ollama' ? (settings.ollamaModel ? `Ollama · ${settings.ollamaModel}` : null) : modelName(settings.llmModel)
 
@@ -363,9 +369,10 @@ export default function Create() {
               </div>
               <div>
                 <dt>Find moments</dt>
-                <dd className={finder ? undefined : 'model-warning'}>
+                <dd className={finder && !finderProblem ? undefined : 'model-warning'}>
                   {finder ?? 'No model chosen'}
                   {finder && runsOn && settings.llmProvider !== 'ollama' ? <span className="muted"> · {runsOn}</span> : null}
+                  {finderProblem ? (<><br />{finderProblem}</>) : null}
                 </dd>
               </div>
               <div>
@@ -377,6 +384,10 @@ export default function Create() {
                       ? 'Detected per clip, when rendering'
                       : 'Detected on the whole video'}
                 </dd>
+              </div>
+              <div>
+                <dt>Reactions</dt>
+                <dd>{settings.detectReactions && reactionsInstalled ? 'Heard, boosts clips that got laughs, cheers or gasps' : 'Off'}</dd>
               </div>
             </dl>
             <Link to="/models" className="side-link">
@@ -504,6 +515,26 @@ export default function Create() {
                   </label>
                 </div>
               ) : null}
+              <label className={reactionsInstalled ? 'toggle' : 'toggle disabled'}>
+                <input
+                  type="checkbox"
+                  disabled={!reactionsInstalled}
+                  checked={settings.detectReactions && reactionsInstalled}
+                  onChange={(event) => update({ detectReactions: event.target.checked })}
+                />
+                <span>
+                  <strong>Reaction detection</strong>
+                  <span className="muted">
+                    {reactionsInstalled ? (
+                      'Hears laughter, cheering, shouting, crying and gasps, so moments that got a reaction rank higher. About a minute per hour of video.'
+                    ) : (
+                      <>
+                        Not downloaded ({formatBytes(bytesOf(REACTION_MODEL_IDS))}). Get it in <Link to="/models">Models</Link>.
+                      </>
+                    )}
+                  </span>
+                </span>
+              </label>
             </div>
             <p className="muted small">Each video keeps the settings it was added with.</p>
           </section>

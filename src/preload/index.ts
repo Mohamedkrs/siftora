@@ -18,6 +18,7 @@ const api: Api = {
   getRecommendation: () => ipcRenderer.invoke(IPC.getRecommendation),
   getRequiredEngines: () => ipcRenderer.invoke(IPC.getRequiredEngines),
   getEngineOptions: () => ipcRenderer.invoke(IPC.getEngineOptions),
+  ownLlamaBuild: () => ipcRenderer.invoke(IPC.ownLlamaBuild),
   findSystemEngines: (force) => ipcRenderer.invoke(IPC.findSystemEngines, force),
   pickEngineBinary: (engine) => ipcRenderer.invoke(IPC.pickEngineBinary, engine),
   useSystemEngine: (engine, path) => ipcRenderer.invoke(IPC.useSystemEngine, engine, path),

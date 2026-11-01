@@ -2047,3 +2047,30 @@ select {
     animation: none;
   }
 }
+
+.captions-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.captions-head h3 {
+  margin-right: auto;
+}
+
+.captions-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.captions-switch input {
+  accent-color: var(--accent);
+}
+
+/* Captions off: options stay visible (and editable), just faded. */
+.field-grid.captions-off {
+  opacity: 0.5;
+}

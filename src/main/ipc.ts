@@ -11,7 +11,8 @@ import {
   detectOllama,
   detectOpenAiWhisper,
   findSystemEngines,
-  inspectEngineBinary
+  inspectEngineBinary,
+  ownLlamaBuild
 } from './systemEngines'
 import { Cancelled } from './pipeline/run'
 import { getSettings, setSettings } from './settings'
@@ -57,6 +58,7 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.getRequiredEngines, () => requiredEngineInfo())
 
   ipcMain.handle(IPC.getEngineOptions, () => engineOptions())
+  ipcMain.handle(IPC.ownLlamaBuild, () => ownLlamaBuild())
 
   ipcMain.handle(IPC.findSystemEngines, (_event, force: unknown) => findSystemEngines(force === true))
 
