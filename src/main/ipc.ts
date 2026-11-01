@@ -5,7 +5,18 @@ import { deleteDownloads, quitAfterRemoval, removeAllData, storageUsage } from '
 import { cancelDownload, deleteModel, downloadModels, listModels, modelsDir } from './downloads'
 import { detectHardware, engineOptions, recommend, requiredEngineInfo } from './hardware'
 import { addCustomModel, removeCustomModel, scanForModels } from './localModels'
-import { addJobs, cancelJob, deleteJob, deleteReel, findAgain, listJobs, removeJob, renderClips, retryJob } from './jobs'
+import {
+  addJobs,
+  cancelJob,
+  deleteJob,
+  deleteReel,
+  findAgain,
+  listJobs,
+  removeJob,
+  renderClips,
+  retryJob,
+  setClipRange
+} from './jobs'
 import { log } from './logger'
 import {
   detectOllama,
@@ -140,6 +151,9 @@ export function registerIpc(): void {
   // Only files the app produced or the user chose are passed here; still, never run programs.
   ipcMain.handle(IPC.deleteJob, (_event, id: unknown) => deleteJob(String(id)))
   ipcMain.handle(IPC.deleteReel, (_event, jobId: unknown, clipId: unknown) => deleteReel(String(jobId), String(clipId)))
+  ipcMain.handle(IPC.setClipRange, (_event, jobId: unknown, clipId: unknown, start: unknown, end: unknown) => {
+    if (typeof start === 'number' && typeof end === 'number') setClipRange(String(jobId), String(clipId), start, end)
+  })
   ipcMain.handle(IPC.openPath, async (_event, path: unknown) => {
     if (typeof path === 'string' && !/\.(exe|bat|cmd|com|ps1|sh|app|msi|lnk)$/i.test(path)) await shell.openPath(path)
   })

@@ -14,7 +14,7 @@ import { detectReactions, type ReactionLevels } from './pipeline/reactions'
 import { renderClip } from './pipeline/render'
 import { Cancelled, ffmpegPaths, run } from './pipeline/run'
 import { assignSpeakers, detectSpeakers } from './pipeline/speakers'
-import { DEFAULT_YOUTUBE_HEIGHT, renderStyleKey } from '../shared/jobs'
+import { DEFAULT_YOUTUBE_HEIGHT, rangeKey, renderStyleKey } from '../shared/jobs'
 import { fitWordsToSegments, transcribePython, transcribeWhisperCpp, type Transcript } from './pipeline/transcribe'
 import { getSettings } from './settings'
 import { ownLlamaBuild } from './systemEngines'
@@ -505,6 +505,35 @@ export async function deleteReel(jobId: string, clipId: string): Promise<void> {
   update(job)
 }
 
+/** Shortest clip a user can trim to. */
+const MIN_CLIP_MS = 1000
+
+/**
+ * Sets a clip's start/end by hand (ms in the source video). The clip keeps its id; a reel
+ * rendered before shows as out of date until it is rendered again.
+ */
+export function setClipRange(jobId: string, clipId: string, start: number, end: number): void {
+  const job = jobs.get(jobId)
+  const clip = job?.clips.find((c) => c.id === clipId)
+  if (!job || !clip || clip.render.status === 'queued' || clip.render.status === 'rendering') return
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return
+  const from = Math.max(0, Math.round(start))
+  const to = Math.min(job.durationMs ?? Infinity, Math.round(end))
+  if (to - from < MIN_CLIP_MS) return
+
+  clip.original ??= { start: clip.start, end: clip.end }
+  clip.start = from
+  clip.end = to
+  const atOriginal = clip.start === clip.original.start && clip.end === clip.original.end
+  if (atOriginal) clip.original = undefined
+  clip.notes = clip.notes.filter((note) => note !== 'length set by hand')
+  if (!atOriginal) clip.notes.push('length set by hand')
+  const words = readJson<Transcript>(join(jobDir(job.id), 'transcript.json'))?.segments.flatMap((s) => s.words ?? []) ?? []
+  const spoken = words.filter((word) => word.start >= from && word.end <= to)
+  if (spoken.length > 0) clip.text = spoken.map((word) => word.text.trim()).join(' ')
+  update(job)
+}
+
 async function renderNext(): Promise<void> {
   if (rendering) return
   rendering = true
@@ -567,7 +596,14 @@ async function renderOne(job: Job, clip: Clip): Promise<void> {
         update(job)
       }
     })
-    clip.render = { status: 'done', progress: 1, path: output, style: renderStyleKey(style, layout), at: Date.now() }
+    clip.render = {
+      status: 'done',
+      progress: 1,
+      path: output,
+      style: renderStyleKey(style, layout),
+      range: rangeKey(clip),
+      at: Date.now()
+    }
   } catch (err) {
     log.error('render', `${job.title} / ${clip.title}: ${String(err)}`)
     clip.render = { status: 'error', progress: 0, error: err instanceof Error ? err.message : String(err) }

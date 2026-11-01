@@ -308,6 +308,8 @@ export interface Api {
   deleteJob(id: string): Promise<void>
   /** Moves a rendered reel to the Recycle Bin / Trash and marks the clip as not rendered. */
   deleteReel(jobId: string, clipId: string): Promise<void>
+  /** Sets a clip's start/end (ms in the source video) by hand. */
+  setClipRange(jobId: string, clipId: string, start: number, end: number): Promise<void>
   openPath(path: string): Promise<void>
   showInFolder(path: string): Promise<void>
   onJobUpdate(cb: (job: Job) => void): () => void
@@ -370,6 +372,7 @@ export const IPC = {
   renderClips: 'jobs:render',
   deleteJob: 'jobs:delete',
   deleteReel: 'jobs:delete-reel',
+  setClipRange: 'jobs:set-clip-range',
   openPath: 'shell:open-path',
   showInFolder: 'shell:show-in-folder',
   onJobUpdate: 'jobs:update'

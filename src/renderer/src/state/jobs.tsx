@@ -12,6 +12,7 @@ interface JobsContextValue {
   findAgain: (id: string) => void
   render: (jobId: string, clipIds: string[]) => void
   deleteReel: (jobId: string, clipId: string) => void
+  setClipRange: (jobId: string, clipId: string, start: number, end: number) => void
   /** Removes a video with its reels and data. */
   deleteJob: (id: string) => void
 }
@@ -45,6 +46,7 @@ export function JobsProvider({ children }: { children: ReactNode }) {
     findAgain: (id) => void window.api.findAgain(id),
     render: (jobId, clipIds) => void window.api.renderClips(jobId, clipIds),
     deleteReel: (jobId, clipId) => void window.api.deleteReel(jobId, clipId),
+    setClipRange: (jobId, clipId, start, end) => void window.api.setClipRange(jobId, clipId, start, end),
     deleteJob: (id) => {
       setJobs((current) => current.filter((job) => job.id !== id))
       void window.api.deleteJob(id)

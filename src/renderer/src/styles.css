@@ -2074,3 +2074,38 @@ select {
 .field-grid.captions-off {
   opacity: 0.5;
 }
+
+/* Adjust length on a clip card */
+.clip-trim {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 10px;
+  background: var(--sunken);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.trim-row,
+.trim-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.trim-label {
+  width: 40px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.trim-time {
+  min-width: 64px;
+  font-variant-numeric: tabular-nums;
+}
+
+.trim-actions .muted {
+  font-size: 12px;
+}

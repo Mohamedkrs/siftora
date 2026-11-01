@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { mediaUrl, renderStyleKey, type Clip, type Job } from '../../../shared/jobs'
+import { mediaUrl, rangeKey, renderStyleKey, type Clip, type Job } from '../../../shared/jobs'
 import CaptionStyle from '../components/CaptionStyle'
 import { useDialog } from '../components/Dialog'
 import VideoCard from '../components/VideoCard'
@@ -12,17 +12,64 @@ function scoreClass(score: number): string {
   return score >= 75 ? 'score high' : score >= 55 ? 'score mid' : 'score low'
 }
 
+/** m:ss.t, precise enough to trim by. */
+function clockTenths(ms: number): string {
+  const tenths = Math.floor((ms % 1000) / 100)
+  return `${formatClock(Math.floor(ms / 1000) * 1000)}.${tenths}`
+}
+
+function TrimRow(props: {
+  label: string
+  ms: number
+  disabled: boolean
+  onChange: (ms: number) => void
+  onPlayhead: () => void
+}) {
+  return (
+    <div className="trim-row">
+      <span className="trim-label">{props.label}</span>
+      <span className="trim-time">{clockTenths(props.ms)}</span>
+      {[-1000, -100, 100, 1000].map((step) => (
+        <button
+          key={step}
+          type="button"
+          className="button small"
+          disabled={props.disabled}
+          onClick={() => props.onChange(props.ms + step)}
+        >
+          {step < 0 ? '−' : '+'}
+          {Math.abs(step) / 1000}s
+        </button>
+      ))}
+      <button type="button" className="button small" disabled={props.disabled} onClick={props.onPlayhead}>
+        Set to playhead
+      </button>
+    </div>
+  )
+}
+
 function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: number; stale: boolean }) {
-  const { render, deleteReel } = useJobs()
+  const { render, deleteReel, setClipRange } = useJobs()
   const dialog = useDialog()
   const [showText, setShowText] = useState(false)
+  const [adjusting, setAdjusting] = useState(false)
+  const source = useRef<HTMLVideoElement>(null)
+  // While adjusting the player runs freely (to find a new end); "Play clip" plays just the range.
+  const stopAtEnd = useRef(true)
   const done = clip.render.status === 'done' && clip.render.path
   const busy = clip.render.status === 'queued' || clip.render.status === 'rendering'
+  const lengthChanged = clip.render.range !== undefined && clip.render.range !== rangeKey(clip)
+  const playhead = (): number => Math.round((source.current?.currentTime ?? 0) * 1000)
+  const setRange = (start: number, end: number): void => setClipRange(job.id, clip.id, start, end)
+  const toggleAdjust = (): void => {
+    stopAtEnd.current = adjusting
+    setAdjusting(!adjusting)
+  }
 
   return (
     <article className="card clip-card">
       <div className="clip-media">
-        {done ? (
+        {done && !adjusting ? (
           <video
             key={clip.render.at}
             className="clip-reel"
@@ -32,6 +79,7 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
           />
         ) : job.videoPath ? (
           <video
+            ref={source}
             className="clip-source"
             src={mediaUrl(job.videoPath)}
             controls
@@ -42,9 +90,10 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
             }}
             onTimeUpdate={(event) => {
               const video = event.currentTarget
-              if (video.currentTime >= clip.end / 1000) {
+              if (stopAtEnd.current && video.currentTime >= clip.end / 1000) {
                 video.pause()
                 video.currentTime = clip.start / 1000
+                if (adjusting) stopAtEnd.current = false
               }
             }}
           />
@@ -77,12 +126,59 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
             ))}
           </p>
         ) : null}
+        {adjusting ? (
+          <div className="clip-trim">
+            <TrimRow
+              label="Start"
+              ms={clip.start}
+              disabled={busy}
+              onChange={(ms) => setRange(ms, clip.end)}
+              onPlayhead={() => setRange(playhead(), clip.end)}
+            />
+            <TrimRow
+              label="End"
+              ms={clip.end}
+              disabled={busy}
+              onChange={(ms) => setRange(clip.start, ms)}
+              onPlayhead={() => setRange(clip.start, playhead())}
+            />
+            <div className="trim-actions">
+              <button
+                type="button"
+                className="button small"
+                onClick={() => {
+                  const video = source.current
+                  if (!video) return
+                  stopAtEnd.current = true
+                  video.currentTime = clip.start / 1000
+                  void video.play()
+                }}
+              >
+                Play clip
+              </button>
+              {clip.original ? (
+                <button
+                  type="button"
+                  className="button small"
+                  disabled={busy}
+                  onClick={() => clip.original && setRange(clip.original.start, clip.original.end)}
+                >
+                  Reset to the AI&apos;s cut
+                </button>
+              ) : null}
+              <span className="muted">Play past the end or scrub, then use “Set to playhead”.</span>
+            </div>
+          </div>
+        ) : null}
         <button type="button" className="link-button" onClick={() => setShowText((v) => !v)}>
           {showText ? 'Hide transcript' : 'Show transcript'}
         </button>
         {showText ? <p className="clip-text">{clip.text}</p> : null}
 
         <div className="actions">
+          <button type="button" className="button" disabled={busy} onClick={toggleAdjust} aria-pressed={adjusting}>
+            {adjusting ? 'Done adjusting' : 'Adjust length'}
+          </button>
           {done ? (
             <>
               <button type="button" className="button primary" onClick={() => void window.api.openPath(clip.render.path as string)}>
@@ -126,7 +222,11 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
             </button>
           )}
         </div>
-        {done && stale ? <p className="stale-hint">Caption style changed since this was rendered — render again to update it.</p> : null}
+        {done && stale ? (
+          <p className="stale-hint">
+            {lengthChanged ? 'Length changed' : 'Caption style changed'} since this was rendered — render again to update it.
+          </p>
+        ) : null}
         {clip.render.status === 'error' ? <p className="error">{clip.render.error}</p> : null}
       </div>
     </article>
@@ -176,7 +276,11 @@ export default function Results() {
       })
   }
   const styleKey = renderStyleKey(settings.subtitle, settings.layout)
-  const isStale = (clip: Clip): boolean => clip.render.status === 'done' && clip.render.style !== styleKey
+  // Older reels have no saved range; only a known, different one counts as changed.
+  const rangeChanged = (clip: Clip): boolean =>
+    clip.render.status === 'done' && clip.render.range !== undefined && clip.render.range !== rangeKey(clip)
+  const isStale = (clip: Clip): boolean =>
+    (clip.render.status === 'done' && clip.render.style !== styleKey) || rangeChanged(clip)
   const stale = clips.filter(isStale)
   // Preview the style on the best clip: a frame just after it starts and its first caption line.
   const top = clips[0]
@@ -219,7 +323,7 @@ export default function Results() {
           </button>
           {stale.length > 0 ? (
             <button type="button" className="button" onClick={() => render(job.id, stale.map((clip) => clip.id))}>
-              Update {stale.length} to new style
+              Update {stale.length} out of date
             </button>
           ) : null}
           <button type="button" className="button" onClick={() => void window.api.openPath(job.outputDir)}>

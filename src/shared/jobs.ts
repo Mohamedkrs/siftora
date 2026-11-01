@@ -49,6 +49,8 @@ export interface Clip {
   /** Milliseconds in the source video. */
   start: number
   end: number
+  /** The AI's cut, kept once the user changes start/end by hand, so it can be restored. */
+  original?: { start: number; end: number }
   title: string
   hook: string
   category: string
@@ -64,8 +66,24 @@ export interface Clip {
    * style: renderStyleKey() of the look it was rendered with, to flag reels that are out of date.
    * at: when it finished; re-renders overwrite the same file, so the player URL needs it to reload.
    */
-  /** message: what a render is doing before the progress bar moves (e.g. finding speakers). */
-  render: { status: RenderStatus; progress: number; path?: string; error?: string; style?: string; at?: number; message?: string }
+  /**
+   * message: what a render is doing before the progress bar moves (e.g. finding speakers).
+   * range: rangeKey() of the start/end it was rendered with, to flag reels whose length changed.
+   */
+  render: {
+    status: RenderStatus
+    progress: number
+    path?: string
+    error?: string
+    style?: string
+    at?: number
+    message?: string
+    range?: string
+  }
+}
+
+export function rangeKey(clip: { start: number; end: number }): string {
+  return `${clip.start}-${clip.end}`
 }
 
 export function renderStyleKey(subtitle: SubtitleStyle, layout: Layout): string {
