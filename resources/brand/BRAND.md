@@ -37,3 +37,10 @@ In the horizontal lockups the symbol is 1.13 times the text size, centred on the
 - **Minimum size:** use the full symbol at 48 px and up; below that, use `siftora-symbol-small.svg`. Horizontal lockups need at least 100 px of width; below 48 px tall, use the `-small` lockups.
 - **Backgrounds:** white, light neutrals, or the ink colour `#16131F`. On photos or busy backgrounds, use the app-icon tile or the one-colour white version.
 - **Don't:** reorder or recolour the rows, add gradients or shadows, stretch the logo, rotate it, or change the number of dots.
+
+## Use of the name and logo
+
+The Siftora name and logo are not covered by the GPL that applies to the code. They identify the original project, so:
+
+- **Fine:** using them to refer to Siftora itself, for example in an article, review, tutorial or link to the project.
+- **Not fine:** using them for a modified version or another product, or in a way that suggests it comes from or is endorsed by the Siftora project. Forks that are published must use their own name and logo.

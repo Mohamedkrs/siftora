@@ -101,4 +101,6 @@ Bug reports, ideas and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBU
 
 Siftora is free software under the [GNU GPL v3](LICENSE).
 
+The Siftora name and logo are not covered by the GPL. You are welcome to fork and modify Siftora under its license, but please give a modified version that you publish its own name and logo, so people can tell it apart from the original. Using the name to refer to Siftora itself, for example in a review or tutorial, is fine.
+
 It builds on [whisper.cpp](https://github.com/ggml-org/whisper.cpp) and [llama.cpp](https://github.com/ggml-org/llama.cpp) (MIT), [FFmpeg](https://ffmpeg.org) (GPL), [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (Apache 2.0), OpenAI's Whisper models (MIT), Qwen models (Apache 2.0), Silero VAD (MIT), and the caption fonts listed in [resources/fonts](resources/fonts/README.md) (SIL Open Font License). The engines and models are downloaded from their publishers when you need them.
