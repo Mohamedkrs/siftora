@@ -319,8 +319,9 @@ export function recommend(hw: HardwareInfo): Recommendation {
   const budget = hw.memoryBudgetBytes
   const cpu = hw.backend === 'cpu'
 
+  // Large v3 is opt-in: a little more accurate than Turbo but several times slower.
   const transcriptionModels = CATALOG.filter(
-    (m) => m.kind === 'transcription' && (!cpu || m.memoryBytes <= GB)
+    (m) => m.kind === 'transcription' && m.id !== 'whisper-large-v3' && (!cpu || m.memoryBytes <= GB)
   )
   const llmModels = CATALOG.filter((m) => {
     if (m.kind !== 'llm') return false

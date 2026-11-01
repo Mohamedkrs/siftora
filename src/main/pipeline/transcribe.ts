@@ -30,6 +30,7 @@ const DTW_PRESETS: Record<string, string> = {
   'whisper-base': 'base',
   'whisper-small': 'small',
   'whisper-large-v3-turbo': 'large.v3.turbo',
+  'whisper-large-v3': 'large.v3',
   'whisper-large-v3-turbo-q5': 'large.v3.turbo'
 }
 

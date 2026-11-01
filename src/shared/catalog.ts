@@ -73,13 +73,25 @@ export const CATALOG: ModelEntry[] = [
     id: 'whisper-large-v3-turbo',
     kind: 'transcription',
     name: 'Whisper Large v3 Turbo',
-    description: 'Best accuracy. Recommended with a GPU.',
+    description: 'Fast and accurate. Recommended with a GPU.',
     url: `${HF_WHISPER}/ggml-large-v3-turbo.bin`,
     file: 'ggml-large-v3-turbo.bin',
     bytes: 1624555275,
     sha256: '1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69',
     license: 'MIT',
     memoryBytes: 2.5 * GB
+  },
+  {
+    id: 'whisper-large-v3',
+    kind: 'transcription',
+    name: 'Whisper Large v3',
+    description: 'Most accurate, mainly on accents, fast speech and other languages. 3-5x slower than Turbo; needs a strong GPU.',
+    url: `${HF_WHISPER}/ggml-large-v3.bin`,
+    file: 'ggml-large-v3.bin',
+    bytes: 3095033483,
+    sha256: '64d182b440b98d5203c4f9bd541544d84c605196c4f7b845dfa11fb23594d1e2',
+    license: 'MIT',
+    memoryBytes: 4.5 * GB
   },
   {
     id: 'qwen3-4b',
