@@ -42,16 +42,19 @@ const hashtags = (words: string[]): string => [...new Set(words)].map((word) => 
 /** Post texts for one platform. `title` only where the platform has a separate title field. */
 export function shareText(clip: Clip, platform: SharePlatform): { title?: string; text: string } {
   const tags = clip.hashtags?.length ? clip.hashtags : (CATEGORY_TAGS[clip.category] ?? [])
-  const description = clip.description?.trim() || clip.hook
+  // Never the hook: it is a raw transcript quote, not something to post.
+  const caption = clip.caption?.trim() || clip.title
+  const description = clip.description?.trim()
+  const body = (lines: (string | undefined)[]): string => lines.filter(Boolean).join('\n\n')
   if (platform === 'youtube') {
     return {
       title: cut(clip.title, YOUTUBE_TITLE_MAX),
-      text: `${description}\n\n${hashtags([...tags, 'shorts'])}`
+      text: body([description ?? caption, hashtags([...tags, 'shorts'])])
     }
   }
   if (platform === 'tiktok') {
-    // TikTok shows the first line in the feed: lead with the hook.
-    return { text: cut(`${clip.hook} ${hashtags([...tags, 'fyp'])}`, CAPTION_MAX) }
+    // TikTok shows the first line in the feed: lead with the caption.
+    return { text: cut(`${caption} ${hashtags([...tags, 'fyp'])}`, CAPTION_MAX) }
   }
-  return { text: cut(`${description}\n\n${hashtags([...tags, 'reels'].slice(0, INSTAGRAM_TAGS_MAX))}`, CAPTION_MAX) }
+  return { text: cut(body([caption, description, hashtags([...tags, 'reels'].slice(0, INSTAGRAM_TAGS_MAX))]), CAPTION_MAX) }
 }

@@ -10,6 +10,7 @@ interface JobsContextValue {
   remove: (id: string) => void
   retry: (id: string) => void
   findAgain: (id: string) => void
+  rewritePosts: (id: string) => void
   render: (jobId: string, clipIds: string[]) => void
   deleteReel: (jobId: string, clipId: string) => void
   setClipRange: (jobId: string, clipId: string, start: number, end: number) => void
@@ -44,6 +45,7 @@ export function JobsProvider({ children }: { children: ReactNode }) {
     },
     retry: (id) => void window.api.retryJob(id),
     findAgain: (id) => void window.api.findAgain(id),
+    rewritePosts: (id) => void window.api.rewritePosts(id),
     render: (jobId, clipIds) => void window.api.renderClips(jobId, clipIds),
     deleteReel: (jobId, clipId) => void window.api.deleteReel(jobId, clipId),
     setClipRange: (jobId, clipId, start, end) => void window.api.setClipRange(jobId, clipId, start, end),

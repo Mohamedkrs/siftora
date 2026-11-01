@@ -12,6 +12,7 @@ import {
   deleteJob,
   deleteReel,
   findAgain,
+  rewritePosts,
   listJobs,
   removeJob,
   renderClips,
@@ -148,6 +149,7 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.removeJob, (_event, id: unknown) => removeJob(String(id)))
   ipcMain.handle(IPC.retryJob, (_event, id: unknown) => retryJob(String(id)))
   ipcMain.handle(IPC.findAgain, (_event, id: unknown) => findAgain(String(id)))
+  ipcMain.handle(IPC.rewritePosts, (_event, id: unknown) => rewritePosts(String(id)))
   ipcMain.handle(IPC.renderClips, (_event, jobId: unknown, clipIds: unknown) => renderClips(String(jobId), ids(clipIds)))
   // Only files the app produced or the user chose are passed here; still, never run programs.
   ipcMain.handle(IPC.deleteJob, (_event, id: unknown) => deleteJob(String(id)))

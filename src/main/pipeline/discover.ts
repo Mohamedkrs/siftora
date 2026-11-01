@@ -48,8 +48,6 @@ interface Moment {
   category: string
   rationale: string
   payoff_quote: string
-  description: string
-  hashtags: string[]
   needs_earlier_context: boolean
   scores: ClipScores
 }
@@ -69,8 +67,6 @@ const SCHEMA = {
           category: { type: 'string', enum: ['funny', 'educational', 'controversial', 'emotional', 'surprising', 'conversation'] },
           rationale: { type: 'string' },
           payoff_quote: { type: 'string' },
-          description: { type: 'string' },
-          hashtags: { type: 'array', items: { type: 'string' }, maxItems: 6 },
           needs_earlier_context: { type: 'boolean' },
           scores: {
             type: 'object',
@@ -88,8 +84,6 @@ const SCHEMA = {
           'category',
           'rationale',
           'payoff_quote',
-          'description',
-          'hashtags',
           'needs_earlier_context',
           'scores'
         ]
@@ -119,14 +113,18 @@ Rules:
 - When the payoff gets an immediate reaction (a laugh, "that was good", "no way"), end_id includes that reaction; do not end on the punchline itself.
 - Return at most 3 moments for this excerpt, only genuinely strong ones. An empty list is fine.
 - Pick start_id and end_id from the line ids. Never invent ids.
-- Write title, hook, rationale and description in the transcript's language.
-- description: 1-2 sentences for the post caption when the clip is shared; make people want to watch, no hashtags.
-- hashtags: 3-6 hashtags that fit this clip (topic, people, format), as plain words without '#'.
+- Write title, hook and rationale in the transcript's language.
 - Scores 1-5: hook = how strongly the first seconds grab attention; payoff = how satisfying the ending is; standalone = understandable without context; value = entertainment or information value. Be strict: 5 is rare.`
 }
 
+export interface ChatOptions {
+  /** JSON schema the reply must follow; defaults to the moments schema. */
+  schema?: object
+  temperature?: number
+}
+
 export interface LlmClient {
-  chat(system: string, user: string): Promise<string>
+  chat(system: string, user: string, options?: ChatOptions): Promise<string>
   close(): void
 }
 
@@ -182,18 +180,18 @@ export async function startLlamaServer(binary: string, model: string, signal: Ab
   }
 
   return {
-    async chat(system, user) {
+    async chat(system, user, options = {}) {
       const response = await fetch(`${base}/v1/chat/completions`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         signal,
         body: JSON.stringify({
-          temperature: 0.3,
+          temperature: options.temperature ?? 0.3,
           messages: [
             { role: 'system', content: system },
             { role: 'user', content: user }
           ],
-          response_format: { type: 'json_schema', json_schema: { name: 'moments', schema: SCHEMA } },
+          response_format: { type: 'json_schema', json_schema: { name: 'reply', schema: options.schema ?? SCHEMA } },
           chat_template_kwargs: { enable_thinking: false }
         })
       })
@@ -209,7 +207,7 @@ export function ollamaClient(model: string, signal: AbortSignal): LlmClient {
   const host = process.env.OLLAMA_HOST
   const base = !host ? 'http://127.0.0.1:11434' : host.startsWith('http') ? host.replace(/\/$/, '') : `http://${host}`
   return {
-    async chat(system, user) {
+    async chat(system, user, options = {}) {
       const response = await fetch(`${base}/api/chat`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -218,8 +216,8 @@ export function ollamaClient(model: string, signal: AbortSignal): LlmClient {
           model,
           stream: false,
           think: false,
-          format: SCHEMA,
-          options: { temperature: 0.3, num_ctx: 16384 },
+          format: options.schema ?? SCHEMA,
+          options: { temperature: options.temperature ?? 0.3, num_ctx: 16384 },
           messages: [
             { role: 'system', content: system },
             { role: 'user', content: user }
@@ -237,6 +235,81 @@ export function ollamaClient(model: string, signal: AbortSignal): LlmClient {
 }
 
 const norm = (text: string): string => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+
+const POST_SCHEMA = {
+  type: 'object',
+  properties: {
+    title: { type: 'string' },
+    caption: { type: 'string' },
+    description: { type: 'string' },
+    hashtags: { type: 'array', items: { type: 'string' }, maxItems: 6 }
+  },
+  required: ['title', 'caption', 'description', 'hashtags']
+}
+
+const POST_PROMPT = `You write the post for one short-form clip (YouTube Shorts, TikTok, Instagram Reels) cut from a longer video. You get the long video's title, channel, description and tags (its format and who is in it), what kind of moment the clip is, sounds the audience made, and the clip's transcript.
+
+Write, in the transcript's language:
+- title: max 60 characters. Make a stranger curious enough to watch. Be specific to this clip: name the channel's host or a guest when the transcript shows they are in it, and the situation (the challenge, the game, the topic). Do not give away the punchline. No quotation marks, no ALL CAPS, no emoji, no clickbait the clip does not deliver.
+- caption: the first line people see in the feed, max 100 characters. Sets up the moment in your own words; never a quote copied from the transcript.
+- description: 1-2 sentences, max 200 characters. Tells a stranger who is in it, what the setup is and what happens, and why it is worth watching. Your own words, no hashtags.
+- hashtags: 3-6 plain words without '#': the host or show, the format (e.g. trynottolaugh, podcast), the topic.
+
+Rules:
+- Only describe what the context and the transcript show. Never invent people, roles (like a heckler or a host), places or events.
+- Use the video's format from its title, description and tags: if it is a challenge or game, say so.
+- The transcript comes from speech recognition: ignore filler, false starts and misheard words; never repeat them.
+- Speech recognition mishears names. Spell names the way the video title, description or tags spell them. If you cannot tell who someone is, say what they are (a comedian, a guest) instead of guessing a name.
+- Say what actually happens. Never use filler like hilarious, wild, chaos, epic, "you won't believe", "worth watching", "don't miss".
+- The caption must not repeat the title; it adds the setup or the stakes.`
+
+/**
+ * Writes each clip's title, feed caption, description and hashtags in its own call, with the
+ * whole clip in view. The moment search only drafts a working title on the side.
+ */
+export async function writePosts(opts: {
+  client: LlmClient
+  clips: Clip[]
+  segments: Segment[]
+  /** Long video's title, channel, description and tags, one per line. */
+  videoContext: string
+  signal: AbortSignal
+  onProgress: (fraction: number) => void
+}): Promise<void> {
+  for (const [i, clip] of opts.clips.entries()) {
+    if (opts.signal.aborted) throw new Cancelled()
+    opts.onProgress(i / opts.clips.length)
+    const lines = opts.segments
+      .filter((s) => s.end > clip.start && s.start < clip.end)
+      .map((s) => `${s.speaker !== undefined ? `S${s.speaker + 1}: ` : ''}${s.text}`)
+    const sounds = clip.notes.filter((note) => /laughed|cheering|gasps|shouting|crying/.test(note))
+    const user = [
+      opts.videoContext,
+      `Kind of moment: ${clip.category}`,
+      sounds.length > 0 ? `Audience: ${sounds.join(', ')}` : null,
+      `Clip transcript:\n${lines.join('\n')}`
+    ]
+      .filter(Boolean)
+      .join('\n')
+    try {
+      const post = JSON.parse(await opts.client.chat(POST_PROMPT, user, { schema: POST_SCHEMA, temperature: 0.7 })) as {
+        title?: string
+        caption?: string
+        description?: string
+        hashtags?: unknown
+      }
+      if (post.title?.trim()) clip.title = post.title.trim().replace(/^["']|["']$/g, '')
+      if (post.caption?.trim()) clip.caption = post.caption.trim()
+      if (post.description?.trim()) clip.description = post.description.trim()
+      const tags = cleanHashtags(post.hashtags).slice(0, 6)
+      if (tags.length > 0) clip.hashtags = tags
+    } catch (err) {
+      if (opts.signal.aborted) throw new Cancelled()
+      log.warn('find', `writing the post for "${clip.title}" failed: ${String(err)}`)
+    }
+  }
+  opts.onProgress(1)
+}
 
 /** Asks the LLM for moments window by window and turns them into checked, scored clips. */
 export async function findMoments(opts: {
@@ -366,8 +439,6 @@ function refine(moment: Moment, segments: Segment[], minMs: number, maxMs: numbe
     end: segments[b].end,
     title: moment.title,
     hook: moment.hook,
-    description: moment.description,
-    hashtags: cleanHashtags(moment.hashtags).slice(0, 6),
     category: moment.category,
     rationale: moment.rationale,
     scores: s,

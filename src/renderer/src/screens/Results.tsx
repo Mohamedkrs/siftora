@@ -240,7 +240,7 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
 }
 
 export default function Results() {
-  const { jobs, render, findAgain, deleteJob } = useJobs()
+  const { jobs, render, findAgain, rewritePosts, deleteJob } = useJobs()
   const dialog = useDialog()
   const { settings } = useSettings()
   const [params, setParams] = useSearchParams()
@@ -334,6 +334,15 @@ export default function Results() {
           ) : null}
           <button type="button" className="button" onClick={() => void window.api.openPath(job.outputDir)}>
             Open output folder
+          </button>
+          <button
+            type="button"
+            className="button"
+            disabled={rendering || clips.length === 0}
+            title="Ask the AI for new titles, captions and descriptions; the clips stay as they are"
+            onClick={() => rewritePosts(job.id)}
+          >
+            Rewrite post texts
           </button>
           <button type="button" className="button" onClick={() => findAgain(job.id)}>
             Find moments again

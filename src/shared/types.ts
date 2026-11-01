@@ -304,6 +304,8 @@ export interface Api {
   retryJob(id: string): Promise<void>
   /** Run moment discovery again on the cached transcript ("Find moments again"). */
   findAgain(id: string): Promise<void>
+  /** Rewrites the clips' titles, captions and descriptions; the clips stay. */
+  rewritePosts(id: string): Promise<void>
   renderClips(jobId: string, clipIds: string[]): Promise<void>
   /** Deletes a video's reels (to the Recycle Bin / Trash) and saved data; the original file stays. */
   deleteJob(id: string): Promise<void>
@@ -372,6 +374,7 @@ export const IPC = {
   removeJob: 'jobs:remove',
   retryJob: 'jobs:retry',
   findAgain: 'jobs:find-again',
+  rewritePosts: 'jobs:rewrite-posts',
   renderClips: 'jobs:render',
   deleteJob: 'jobs:delete',
   deleteReel: 'jobs:delete-reel',

@@ -9,7 +9,7 @@ import { IPC, type YoutubeChoice } from '../shared/types'
 import { downloadModels, enginePath, listModels, modelFilePath } from './downloads'
 import { readGgufInfo } from './gguf'
 import { log } from './logger'
-import { findMoments, ollamaClient, startLlamaServer, type LlmClient } from './pipeline/discover'
+import { findMoments, ollamaClient, startLlamaServer, writePosts, type LlmClient } from './pipeline/discover'
 import { detectReactions, type ReactionLevels } from './pipeline/reactions'
 import { renderClip } from './pipeline/render'
 import { Cancelled, ffmpegPaths, run } from './pipeline/run'
@@ -188,6 +188,15 @@ export function retryJob(id: string): void {
 }
 
 /** "Find moments again": keep audio/transcript/speakers, redo discovery. */
+/** Rewrites the titles, captions and descriptions of a video's clips; the clips themselves stay. */
+export function rewritePosts(id: string): void {
+  const job = jobs.get(id)
+  if (!job || job.stage !== 'done' || job.clips.length === 0) return
+  if (job.clips.some((clip) => clip.render.status === 'queued' || clip.render.status === 'rendering')) return
+  update(job, { stage: 'queued', progress: 0, message: undefined, rewritePosts: true, hiddenFromQueue: undefined })
+  void work()
+}
+
 export function findAgain(id: string): void {
   const job = jobs.get(id)
   if (!job || job.stage !== 'done') return
@@ -379,7 +388,8 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
   }
   try {
     const onProgress = progressUpdater(job)
-    const clips = await findMoments({
+    const rewriteOnly = job.rewritePosts === true && job.clips.length > 0
+    const clips = rewriteOnly ? job.clips : await findMoments({
       client,
       segments: transcript.segments,
       durationMs: job.durationMs ?? 0,
@@ -393,11 +403,41 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
       signal,
       onProgress: (fraction) => onProgress(fraction, 'Reading the transcript…')
     })
+    await writePosts({
+      client,
+      clips,
+      segments: transcript.segments,
+      videoContext: videoContext(job.title, dir),
+      signal,
+      onProgress: (fraction) => onProgress(fraction, 'Writing titles and captions…')
+    })
     writeFileSync(join(dir, 'clips.json'), JSON.stringify(clips))
-    update(job, { clips })
+    update(job, { clips, rewritePosts: undefined })
   } finally {
     client.close()
   }
+}
+
+/** What the writing step should know about the long video: title, plus channel, description and tags for links. */
+function videoContext(title: string, dir: string): string {
+  const info = readJson<{ channel?: string; uploader?: string; description?: string; tags?: string[] }>(
+    join(dir, 'video.info.json')
+  )
+  const channel = info?.channel ?? info?.uploader
+  // Social and merch links say nothing about the video; @handles and plain text do.
+  const description = (info?.description ?? '')
+    .split('\n')
+    .filter((line) => line.trim() && !/https?:\/\//.test(line))
+    .join(' ')
+    .slice(0, 500)
+  return [
+    `Video title: ${title}`,
+    channel ? `Channel: ${channel}` : null,
+    description ? `Video description: ${description}` : null,
+    info?.tags?.length ? `Video tags: ${info.tags.slice(0, 15).join(', ')}` : null
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 async function speakerTurns(

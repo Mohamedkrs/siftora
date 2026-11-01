@@ -56,6 +56,7 @@ const api: Api = {
   removeJob: (id) => ipcRenderer.invoke(IPC.removeJob, id),
   retryJob: (id) => ipcRenderer.invoke(IPC.retryJob, id),
   findAgain: (id) => ipcRenderer.invoke(IPC.findAgain, id),
+  rewritePosts: (id) => ipcRenderer.invoke(IPC.rewritePosts, id),
   renderClips: (jobId, clipIds) => ipcRenderer.invoke(IPC.renderClips, jobId, clipIds),
   deleteJob: (id) => ipcRenderer.invoke(IPC.deleteJob, id),
   deleteReel: (jobId, clipId) => ipcRenderer.invoke(IPC.deleteReel, jobId, clipId),

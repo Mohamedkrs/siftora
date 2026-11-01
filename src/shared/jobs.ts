@@ -53,7 +53,11 @@ export interface Clip {
   original?: { start: number; end: number }
   title: string
   hook: string
-  /** Post caption and hashtags (no '#') for sharing; missing on clips found before the share kit. */
+  /**
+   * Written for sharing by a separate AI step: caption = first line in the feed, description,
+   * hashtags (no '#'). Missing on clips found before that step; "Rewrite post texts" adds them.
+   */
+  caption?: string
   description?: string
   hashtags?: string[]
   category: string
@@ -116,6 +120,8 @@ export interface Job {
   outputDir: string
   /** Removed from the Queue but kept, with its clips, on Results. */
   hiddenFromQueue?: boolean
+  /** Queued to rewrite its clips' post texts only, keeping the clips. */
+  rewritePosts?: boolean
 }
 
 /** URL the renderer can use in <video src> for a local file (served by the main process). */
