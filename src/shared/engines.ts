@@ -1,7 +1,7 @@
 // Engine builds (llama.cpp, whisper.cpp, FFmpeg) per OS/arch/backend. Sizes and SHA-256
 // come from the GitHub release asset digests, checked 2026-10-31.
 // These are the fallback; the tested list published by .github/workflows/engines.yml (see
-// ENGINE_LIST_URL) overrides them and adds builds upstream does not ship (macOS whisper.cpp).
+// ENGINE_LIST_URL) overrides them with newer tested versions (Windows whisper.cpp for now).
 // TODO before 1.0: mirror FFmpeg too (BtbN prunes old autobuild tags; no macOS build yet).
 
 export type EngineName = 'llama' | 'whisper' | 'ffmpeg' | 'sherpa'

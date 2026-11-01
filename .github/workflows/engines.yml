@@ -1,11 +1,10 @@
-# Keeps the app's engines up to date without shipping a new app version.
+# Keeps the app's engines up to date without shipping a new app version (Windows).
 #
-# Weekly (or on demand) it looks for a new whisper.cpp release. If there is one it builds the
-# macOS versions upstream does not ship, smoke-tests every build the app would download with the
-# app's own flags (scripts/engines/smoke-whisper.mjs), and only if all pass publishes:
-#   - release "whisper-<version>": our macOS builds
-#   - release "engines": engines.json, the tested list the app reads (ENGINE_LIST_URL)
-# A failing run publishes nothing; GitHub emails the failure.
+# Weekly (opt-in, see below) or on demand, it looks for a new whisper.cpp release. If there is
+# one, it smoke-tests the upstream Windows build with the app's own flags
+# (scripts/engines/smoke-whisper.mjs) and, only if that passes, publishes engines.json to the
+# release "engines": the tested list the app reads (ENGINE_LIST_URL). A failing run publishes
+# nothing; GitHub emails the failure.
 #
 # Not smoke-tested: the Windows CUDA build (GitHub runners have no GPU). It comes from the same
 # upstream release as the Windows CPU build that is tested.
@@ -21,7 +20,7 @@ on:
         description: 'whisper.cpp release tag (empty = newest)'
         required: false
       force:
-        description: 'Build and publish even if this version is already published'
+        description: 'Test and publish even if this version is already published'
         type: boolean
         default: false
 
@@ -41,8 +40,8 @@ env:
 
 jobs:
   check:
-    # The weekly run is opt-in (repository variable ENGINES_WEEKLY = true), so a private repo does
-    # not spend Actions minutes on it; macOS runners count ten times. Manual runs always work.
+    # The weekly run is opt-in (repository variable ENGINES_WEEKLY = true), so it does not spend
+    # Actions minutes until wanted. Manual runs always work.
     if: github.event_name != 'schedule' || vars.ENGINES_WEEKLY == 'true'
     runs-on: ubuntu-latest
     outputs:
@@ -60,7 +59,7 @@ jobs:
           [[ "$version" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "unexpected tag: $version"; exit 1; }
           published=""
           if gh release download engines -R "$GITHUB_REPOSITORY" -p engines.json -O list.json 2>/dev/null; then
-            published="$(jq -r '[.engines[] | select(.id == "whisper-mac-metal") | .version][0] // ""' list.json)"
+            published="$(jq -r '[.engines[] | select(.id == "whisper-win-cpu") | .version][0] // ""' list.json)"
           fi
           echo "newest: $version, published: ${published:-none}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -70,83 +69,30 @@ jobs:
             echo "build=false" >> "$GITHUB_OUTPUT"
           fi
 
-  build-mac:
+  test-windows:
     needs: check
     if: needs.check.outputs.build == 'true'
-    strategy:
-      fail-fast: true
-      matrix:
-        include:
-          - arch: arm64
-            runner: macos-14
-            flags: -DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON
-          - arch: x64
-            runner: macos-15-intel
-            # Portable x86-64: AVX2 (2013+ Macs), not the runner's own CPU features.
-            flags: -DGGML_METAL=OFF -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON
-    runs-on: ${{ matrix.runner }}
-    env:
-      VERSION: ${{ needs.check.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Fetch whisper.cpp source
-        run: git clone --depth 1 --branch "$VERSION" "https://github.com/$UPSTREAM.git" src-whisper
-      - name: Build whisper-cli
-        working-directory: src-whisper
-        run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
-            -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DWHISPER_BUILD_TESTS=OFF -DWHISPER_SDL2=OFF \
-            ${{ matrix.flags }}
-          cmake --build build --config Release -j 4 --target whisper-cli
-          otool -L build/bin/whisper-cli # should list only system libraries
-      - uses: ./.github/actions/smoke-models
-      - name: Smoke test
-        run: node scripts/engines/smoke-whisper.mjs src-whisper/build/bin/whisper-cli models/ggml-base.bin models/ggml-silero.bin src-whisper/samples/jfk.wav work
-      - name: Package
-        run: |
-          mkdir -p pkg dist
-          cp src-whisper/build/bin/whisper-cli pkg/
-          cp src-whisper/LICENSE pkg/LICENSE.txt
-          tar -czf "dist/whisper-$VERSION-mac-${{ matrix.arch }}.tar.gz" -C pkg .
-      - uses: actions/upload-artifact@v4
-        with:
-          name: whisper-mac-${{ matrix.arch }}
-          path: dist/*.tar.gz
-          if-no-files-found: error
-
-  test-upstream:
-    needs: check
-    if: needs.check.outputs.build == 'true'
-    strategy:
-      fail-fast: true
-      matrix:
-        include:
-          - runner: ubuntu-latest
-            asset: '^whisper-bin-ubuntu-x64\.tar\.gz$'
-          - runner: windows-latest
-            asset: '^whisper-bin-x64\.zip$'
-    runs-on: ${{ matrix.runner }}
+    runs-on: windows-latest
     defaults:
       run:
         shell: bash
     env:
       VERSION: ${{ needs.check.outputs.version }}
       GH_TOKEN: ${{ github.token }}
+      ASSET: '^whisper-bin-x64\.zip$'
     steps:
       - uses: actions/checkout@v4
-      - name: Download upstream build (checked against GitHub's SHA-256)
+      - name: Download the upstream build (checked against GitHub's SHA-256)
         run: |
           gh api "repos/$UPSTREAM/releases/tags/$VERSION" > release.json
-          name="$(jq -r --arg re '${{ matrix.asset }}' '[.assets[] | select(.name | test($re))][0].name' release.json)"
+          name="$(jq -r --arg re "$ASSET" '[.assets[] | select(.name | test($re))][0].name' release.json)"
+          [ "$name" != "null" ] || { echo "no asset matching $ASSET"; exit 1; }
           digest="$(jq -r --arg n "$name" '.assets[] | select(.name == $n) | .digest' release.json)"
-          [ "$name" != "null" ] || { echo "no asset matching ${{ matrix.asset }}"; exit 1; }
           gh release download "$VERSION" -R "$UPSTREAM" -p "$name" -O build-archive
           echo "${digest#sha256:}  build-archive" | sha256sum -c -
-          mkdir upstream
-          if [[ "$name" == *.zip ]]; then unzip -q build-archive -d upstream; else tar -xf build-archive -C upstream; fi
-          cli="$(find upstream -type f \( -name whisper-cli -o -name whisper-cli.exe \) | head -1)"
-          [ -n "$cli" ] || { echo "whisper-cli not found in $name"; exit 1; }
-          chmod +x "$cli"
+          mkdir upstream && unzip -q build-archive -d upstream
+          cli="$(find upstream -type f -name whisper-cli.exe | head -1)"
+          [ -n "$cli" ] || { echo "whisper-cli.exe not found in $name"; exit 1; }
           echo "CLI=$cli" >> "$GITHUB_ENV"
           curl -fsSL -o jfk.wav "https://raw.githubusercontent.com/$UPSTREAM/$VERSION/samples/jfk.wav"
       - uses: ./.github/actions/smoke-models
@@ -154,7 +100,7 @@ jobs:
         run: node scripts/engines/smoke-whisper.mjs "$CLI" models/ggml-base.bin models/ggml-silero.bin jfk.wav work
 
   publish:
-    needs: [check, build-mac, test-upstream]
+    needs: [check, test-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -163,23 +109,12 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: whisper-mac-*
-          path: dist
-          merge-multiple: true
-      - name: Publish macOS builds
-        run: |
-          tag="whisper-$VERSION"
-          gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
-          gh release create "$tag" dist/*.tar.gz --latest=false --title "whisper.cpp $VERSION for macOS" \
-            --notes "whisper-cli built from $UPSTREAM $VERSION (MIT) by the Engines workflow, smoke-tested before publishing. Apple Silicon uses Metal."
-      - name: Publish engine list
+      - name: Publish the engine list
         run: |
           gh release view engines >/dev/null 2>&1 || gh release create engines --latest=false --title "Engine list" \
             --notes "engines.json lists the tested engine builds the app downloads. Updated by the Engines workflow."
           gh release download engines -p engines.json -O previous.json 2>/dev/null || echo '{"schema":1,"engines":[]}' > previous.json
           gh api "repos/$UPSTREAM/releases/tags/$VERSION" > upstream.json
-          node scripts/engines/make-list.mjs "$VERSION" "$GITHUB_REPOSITORY" "whisper-$VERSION" dist upstream.json previous.json engines.json
+          node scripts/engines/make-list.mjs "$VERSION" upstream.json previous.json engines.json
           gh release upload engines engines.json --clobber
           cat engines.json

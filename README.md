@@ -89,7 +89,7 @@ Running the workflow by hand from the Actions tab only builds the installer, as 
 
 Engines are downloaded on demand, never bundled. Besides the built-in list in `src/shared/engines.ts`, the app reads a tested list, `engines.json`, from this repository's `engines` release, and offers an **Update** on the Models screen when a newer tested version exists.
 
-[.github/workflows/engines.yml](.github/workflows/engines.yml) keeps that list current: weekly, or on demand, it picks up a new whisper.cpp release, builds the macOS versions upstream does not ship, smoke-tests every build with the app's own settings ([scripts/engines/smoke-whisper.mjs](scripts/engines/smoke-whisper.mjs)), and publishes only if all pass. To enable it, set `ENGINE_REPO` in `src/shared/engines.ts` to this repository's `owner/repo` and run the workflow once from the Actions tab.
+[.github/workflows/engines.yml](.github/workflows/engines.yml) keeps that list current for Windows: on demand, or weekly once the repository variable `ENGINES_WEEKLY` is set to `true`, it picks up a new whisper.cpp release, smoke-tests the Windows build with the app's own settings ([scripts/engines/smoke-whisper.mjs](scripts/engines/smoke-whisper.mjs)), and publishes only if that passes. To enable it, set `ENGINE_REPO` in `src/shared/engines.ts` to this repository's `owner/repo` and run the workflow once from the Actions tab.
 
 The original design notes are in [docs/planning](docs/planning).
 
