@@ -93,6 +93,10 @@ Engines are downloaded on demand, never bundled. Besides the built-in list in `s
 
 The original design notes are in [docs/planning](docs/planning).
 
+## Contributing
+
+Bug reports, ideas and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md). Please report security problems privately, as described in [SECURITY.md](SECURITY.md).
+
 ## License
 
 Siftora is free software under the [GNU GPL v3](LICENSE).
