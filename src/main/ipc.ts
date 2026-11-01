@@ -1,5 +1,5 @@
 import { app, dialog, ipcMain, shell } from 'electron'
-import { IPC, type Settings } from '../shared/types'
+import { IPC, type Settings, type YoutubeChoice } from '../shared/types'
 import { currentEngineList } from './engineList'
 import { deleteDownloads, quitAfterRemoval, removeAllData, storageUsage } from './storage'
 import { cancelDownload, deleteModel, downloadModels, listModels, modelsDir } from './downloads'
@@ -13,7 +13,9 @@ import {
   findSystemEngines,
   inspectEngineBinary
 } from './systemEngines'
+import { Cancelled } from './pipeline/run'
 import { getSettings, setSettings } from './settings'
+import { isYoutubeUrl, youtubeInfo } from './youtube'
 
 export function registerIpc(): void {
   ipcMain.handle(IPC.getSettings, () => getSettings())
@@ -107,7 +109,26 @@ export function registerIpc(): void {
   const ids = (value: unknown): string[] =>
     Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
 
-  ipcMain.handle(IPC.addJobs, (_event, sources: unknown) => addJobs(ids(sources)))
+  ipcMain.handle(IPC.youtubeInfo, (_event, url: unknown) => {
+    if (typeof url !== 'string' || !isYoutubeUrl(url)) throw new Error('Not a YouTube link.')
+    // Bounded so a stalled yt-dlp cannot keep Create's Start button disabled.
+    return youtubeInfo(url.trim(), AbortSignal.timeout(60_000)).catch((err: unknown) => {
+      throw err instanceof Cancelled ? new Error('YouTube did not answer within a minute.') : err
+    })
+  })
+  ipcMain.handle(IPC.addJobs, (_event, sources: unknown, links: unknown) => {
+    const valid: Record<string, YoutubeChoice> = {}
+    if (links && typeof links === 'object') {
+      for (const [source, link] of Object.entries(links as Record<string, Partial<YoutubeChoice> | null>)) {
+        const height = link?.height
+        const title = link?.title
+        if (typeof height === 'number' && Number.isInteger(height) && height >= 0 && height <= 10000 && typeof title === 'string') {
+          valid[source] = { height, title: title.slice(0, 300) }
+        }
+      }
+    }
+    return addJobs(ids(sources), valid)
+  })
   ipcMain.handle(IPC.listJobs, () => listJobs())
   ipcMain.handle(IPC.cancelJob, (_event, id: unknown) => cancelJob(String(id)))
   ipcMain.handle(IPC.removeJob, (_event, id: unknown) => removeJob(String(id)))

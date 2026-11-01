@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react'
-import type { StorageUsage } from '../../../shared/types'
+import { PALETTES, type StorageUsage, type Theme } from '../../../shared/types'
 import { useDialog } from '../components/Dialog'
 import { formatBytes } from '../lib/format'
 import { useSettings } from '../state/settings'
+
+const THEMES: [Theme, string][] = [
+  ['system', 'Match system'],
+  ['dark', 'Dark'],
+  ['light', 'Light']
+]
 
 interface AppInfo {
   version: string
@@ -171,6 +177,40 @@ export default function SettingsScreen() {
         <h1>Settings</h1>
         <p>Defaults applied to every new clip. Changes save immediately.</p>
       </div>
+
+      <section className="card">
+        <h2>Appearance</h2>
+        <div className="model-chips" role="radiogroup" aria-label="Theme">
+          <span className="chips-label">Theme</span>
+          {THEMES.map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={settings.theme === value}
+              className={settings.theme === value ? 'chip selected' : 'chip'}
+              onClick={() => update({ theme: value })}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="model-chips" role="radiogroup" aria-label="Color">
+          <span className="chips-label">Color</span>
+          {PALETTES.map((palette) => (
+            <button
+              key={palette.id}
+              type="button"
+              role="radio"
+              aria-checked={settings.palette === palette.id}
+              className={settings.palette === palette.id ? 'chip selected' : 'chip'}
+              onClick={() => update({ palette: palette.id })}
+            >
+              <span className="swatch-dot" style={{ background: palette.swatch }} aria-hidden="true" /> {palette.name}
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section className="card">
         <h2>Output</h2>

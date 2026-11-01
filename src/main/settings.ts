@@ -6,6 +6,7 @@ import {
   CAPTION_FONTS,
   DEFAULT_SETTINGS,
   MAX_SPEAKER_COLORS,
+  PALETTES,
   type CustomModel,
   type EngineBackend,
   type Settings
@@ -140,6 +141,8 @@ function sanitize(input: unknown): Settings {
     minClipSeconds: Math.min(minClipSeconds, maxClipSeconds),
     maxClipSeconds,
     minScore: clamp(numberOr(raw.minScore, defaults.minScore), 0, 10),
+    theme: raw.theme === 'dark' || raw.theme === 'light' ? raw.theme : defaults.theme,
+    palette: PALETTES.find((p) => p.id === raw.palette)?.id ?? defaults.palette,
     onboarded: typeof raw.onboarded === 'boolean' ? raw.onboarded : defaults.onboarded,
     transcriptionModel: modelIdOr(raw.transcriptionModel, 'transcription', customModels),
     llmModel: modelIdOr(raw.llmModel, 'llm', customModels),
@@ -149,6 +152,7 @@ function sanitize(input: unknown): Settings {
       typeof raw.detectSpeakers === 'boolean'
         ? raw.detectSpeakers
         : subtitle.speakerColors === true,
+    speakersWhen: raw.speakersWhen === 'clip' ? 'clip' : 'video',
     engineBackend:
       ENGINE_BACKENDS.find((backend) => backend === raw.engineBackend) ?? defaults.engineBackend,
     customModels,

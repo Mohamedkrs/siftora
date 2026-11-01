@@ -5,14 +5,14 @@ import { basename, extname, join, resolve, sep } from 'node:path'
 import { SPEAKER_MODEL_IDS } from '../shared/catalog'
 import { pickEngine } from '../shared/engines'
 import type { Clip, Job, JobOptions } from '../shared/jobs'
-import { IPC } from '../shared/types'
+import { IPC, type YoutubeChoice } from '../shared/types'
 import { downloadModels, enginePath, listModels, modelFilePath } from './downloads'
 import { log } from './logger'
 import { findMoments, ollamaClient, startLlamaServer, type LlmClient } from './pipeline/discover'
 import { renderClip } from './pipeline/render'
 import { Cancelled, ffmpegPaths, run } from './pipeline/run'
 import { assignSpeakers, detectSpeakers } from './pipeline/speakers'
-import { renderStyleKey } from '../shared/jobs'
+import { DEFAULT_YOUTUBE_HEIGHT, renderStyleKey } from '../shared/jobs'
 import { fitWordsToSegments, transcribePython, transcribeWhisperCpp, type Transcript } from './pipeline/transcribe'
 import { getSettings } from './settings'
 import { downloadYoutube, isYoutubeUrl } from './youtube'
@@ -88,11 +88,12 @@ function safeName(name: string): string {
   return name.replace(/[<>:"/\\|?*\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'video'
 }
 
-export function addJobs(sources: string[]): Job[] {
+export function addJobs(sources: string[], links: Record<string, YoutubeChoice> = {}): Job[] {
   const settings = getSettings()
   const options: JobOptions = {
     useVad: settings.useVad,
     speakers: settings.detectSpeakers,
+    speakersWhen: settings.speakersWhen,
     subtitle: settings.subtitle,
     layout: settings.layout,
     language: settings.language,
@@ -104,14 +105,15 @@ export function addJobs(sources: string[]): Job[] {
     .filter((source) => source.trim().length > 0)
     .map((source): Job => {
       const url = isYoutubeUrl(source)
-      const title = url ? source : basename(source, extname(source))
+      const link = Object.hasOwn(links, source) ? links[source] : undefined
+      const title = link?.title ?? (url ? source : basename(source, extname(source)))
       const job: Job = {
         id: randomUUID(),
         source,
         videoPath: url ? null : source,
         title,
         createdAt: Date.now(),
-        options,
+        options: link ? { ...options, youtubeMaxHeight: link.height } : options,
         stage: 'queued',
         progress: 0,
         clips: [],
@@ -229,7 +231,14 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
   if (!job.videoPath || !existsSync(job.videoPath)) {
     if (!isYoutubeUrl(job.source)) throw new Error('The video file no longer exists.')
     update(job, { stage: 'download', progress: 0, message: undefined })
-    const result = await downloadYoutube(job.source, dir, signal, progressUpdater(job))
+    const result = await downloadYoutube(
+      job.source,
+      job.options.youtubeMaxHeight ?? DEFAULT_YOUTUBE_HEIGHT,
+      dir,
+      signal,
+      progressUpdater(job),
+      job.title !== job.source ? job.title : undefined
+    )
     update(job, { videoPath: result.path, title: result.title, outputDir: join(outputRoot(), safeName(result.title)) })
   }
   const video = job.videoPath as string
@@ -283,11 +292,14 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
       })
     }
     writeFileSync(transcriptFile, JSON.stringify(transcript))
+    // Speaker caches index into the old transcript's segments.
+    rmSync(join(dir, 'speakers.json'), { force: true })
+    rmSync(join(dir, 'speakers'), { recursive: true, force: true })
   }
   update(job, { language: transcript.language })
 
-  // 4. Speakers (cached, optional)
-  if (job.options.speakers) {
+  // 4. Speakers (cached, optional; in 'clip' mode they are found per clip at render)
+  if (job.options.speakers && job.options.speakersWhen !== 'clip') {
     const speakersFile = join(dir, 'speakers.json')
     const cached = readJson<{ count: number; speakers: (number | null)[] }>(speakersFile)
     if (cached) {
@@ -297,13 +309,8 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
       update(job, { speakerCount: cached.count })
     } else {
       update(job, { stage: 'speakers', progress: 0, message: undefined })
-      const binary = await speakerEngine(job, signal)
+      const turns = await speakerTurns(wav, signal, (message) => update(job, { message }))
       update(job, { message: 'Listening for who speaks when — this takes a few minutes…' })
-      const [segmentation, embedding] = SPEAKER_MODEL_IDS.map((id) => modelFilePath(id))
-      if (!segmentation || !embedding || !existsSync(segmentation) || !existsSync(embedding)) {
-        throw new Error('Speaker detection models are not downloaded. Get them on the Models screen.')
-      }
-      const turns = await detectSpeakers({ binary, segmentationModel: segmentation, embeddingModel: embedding, wav, signal })
       const count = assignSpeakers(transcript.segments, turns)
       writeFileSync(speakersFile, JSON.stringify({ count, speakers: transcript.segments.map((s) => s.speaker ?? null) }))
       update(job, { speakerCount: count })
@@ -341,13 +348,54 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
   }
 }
 
+async function speakerTurns(wav: string, signal: AbortSignal, onMessage: (message: string) => void): ReturnType<typeof detectSpeakers> {
+  const binary = await speakerEngine(signal, onMessage)
+  const [segmentation, embedding] = SPEAKER_MODEL_IDS.map((id) => modelFilePath(id))
+  if (!segmentation || !embedding || !existsSync(segmentation) || !existsSync(embedding)) {
+    throw new Error('Speaker detection models are not downloaded. Get them on the Models screen.')
+  }
+  return detectSpeakers({ binary, segmentationModel: segmentation, embeddingModel: embedding, wav, signal })
+}
+
+/** Speakers for one clip only: diarize its slice of audio.wav, cached per clip start/end. */
+async function clipSpeakers(
+  job: Job,
+  clip: Clip,
+  segments: Transcript['segments'],
+  signal: AbortSignal,
+  onMessage: (message: string) => void
+): Promise<void> {
+  const dir = join(jobDir(job.id), 'speakers')
+  const file = join(dir, `${clip.id}-${clip.start}-${clip.end}.json`)
+  const inClip = segments.filter((s) => s.end > clip.start && s.start < clip.end)
+  const cached = readJson<(number | null)[]>(file)
+  if (cached) {
+    inClip.forEach((segment, i) => {
+      if (cached[i] !== null) segment.speaker = cached[i] as number
+    })
+    return
+  }
+  mkdirSync(dir, { recursive: true })
+  const slice = join(dir, `${clip.id}.wav`)
+  const { ffmpeg } = ffmpegPaths()
+  const args = ['-y', '-v', 'error', '-ss', String(clip.start / 1000), '-t', String((clip.end - clip.start) / 1000)]
+  await run(ffmpeg, [...args, '-i', join(jobDir(job.id), 'audio.wav'), '-c:a', 'pcm_s16le', slice], { signal })
+  try {
+    const turns = (await speakerTurns(slice, signal, onMessage)).map((t) => ({ ...t, start: t.start + clip.start, end: t.end + clip.start }))
+    assignSpeakers(inClip, turns)
+  } finally {
+    rmSync(slice, { force: true })
+  }
+  writeFileSync(file, JSON.stringify(inClip.map((s) => s.speaker ?? null)))
+}
+
 /** sherpa-onnx comes with the speaker detection feature; fetch it if it is missing. */
-async function speakerEngine(job: Job, signal: AbortSignal): Promise<string> {
+async function speakerEngine(signal: AbortSignal, onMessage: (message: string) => void): Promise<string> {
   const existing = enginePath('sherpa')
   if (existing) return existing
   const entry = pickEngine('sherpa', process.platform, process.arch, 'cpu')
   if (!entry) throw new Error('Speaker detection is not available on this system yet.')
-  update(job, { message: 'Downloading the speaker detection engine…' })
+  onMessage('Downloading the speaker detection engine…')
   downloadModels([entry.id])
   for (;;) {
     if (signal.aborted) throw new Cancelled()
@@ -412,7 +460,7 @@ async function renderOne(job: Job, clip: Clip): Promise<void> {
     if (!transcript) throw new Error('Transcript missing; run the job again.')
     fitWordsToSegments(transcript.segments) // transcripts cached before this fix
     const speakers = readJson<{ speakers: (number | null)[] }>(join(jobDir(job.id), 'speakers.json'))
-    if (speakers && job.options.speakers) {
+    if (speakers && job.options.speakers && job.options.speakersWhen !== 'clip') {
       transcript.segments.forEach((segment, i) => {
         if (speakers.speakers[i] !== null) segment.speaker = speakers.speakers[i] as number
       })
@@ -420,10 +468,19 @@ async function renderOne(job: Job, clip: Clip): Promise<void> {
     mkdirSync(job.outputDir, { recursive: true })
     const rank = [...job.clips].sort((a, b) => b.score - a.score).indexOf(clip) + 1
     const output = join(job.outputDir, `${String(rank).padStart(2, '0')} - ${safeName(clip.title)}.mp4`)
-    clip.render = { status: 'rendering', progress: 0 }
-    update(job)
     // The style on Results now, not the one saved with the job, so restyling + "Render again" works.
     const { subtitle: style, layout } = getSettings()
+    const onMessage = (message: string): void => {
+      clip.render.message = message
+      update(job)
+    }
+    clip.render = { status: 'rendering', progress: 0 }
+    update(job)
+    if (job.options.speakers && job.options.speakersWhen === 'clip' && style.speakerColors) {
+      onMessage('Finding who speaks…')
+      await clipSpeakers(job, clip, transcript.segments, controller.signal, onMessage)
+      clip.render.message = undefined
+    }
     let last = 0
     await renderClip({
       ffmpeg,

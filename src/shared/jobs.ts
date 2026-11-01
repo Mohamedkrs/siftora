@@ -16,6 +16,8 @@ export type JobStage =
 export interface JobOptions {
   useVad: boolean
   speakers: boolean
+  /** Missing on older jobs = 'video'. */
+  speakersWhen?: 'video' | 'clip'
   subtitle: SubtitleStyle
   layout: Layout
   language: string
@@ -23,7 +25,12 @@ export interface JobOptions {
   maxClipSeconds: number
   /** 0-10; clips scoring below this (score/10) are not shown. */
   minScore: number
+  /** Highest YouTube download height, picked per link on Create; missing = DEFAULT_YOUTUBE_HEIGHT. */
+  youtubeMaxHeight?: number
 }
+
+/** YouTube quality when none was picked (the link check failed): best up to this height. */
+export const DEFAULT_YOUTUBE_HEIGHT = 1080
 
 export interface ClipScores {
   hook: number
@@ -54,7 +61,8 @@ export interface Clip {
    * style: renderStyleKey() of the look it was rendered with, to flag reels that are out of date.
    * at: when it finished; re-renders overwrite the same file, so the player URL needs it to reload.
    */
-  render: { status: RenderStatus; progress: number; path?: string; error?: string; style?: string; at?: number }
+  /** message: what a render is doing before the progress bar moves (e.g. finding speakers). */
+  render: { status: RenderStatus; progress: number; path?: string; error?: string; style?: string; at?: number; message?: string }
 }
 
 export function renderStyleKey(subtitle: SubtitleStyle, layout: Layout): string {

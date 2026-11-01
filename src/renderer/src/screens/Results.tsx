@@ -117,7 +117,7 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
                 <div className="progress-fill" style={{ width: `${Math.round(clip.render.progress * 100)}%` }} />
               </div>
               <span className="muted">
-                {clip.render.status === 'queued' ? 'Waiting…' : `Rendering ${Math.round(clip.render.progress * 100)}%`}
+                {clip.render.status === 'queued' ? 'Waiting…' : clip.render.message ?? `Rendering ${Math.round(clip.render.progress * 100)}%`}
               </span>
             </div>
           ) : (
@@ -249,7 +249,11 @@ export default function Results() {
             <h2>Caption style &amp; layout</h2>
             <span className="muted">Used for every reel you render; saved for future videos too.</span>
           </summary>
-          <CaptionStyle sample={sample} speakerCount={job.speakerCount ?? 0} />
+          <CaptionStyle
+            sample={sample}
+            speakerCount={job.speakerCount ?? 0}
+            speakersPerClip={job.options.speakers && job.options.speakersWhen === 'clip'}
+          />
         </details>
       ) : null}
 

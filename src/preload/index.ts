@@ -8,6 +8,7 @@ const api: Api = {
   setSettings: (patch) => ipcRenderer.invoke(IPC.setSettings, patch),
   pickOutputDir: () => ipcRenderer.invoke(IPC.pickOutputDir),
   pickVideos: () => ipcRenderer.invoke(IPC.pickVideos),
+  youtubeInfo: (url) => ipcRenderer.invoke(IPC.youtubeInfo, url),
   log: (level, msg) => {
     ipcRenderer.send(IPC.log, level, msg)
   },
@@ -48,7 +49,7 @@ const api: Api = {
     ipcRenderer.on(IPC.onModelState, listener)
     return () => ipcRenderer.removeListener(IPC.onModelState, listener)
   },
-  addJobs: (sources) => ipcRenderer.invoke(IPC.addJobs, sources),
+  addJobs: (sources, links) => ipcRenderer.invoke(IPC.addJobs, sources, links),
   listJobs: () => ipcRenderer.invoke(IPC.listJobs),
   cancelJob: (id) => ipcRenderer.invoke(IPC.cancelJob, id),
   removeJob: (id) => ipcRenderer.invoke(IPC.removeJob, id),

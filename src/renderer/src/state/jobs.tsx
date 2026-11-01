@@ -1,10 +1,11 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Job } from '../../../shared/jobs'
+import type { YoutubeChoice } from '../../../shared/types'
 
 interface JobsContextValue {
   /** Newest first. */
   jobs: Job[]
-  add: (sources: string[]) => Promise<void>
+  add: (sources: string[], links?: Record<string, YoutubeChoice>) => Promise<void>
   cancel: (id: string) => void
   remove: (id: string) => void
   retry: (id: string) => void
@@ -31,8 +32,8 @@ export function JobsProvider({ children }: { children: ReactNode }) {
 
   const value: JobsContextValue = {
     jobs,
-    add: async (sources) => {
-      await window.api.addJobs(sources)
+    add: async (sources, links) => {
+      await window.api.addJobs(sources, links)
     },
     cancel: (id) => void window.api.cancelJob(id),
     remove: (id) => {

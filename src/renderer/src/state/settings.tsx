@@ -1,5 +1,22 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import type { Settings } from '../../../shared/types'
+import type { Settings, Theme } from '../../../shared/types'
+
+const THEME_CACHE = 'siftora-theme'
+const lightQuery = window.matchMedia('(prefers-color-scheme: light)')
+
+function applyTheme(theme: Theme, palette: string): void {
+  const root = document.documentElement
+  root.dataset.theme = theme === 'system' ? (lightQuery.matches ? 'light' : 'dark') : theme
+  root.dataset.palette = palette
+}
+
+// Paint the last theme before settings load, so a light theme does not flash dark.
+try {
+  const cached = JSON.parse(localStorage.getItem(THEME_CACHE) ?? 'null') as { theme: Theme; palette: string } | null
+  applyTheme(cached?.theme ?? 'system', cached?.palette ?? 'violet')
+} catch {
+  applyTheme('system', 'violet')
+}
 
 interface SettingsContextValue {
   settings: Settings
@@ -28,6 +45,21 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       alive = false
     }
   }, [])
+
+  const theme = settings?.theme
+  const palette = settings?.palette
+  useEffect(() => {
+    if (!theme || !palette) return
+    const apply = (): void => applyTheme(theme, palette)
+    apply()
+    try {
+      localStorage.setItem(THEME_CACHE, JSON.stringify({ theme, palette }))
+    } catch {
+      // cache is only a startup nicety
+    }
+    lightQuery.addEventListener('change', apply)
+    return () => lightQuery.removeEventListener('change', apply)
+  }, [theme, palette])
 
   if (!settings) return null
 

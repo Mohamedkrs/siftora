@@ -1,7 +1,8 @@
 import { useState, type DragEvent, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CATALOG, SPEAKER_MODEL_IDS } from '../../../shared/catalog'
-import { mediaUrl } from '../../../shared/jobs'
+import { DEFAULT_YOUTUBE_HEIGHT, mediaUrl } from '../../../shared/jobs'
+import type { YoutubeChoice, YoutubeInfo } from '../../../shared/types'
 import VideoCard from '../components/VideoCard'
 import { formatBytes, formatClock } from '../lib/format'
 import { useJobs } from '../state/jobs'
@@ -48,14 +49,26 @@ interface VideoInfo {
   height: number
 }
 
+/** Starting choice for a link: its best quality up to DEFAULT_YOUTUBE_HEIGHT. */
+function defaultHeight(heights: number[]): number | undefined {
+  return heights.find((h) => h <= DEFAULT_YOUTUBE_HEIGHT) ?? heights.at(-1)
+}
+
 /** A video waiting to be analysed: a frame, its name, length and resolution once known. */
 function VideoRow(props: {
   source: string
   info?: VideoInfo
+  /** YouTube links only: undefined while checking, a string when it failed. */
+  youtube?: YoutubeInfo | string
+  /** Quality picked on this row; else defaultHeight(). */
+  quality?: number
+  onQuality: (height: number) => void
   onInfo: (info: VideoInfo) => void
   onRemove: () => void
 }) {
   const youtube = isYouTubeUrl(props.source)
+  const yt = typeof props.youtube === 'object' ? props.youtube : null
+  const atHeight = yt ? (props.quality ?? defaultHeight(yt.heights)) : undefined
   return (
     <li className="video-row">
       <span className="video-row-thumb">
@@ -77,10 +90,20 @@ function VideoRow(props: {
         )}
       </span>
       <span className="video-row-text">
-        <strong title={props.source}>{youtube ? props.source : fileName(props.source)}</strong>
-        <span className="muted">
+        <strong title={props.source}>{yt ? yt.title : youtube ? props.source : fileName(props.source)}</strong>
+        <span className={typeof props.youtube === 'string' ? 'muted video-row-error' : 'muted'}>
           {youtube
-            ? 'YouTube · downloaded when it starts'
+            ? typeof props.youtube === 'string'
+              ? `YouTube · could not check the link (${props.youtube})`
+              : yt
+                ? [
+                    'YouTube',
+                    yt.durationMs ? formatClock(yt.durationMs) : null,
+                    yt.heights.length ? `up to ${yt.heights[0]}p` : null
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')
+                : 'YouTube · checking the link…'
             : [
                 props.info ? formatClock(props.info.durationMs) : null,
                 props.info?.height ? `${props.info.height}p` : null,
@@ -90,6 +113,20 @@ function VideoRow(props: {
                 .join(' · ')}
         </span>
       </span>
+      {yt && atHeight ? (
+        <select
+          className="video-row-quality"
+          aria-label={`Download quality for ${yt.title}`}
+          value={atHeight}
+          onChange={(event) => props.onQuality(Number(event.target.value))}
+        >
+          {yt.heights.map((height) => (
+            <option key={height} value={height}>
+              {height}p
+            </option>
+          ))}
+        </select>
+      ) : null}
       <button type="button" className="icon-button" aria-label={`Remove ${fileName(props.source)}`} onClick={props.onRemove}>
         ×
       </button>
@@ -104,6 +141,8 @@ export default function Create() {
   const navigate = useNavigate()
   const [videos, setVideos] = useState<string[]>([])
   const [info, setInfo] = useState<Record<string, VideoInfo>>({})
+  const [youtube, setYoutube] = useState<Record<string, YoutubeInfo | string>>({})
+  const [quality, setQuality] = useState<Record<string, number>>({})
   const [dragging, setDragging] = useState(false)
   const [url, setUrl] = useState('')
   const [urlError, setUrlError] = useState('')
@@ -126,8 +165,12 @@ export default function Create() {
     settings.llmProvider === 'ollama' ? (settings.ollamaModel ? `Ollama · ${settings.ollamaModel}` : null) : modelName(settings.llmModel)
 
   const recent = jobs.filter((job) => job.stage === 'done').slice(0, 4)
-  const totalMs = videos.reduce((sum, video) => sum + (info[video]?.durationMs ?? 0), 0)
+  const totalMs = videos.reduce((sum, video) => {
+    const yt = youtube[video]
+    return sum + (info[video]?.durationMs ?? (typeof yt === 'object' ? yt.durationMs : 0))
+  }, 0)
   const youtubeCount = videos.filter(isYouTubeUrl).length
+  const checking = videos.some((video) => isYouTubeUrl(video) && youtube[video] === undefined)
 
   const addVideos = (paths: string[]): void => {
     const clean = paths.filter((path) => path.trim().length > 0)
@@ -167,11 +210,32 @@ export default function Create() {
     setUrlError('')
     setUrl('')
     addVideos([value])
+    if (youtube[value] === undefined) {
+      window.api
+        .youtubeInfo(value)
+        .then((result) => setYoutube((current) => ({ ...current, [value]: result })))
+        .catch((err: unknown) => {
+          window.api.log('warn', `youtubeInfo failed: ${String(err)}`)
+          // Keep only yt-dlp's own words, e.g. "Private video" or "Video unavailable".
+          const reason = (err instanceof Error ? err.message : String(err))
+            .replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
+            .replace(/^.*?exited with code \d+: /, '')
+            .replace(/^.*ERROR: (\[[^\]]+\] [^:]+: )?/, '')
+          setYoutube((current) => ({ ...current, [value]: reason || 'unknown error' }))
+        })
+    }
   }
 
   const start = (): void => {
     setStarting(true)
-    void add(videos)
+    // Send the shown default too, so every checked link downloads at what its row says.
+    const links: Record<string, YoutubeChoice> = {}
+    for (const video of videos) {
+      const yt = youtube[video]
+      const height = typeof yt === 'object' ? (quality[video] ?? defaultHeight(yt.heights)) : undefined
+      if (typeof yt === 'object' && height !== undefined) links[video] = { height, title: yt.title }
+    }
+    void add(videos, links)
       .then(() => {
         setVideos([])
         navigate('/queue')
@@ -242,6 +306,9 @@ export default function Create() {
                     key={video}
                     source={video}
                     info={info[video]}
+                    youtube={youtube[video]}
+                    quality={quality[video]}
+                    onQuality={(height) => setQuality((current) => ({ ...current, [video]: height }))}
                     onInfo={(next) => setInfo((current) => ({ ...current, [video]: next }))}
                     onRemove={() => setVideos((current) => current.filter((item) => item !== video))}
                   />
@@ -303,7 +370,13 @@ export default function Create() {
               </div>
               <div>
                 <dt>Speakers</dt>
-                <dd>{settings.detectSpeakers && speakersInstalled ? 'Detected, for per-speaker colors' : 'Off'}</dd>
+                <dd>
+                  {!settings.detectSpeakers || !speakersInstalled
+                    ? 'Off'
+                    : settings.speakersWhen === 'clip'
+                      ? 'Detected per clip, when rendering'
+                      : 'Detected on the whole video'}
+                </dd>
               </div>
             </dl>
             <Link to="/models" className="side-link">
@@ -397,6 +470,40 @@ export default function Create() {
                   </span>
                 </span>
               </label>
+              {settings.detectSpeakers && speakersInstalled ? (
+                <div className="toggle-options" role="radiogroup" aria-label="When to detect speakers">
+                  <label className="toggle">
+                    <input
+                      type="radio"
+                      name="speakers-when"
+                      checked={settings.speakersWhen === 'video'}
+                      onChange={() => update({ speakersWhen: 'video' })}
+                    />
+                    <span>
+                      <strong>Whole video, from the start</strong>
+                      <span className="muted">
+                        Slow on long videos. The AI knows who says what, so it spots back-and-forth moments better,
+                        and each person keeps the same color in every clip.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="toggle">
+                    <input
+                      type="radio"
+                      name="speakers-when"
+                      checked={settings.speakersWhen === 'clip'}
+                      onChange={() => update({ speakersWhen: 'clip' })}
+                    />
+                    <span>
+                      <strong>Each clip, when rendering</strong>
+                      <span className="muted">
+                        Much faster. Colors may differ between clips, and the AI picks moments without knowing who
+                        speaks.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              ) : null}
             </div>
             <p className="muted small">Each video keeps the settings it was added with.</p>
           </section>
@@ -415,7 +522,7 @@ export default function Create() {
                 .filter(Boolean)
                 .join(' · ')}
         </span>
-        <button type="button" className="button primary large" disabled={videos.length === 0 || starting} onClick={start}>
+        <button type="button" className="button primary large" disabled={videos.length === 0 || starting || checking} onClick={start}>
           {videos.length > 1 ? `Find clips in ${videos.length} videos` : 'Find clips'} →
         </button>
       </div>

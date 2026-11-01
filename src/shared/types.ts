@@ -110,7 +110,21 @@ export interface OpenAiWhisperInfo {
   models: string[]
 }
 
+export type Theme = 'system' | 'dark' | 'light'
+
+/** Accent palettes; `swatch` is the dark-mode accent. Colors live in renderer styles.css. */
+export const PALETTES = [
+  { id: 'violet', name: 'Violet', swatch: '#7b61ff' },
+  { id: 'tungsten', name: 'Tungsten', swatch: '#f0a23b' },
+  { id: 'daylight', name: 'Daylight', swatch: '#4c9bff' },
+  { id: 'chroma', name: 'Chroma key', swatch: '#2fc47a' },
+  { id: 'safelight', name: 'Safelight', swatch: '#ff5a4e' },
+  { id: 'neon', name: 'Neon', swatch: '#ec4fa0' }
+] as const
+
 export interface Settings {
+  theme: Theme
+  palette: string
   outputDir: string
   layout: Layout
   subtitle: SubtitleStyle
@@ -124,6 +138,8 @@ export interface Settings {
   useVad: boolean
   /** Run speaker detection on new videos (needed for per-speaker caption colors). */
   detectSpeakers: boolean
+  /** video = whole video up front (slow, the AI sees who speaks); clip = each clip at render (fast). */
+  speakersWhen: 'video' | 'clip'
   engineBackend: EngineBackend
   customModels: CustomModel[]
   linkedModels: Record<string, string>
@@ -137,6 +153,8 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  theme: 'system',
+  palette: 'violet',
   outputDir: '',
   layout: 'blurred',
   subtitle: {
@@ -162,6 +180,7 @@ export const DEFAULT_SETTINGS: Settings = {
   llmModel: null,
   useVad: true,
   detectSpeakers: false,
+  speakersWhen: 'video',
   engineBackend: 'auto',
   customModels: [],
   linkedModels: {},
@@ -230,6 +249,8 @@ export interface Api {
   setSettings(patch: Partial<Settings>): Promise<Settings>
   pickOutputDir(): Promise<string | null>
   pickVideos(): Promise<string[]>
+  /** Asks YouTube about a link (downloads yt-dlp the first time). */
+  youtubeInfo(url: string): Promise<YoutubeInfo>
   log(level: 'info' | 'warn' | 'error', msg: string): void
   appInfo(): Promise<{ version: string; platform: string; userData: string }>
   getPathForFile(file: File): string
@@ -265,7 +286,8 @@ export interface Api {
   getEngineList(): Promise<EngineEntry[]>
   onEngineList(cb: (entries: EngineEntry[]) => void): () => void
   /** Queue videos (file paths or YouTube URLs) with the current settings. */
-  addJobs(sources: string[]): Promise<Job[]>
+  /** links: per checked YouTube link, its title and the quality chosen on Create. */
+  addJobs(sources: string[], links?: Record<string, YoutubeChoice>): Promise<Job[]>
   listJobs(): Promise<Job[]>
   cancelJob(id: string): Promise<void>
   removeJob(id: string): Promise<void>
@@ -282,6 +304,18 @@ export interface Api {
   onJobUpdate(cb: (job: Job) => void): () => void
 }
 
+export interface YoutubeInfo {
+  title: string
+  durationMs: number
+  /** Video heights the link offers, highest first. */
+  heights: number[]
+}
+
+export interface YoutubeChoice {
+  height: number
+  title: string
+}
+
 export const IPC = {
   findSystemEngines: 'engines:find-system',
   pickEngineBinary: 'engines:pick-binary',
@@ -293,6 +327,7 @@ export const IPC = {
   setSettings: 'settings:set',
   pickOutputDir: 'dialog:pick-output-dir',
   pickVideos: 'dialog:pick-videos',
+  youtubeInfo: 'youtube:info',
   log: 'app:log',
   appInfo: 'app:info',
   getHardware: 'hardware:get',

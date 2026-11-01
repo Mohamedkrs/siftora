@@ -67,6 +67,8 @@ function Frame({ video, atMs, className }: { video: string; atMs: number; classN
 export default function CaptionStyle(props: {
   sample?: { video: string; atMs: number; words: string[] }
   speakerCount: number
+  /** Speakers are found per clip when rendering, so the count is not known yet. */
+  speakersPerClip?: boolean
 }) {
   const { settings, update } = useSettings()
   const [previewSpeaker, setPreviewSpeaker] = useState(0)
@@ -74,7 +76,7 @@ export default function CaptionStyle(props: {
   const frameRef = useRef<HTMLDivElement>(null)
 
   const subtitle = settings.subtitle
-  const speakersAvailable = props.speakerCount > 0
+  const speakersAvailable = props.speakerCount > 0 || props.speakersPerClip === true
   const speakerColorsOn = subtitle.speakerColors && speakersAvailable
 
   const setSubtitle = (patch: Partial<SubtitleStyle>): void => {
@@ -164,7 +166,7 @@ export default function CaptionStyle(props: {
                   checked={subtitle.speakerColors}
                   onChange={(event) => setSubtitle({ speakerColors: event.target.checked })}
                 />
-                Color by speaker ({props.speakerCount} found)
+                Color by speaker ({props.speakersPerClip ? 'found per clip when rendering' : `${props.speakerCount} found`})
               </label>
             ) : null}
 
