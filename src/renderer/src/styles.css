@@ -2109,3 +2109,55 @@ select {
 .trim-actions .muted {
   font-size: 12px;
 }
+
+/* Share kit on a clip card */
+.share-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.share-platform {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: var(--sunken);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.share-platform h4 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.share-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.share-title,
+.share-text {
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.share-row .share-title {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+
+.share-text {
+  resize: vertical;
+}

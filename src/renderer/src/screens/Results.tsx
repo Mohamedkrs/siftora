@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { mediaUrl, rangeKey, renderStyleKey, type Clip, type Job } from '../../../shared/jobs'
 import CaptionStyle from '../components/CaptionStyle'
 import { useDialog } from '../components/Dialog'
+import SharePanel from '../components/SharePanel'
 import VideoCard from '../components/VideoCard'
 import { formatClock } from '../lib/format'
 import { useJobs } from '../state/jobs'
@@ -53,6 +54,7 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
   const dialog = useDialog()
   const [showText, setShowText] = useState(false)
   const [adjusting, setAdjusting] = useState(false)
+  const [sharing, setSharing] = useState(false)
   const source = useRef<HTMLVideoElement>(null)
   // While adjusting the player runs freely (to find a new end); "Play clip" plays just the range.
   const stopAtEnd = useRef(true)
@@ -181,6 +183,9 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
           </button>
           {done ? (
             <>
+              <button type="button" className="button" aria-pressed={sharing} onClick={() => setSharing((v) => !v)}>
+                {sharing ? 'Hide share kit' : 'Share'}
+              </button>
               <button type="button" className="button primary" onClick={() => void window.api.openPath(clip.render.path as string)}>
                 Open
               </button>
@@ -222,6 +227,7 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
             </button>
           )}
         </div>
+        {sharing && done ? <SharePanel clip={clip} reelPath={clip.render.path} /> : null}
         {done && stale ? (
           <p className="stale-hint">
             {lengthChanged ? 'Length changed' : 'Caption style changed'} since this was rendered — render again to update it.
