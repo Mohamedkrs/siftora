@@ -1,12 +1,14 @@
 # Builds the Windows installer on a clean machine, and makes releases.
 #
-# Two ways to release (both create a draft: review it, add notes, then publish it):
-#   - Actions → Release → Run workflow, with "Create a draft release" ticked. It releases the
-#     version in package.json, as tag v<version>.
-#   - Push a version tag: git tag v0.1.0 && git push --tags. The tag must match package.json.
-# A draft does not create its tag; the tag appears when you publish the release, so a tag
-# ruleset that only lets you create v* tags still applies.
-# Run by hand without the box ticked to only build: the installer is then a download on the run.
+# Actions → Release → Run workflow, then choose what to do:
+#   - Only build: the installer is a download on the run; nothing is released.
+#   - Draft release: a draft for the version in package.json (tag v<version>). Review it, add
+#     notes, then publish it yourself. A draft creates no tag until you publish it.
+#   - Publish release: released right away; the Download button serves it immediately. This
+#     creates the tag from the workflow, so a tag ruleset must not restrict creating v* tags
+#     (keep updates and deletions restricted).
+# Pushing a version tag (git tag v0.1.0 && git push --tags) makes a draft too; the tag must match
+# package.json.
 
 name: Release
 
@@ -15,10 +17,14 @@ on:
     tags: ['v*.*.*']
   workflow_dispatch:
     inputs:
-      release:
-        description: 'Create a draft release for the version in package.json'
-        type: boolean
-        default: false
+      action:
+        description: 'What to do'
+        type: choice
+        options:
+          - Only build
+          - Draft release
+          - Publish release
+        default: Only build
 
 permissions:
   contents: read
@@ -31,7 +37,7 @@ jobs:
   windows:
     runs-on: windows-latest
     permissions:
-      contents: write # create the draft release
+      contents: write # create the release
     defaults:
       run:
         shell: bash
@@ -48,7 +54,7 @@ jobs:
       - name: Work out the version
         id: version
         env:
-          RELEASE: ${{ inputs.release }}
+          ACTION: ${{ inputs.action }}
         run: |
           version="$(node -p "require('./package.json').version")"
           tag="v$version"
@@ -57,19 +63,20 @@ jobs:
               echo "The tag $GITHUB_REF_NAME does not match the version $version in package.json."
               exit 1
             fi
-            echo "release=true" >> "$GITHUB_OUTPUT"
-          elif [ "$RELEASE" = "true" ]; then
+            mode=draft
+          elif [ "$ACTION" = "Draft release" ] || [ "$ACTION" = "Publish release" ]; then
             # A release for this version must not exist yet: bump the version in package.json first.
             if gh release view "$tag" >/dev/null 2>&1 || gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
               echo "$tag is already released. Set a new version in package.json, commit it, and run again."
               exit 1
             fi
-            echo "release=true" >> "$GITHUB_OUTPUT"
+            [ "$ACTION" = "Publish release" ] && mode=publish || mode=draft
           else
-            echo "release=false" >> "$GITHUB_OUTPUT"
+            mode=none
           fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "Version $version (tag $tag)"
+          echo "Version $version (tag $tag), release: $mode"
 
       - run: npm ci
 
@@ -89,15 +96,24 @@ jobs:
           path: release/Siftora-Setup.exe
           if-no-files-found: error
 
-      - name: Attach it to a draft release
-        if: steps.version.outputs.release == 'true'
+      - name: Create the release
+        if: steps.version.outputs.mode != 'none'
         env:
           TAG: ${{ steps.version.outputs.tag }}
+          MODE: ${{ steps.version.outputs.mode }}
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" release/Siftora-Setup.exe --clobber
+            echo "Updated the installer on the existing release $TAG."
+          elif [ "$MODE" = "publish" ]; then
+            if ! gh release create "$TAG" release/Siftora-Setup.exe --target "$GITHUB_SHA" \
+              --title "Siftora ${TAG#v}" --generate-notes; then
+              echo "::error::Could not publish $TAG. If a tag ruleset restricts creating v* tags, untick 'Restrict creations' in it, or use Draft release and publish it yourself."
+              exit 1
+            fi
+            echo "Published $TAG. The Download button now serves it."
           else
             gh release create "$TAG" release/Siftora-Setup.exe --draft --target "$GITHUB_SHA" \
               --title "Siftora ${TAG#v}" --generate-notes
+            echo "Draft release $TAG is ready: open Releases, review it and publish it."
           fi
-          echo "Draft release $TAG is ready: open Releases, review it and publish it."
