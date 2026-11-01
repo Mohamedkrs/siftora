@@ -1,3 +1,4 @@
+import type { SharePlatform } from './share'
 import type { Backend, EngineEntry } from './engines'
 
 export type Layout = 'blurred' | 'focused'
@@ -311,6 +312,8 @@ export interface Api {
   /** Sets a clip's start/end (ms in the source video) by hand. */
   setClipRange(jobId: string, clipId: string, start: number, end: number): Promise<void>
   openPath(path: string): Promise<void>
+  /** Opens a platform's upload page in the browser. */
+  openUploadPage(platform: SharePlatform): Promise<void>
   showInFolder(path: string): Promise<void>
   onJobUpdate(cb: (job: Job) => void): () => void
 }
@@ -374,6 +377,7 @@ export const IPC = {
   deleteReel: 'jobs:delete-reel',
   setClipRange: 'jobs:set-clip-range',
   openPath: 'shell:open-path',
+  openUploadPage: 'shell:open-upload-page',
   showInFolder: 'shell:show-in-folder',
   onJobUpdate: 'jobs:update'
 } as const

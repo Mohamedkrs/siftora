@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createServer } from 'node:net'
 import type { Clip, ClipScores } from '../../shared/jobs'
+import { cleanHashtags } from '../../shared/share'
 import { log } from '../logger'
 import { SLICE_MS, type Reaction, type ReactionLevels } from './reactions'
 import { Cancelled, clock } from './run'
@@ -47,6 +48,8 @@ interface Moment {
   category: string
   rationale: string
   payoff_quote: string
+  description: string
+  hashtags: string[]
   needs_earlier_context: boolean
   scores: ClipScores
 }
@@ -66,6 +69,8 @@ const SCHEMA = {
           category: { type: 'string', enum: ['funny', 'educational', 'controversial', 'emotional', 'surprising', 'conversation'] },
           rationale: { type: 'string' },
           payoff_quote: { type: 'string' },
+          description: { type: 'string' },
+          hashtags: { type: 'array', items: { type: 'string' }, maxItems: 6 },
           needs_earlier_context: { type: 'boolean' },
           scores: {
             type: 'object',
@@ -75,7 +80,19 @@ const SCHEMA = {
             required: ['hook', 'payoff', 'standalone', 'value']
           }
         },
-        required: ['start_id', 'end_id', 'title', 'hook', 'category', 'rationale', 'payoff_quote', 'needs_earlier_context', 'scores']
+        required: [
+          'start_id',
+          'end_id',
+          'title',
+          'hook',
+          'category',
+          'rationale',
+          'payoff_quote',
+          'description',
+          'hashtags',
+          'needs_earlier_context',
+          'scores'
+        ]
       }
     }
   },
@@ -102,7 +119,9 @@ Rules:
 - When the payoff gets an immediate reaction (a laugh, "that was good", "no way"), end_id includes that reaction; do not end on the punchline itself.
 - Return at most 3 moments for this excerpt, only genuinely strong ones. An empty list is fine.
 - Pick start_id and end_id from the line ids. Never invent ids.
-- Write title, hook and rationale in the transcript's language.
+- Write title, hook, rationale and description in the transcript's language.
+- description: 1-2 sentences for the post caption when the clip is shared; make people want to watch, no hashtags.
+- hashtags: 3-6 hashtags that fit this clip (topic, people, format), as plain words without '#'.
 - Scores 1-5: hook = how strongly the first seconds grab attention; payoff = how satisfying the ending is; standalone = understandable without context; value = entertainment or information value. Be strict: 5 is rare.`
 }
 
@@ -347,6 +366,8 @@ function refine(moment: Moment, segments: Segment[], minMs: number, maxMs: numbe
     end: segments[b].end,
     title: moment.title,
     hook: moment.hook,
+    description: moment.description,
+    hashtags: cleanHashtags(moment.hashtags).slice(0, 6),
     category: moment.category,
     rationale: moment.rationale,
     scores: s,

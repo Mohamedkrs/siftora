@@ -61,6 +61,7 @@ const api: Api = {
   deleteReel: (jobId, clipId) => ipcRenderer.invoke(IPC.deleteReel, jobId, clipId),
   setClipRange: (jobId, clipId, start, end) => ipcRenderer.invoke(IPC.setClipRange, jobId, clipId, start, end),
   openPath: (path) => ipcRenderer.invoke(IPC.openPath, path),
+  openUploadPage: (platform) => ipcRenderer.invoke(IPC.openUploadPage, platform),
   showInFolder: (path) => ipcRenderer.invoke(IPC.showInFolder, path),
   onJobUpdate: (cb) => {
     const listener = (_event: IpcRendererEvent, job: Job): void => cb(job)

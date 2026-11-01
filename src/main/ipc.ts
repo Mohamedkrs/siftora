@@ -1,4 +1,5 @@
 import { app, dialog, ipcMain, shell } from 'electron'
+import { SHARE_PLATFORMS } from '../shared/share'
 import { IPC, type Settings, type YoutubeChoice } from '../shared/types'
 import { currentEngineList } from './engineList'
 import { deleteDownloads, quitAfterRemoval, removeAllData, storageUsage } from './storage'
@@ -153,6 +154,11 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.deleteReel, (_event, jobId: unknown, clipId: unknown) => deleteReel(String(jobId), String(clipId)))
   ipcMain.handle(IPC.setClipRange, (_event, jobId: unknown, clipId: unknown, start: unknown, end: unknown) => {
     if (typeof start === 'number' && typeof end === 'number') setClipRange(String(jobId), String(clipId), start, end)
+  })
+  // Only the fixed upload pages, never a URL from the renderer.
+  ipcMain.handle(IPC.openUploadPage, async (_event, platform: unknown) => {
+    const page = SHARE_PLATFORMS.find((item) => item.id === platform)
+    if (page) await shell.openExternal(page.uploadUrl)
   })
   ipcMain.handle(IPC.openPath, async (_event, path: unknown) => {
     if (typeof path === 'string' && !/\.(exe|bat|cmd|com|ps1|sh|app|msi|lnk)$/i.test(path)) await shell.openPath(path)

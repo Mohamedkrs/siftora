@@ -53,6 +53,9 @@ export interface Clip {
   original?: { start: number; end: number }
   title: string
   hook: string
+  /** Post caption and hashtags (no '#') for sharing; missing on clips found before the share kit. */
+  description?: string
+  hashtags?: string[]
   category: string
   rationale: string
   scores: ClipScores
