@@ -80,10 +80,10 @@ The app is Electron, React and TypeScript. The work happens in `src/main/pipelin
 ### Releasing
 
 1. Set the new version in `package.json` and commit it.
-2. Tag it and push the tag: `git tag v0.2.0` then `git push --tags`.
-3. [.github/workflows/release.yml](.github/workflows/release.yml) builds the installer on a clean Windows machine and attaches `Siftora-Setup.exe` to a draft release. Review it, add notes and publish it; the **Download for Windows** button then serves the new version.
+2. Open **Actions → Release → Run workflow**, tick **Create a draft release**, and run it. (Pushing a matching tag, such as `git tag v0.2.0` then `git push --tags`, does the same.)
+3. [.github/workflows/release.yml](.github/workflows/release.yml) builds the installer on a clean Windows machine and attaches `Siftora-Setup.exe` to a draft release. Review it, add notes and publish it; publishing creates the tag, and the **Download for Windows** button then serves the new version.
 
-Running the workflow by hand from the Actions tab only builds the installer, as a download on the run, without releasing anything.
+Running the workflow without the box ticked only builds the installer, as a download on the run.
 
 ### Engine updates
 

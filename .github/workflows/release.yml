@@ -1,9 +1,12 @@
-# Builds the Windows installer on a clean machine.
+# Builds the Windows installer on a clean machine, and makes releases.
 #
-# Push a version tag (git tag v0.1.0 && git push --tags) to build it and attach Siftora-Setup.exe
-# to a draft release with that name; review the draft, add notes, then publish it. The tag must
-# match the version in package.json. Run it by hand from the Actions tab to only build: the
-# installer is then a downloadable artifact of the run and nothing is released.
+# Two ways to release (both create a draft: review it, add notes, then publish it):
+#   - Actions → Release → Run workflow, with "Create a draft release" ticked. It releases the
+#     version in package.json, as tag v<version>.
+#   - Push a version tag: git tag v0.1.0 && git push --tags. The tag must match package.json.
+# A draft does not create its tag; the tag appears when you publish the release, so a tag
+# ruleset that only lets you create v* tags still applies.
+# Run by hand without the box ticked to only build: the installer is then a download on the run.
 
 name: Release
 
@@ -11,6 +14,11 @@ on:
   push:
     tags: ['v*.*.*']
   workflow_dispatch:
+    inputs:
+      release:
+        description: 'Create a draft release for the version in package.json'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -27,6 +35,8 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
 
@@ -35,14 +45,31 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Check the tag matches package.json
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Work out the version
+        id: version
+        env:
+          RELEASE: ${{ inputs.release }}
         run: |
           version="$(node -p "require('./package.json').version")"
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "The tag $GITHUB_REF_NAME does not match the version $version in package.json."
-            exit 1
+          tag="v$version"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            if [ "$GITHUB_REF_NAME" != "$tag" ]; then
+              echo "The tag $GITHUB_REF_NAME does not match the version $version in package.json."
+              exit 1
+            fi
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          elif [ "$RELEASE" = "true" ]; then
+            # A release for this version must not exist yet: bump the version in package.json first.
+            if gh release view "$tag" >/dev/null 2>&1 || gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+              echo "$tag is already released. Set a new version in package.json, commit it, and run again."
+              exit 1
+            fi
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
           fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Version $version (tag $tag)"
 
       - run: npm ci
 
@@ -63,13 +90,14 @@ jobs:
           if-no-files-found: error
 
       - name: Attach it to a draft release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: steps.version.outputs.release == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" release/Siftora-Setup.exe --clobber
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" release/Siftora-Setup.exe --clobber
           else
-            gh release create "$GITHUB_REF_NAME" release/Siftora-Setup.exe \
-              --draft --title "Siftora ${GITHUB_REF_NAME#v}" --generate-notes
+            gh release create "$TAG" release/Siftora-Setup.exe --draft --target "$GITHUB_SHA" \
+              --title "Siftora ${TAG#v}" --generate-notes
           fi
+          echo "Draft release $TAG is ready: open Releases, review it and publish it."
