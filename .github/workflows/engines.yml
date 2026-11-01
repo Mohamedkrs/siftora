@@ -41,6 +41,9 @@ env:
 
 jobs:
   check:
+    # The weekly run is opt-in (repository variable ENGINES_WEEKLY = true), so a private repo does
+    # not spend Actions minutes on it; macOS runners count ten times. Manual runs always work.
+    if: github.event_name != 'schedule' || vars.ENGINES_WEEKLY == 'true'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.check.outputs.version }}
