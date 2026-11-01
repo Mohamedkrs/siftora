@@ -6,8 +6,14 @@ import type { YoutubeInfo } from '../shared/types'
 import { log } from './logger'
 import { ffmpegPaths, run } from './pipeline/run'
 
-export function isYoutubeUrl(source: string): boolean {
-  return /^(https?:\/\/)?((www|m|music)\.)?(youtube\.com|youtu\.be)\//i.test(source.trim())
+/** A web link for yt-dlp to try: YouTube, Facebook, TikTok, X, Instagram and many more sites. */
+export function isVideoUrl(source: string): boolean {
+  try {
+    const url = new URL(source.trim())
+    return url.protocol === 'https:' || url.protocol === 'http:'
+  } catch {
+    return false
+  }
 }
 
 const ASSET = process.platform === 'win32' ? 'yt-dlp.exe' : process.platform === 'darwin' ? 'yt-dlp_macos' : 'yt-dlp_linux'
@@ -59,23 +65,23 @@ export async function youtubeInfo(url: string, signal?: AbortSignal): Promise<Yo
   }
   const heights = (info.formats ?? []).flatMap((f) => (f.height && f.vcodec !== 'none' ? [f.height] : []))
   return {
-    title: info.title ?? 'YouTube video',
+    title: info.title ?? 'Online video',
     durationMs: Math.round((info.duration ?? 0) * 1000),
     heights: [...new Set(heights)].sort((a, b) => b - a)
   }
 }
 
-/** Downloads a YouTube video (up to `maxHeight`p, 0 = best, mp4) into `dir`. */
+/** Downloads a video from a link (up to `maxHeight`p, 0 = best, mp4) into `dir`. */
 export async function downloadYoutube(
   url: string,
   maxHeight: number,
   dir: string,
   signal: AbortSignal,
   onProgress: (progress: number, message?: string) => void,
-  /** Known from the check on Create; saves asking YouTube again. */
+  /** Known from the check on Create; saves asking the site again. */
   knownTitle?: string
 ): Promise<{ path: string; title: string }> {
-  onProgress(0, 'Preparing the YouTube downloader…')
+  onProgress(0, 'Preparing the video downloader…')
   const ytDlp = await ytDlpPath()
   const { ffmpeg } = ffmpegPaths()
 
@@ -102,6 +108,6 @@ export async function downloadYoutube(
     }
   )
   const file = readdirSync(dir).find((name) => /^video\.(mp4|mkv|webm)$/i.test(name))
-  if (!file) throw new Error('The YouTube download did not produce a video file.')
+  if (!file) throw new Error('The download did not produce a video file.')
   return { path: join(dir, file), title }
 }

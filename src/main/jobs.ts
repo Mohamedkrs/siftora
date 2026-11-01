@@ -18,7 +18,7 @@ import { DEFAULT_YOUTUBE_HEIGHT, rangeKey, renderStyleKey } from '../shared/jobs
 import { fitWordsToSegments, transcribePython, transcribeWhisperCpp, type Transcript } from './pipeline/transcribe'
 import { getSettings } from './settings'
 import { ownLlamaBuild } from './systemEngines'
-import { downloadYoutube, isYoutubeUrl } from './youtube'
+import { downloadYoutube, isVideoUrl } from './youtube'
 
 const jobs = new Map<string, Job>()
 const controllers = new Map<string, AbortController>()
@@ -108,7 +108,7 @@ export function addJobs(sources: string[], links: Record<string, YoutubeChoice> 
   const added = sources
     .filter((source) => source.trim().length > 0)
     .map((source): Job => {
-      const url = isYoutubeUrl(source)
+      const url = isVideoUrl(source)
       const link = Object.hasOwn(links, source) ? links[source] : undefined
       const title = link?.title ?? (url ? source : basename(source, extname(source)))
       const job: Job = {
@@ -238,9 +238,9 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
   const settings = getSettings()
   const { ffmpeg, ffprobe } = ffmpegPaths()
 
-  // 1. YouTube download
+  // 1. Download (links)
   if (!job.videoPath || !existsSync(job.videoPath)) {
-    if (!isYoutubeUrl(job.source)) throw new Error('The video file no longer exists.')
+    if (!isVideoUrl(job.source)) throw new Error('The video file no longer exists.')
     update(job, { stage: 'download', progress: 0, message: undefined })
     const result = await downloadYoutube(
       job.source,

@@ -256,7 +256,7 @@ export interface Api {
   setSettings(patch: Partial<Settings>): Promise<Settings>
   pickOutputDir(): Promise<string | null>
   pickVideos(): Promise<string[]>
-  /** Asks YouTube about a link (downloads yt-dlp the first time). */
+  /** Asks the site about a video link (downloads yt-dlp the first time). */
   youtubeInfo(url: string): Promise<YoutubeInfo>
   log(level: 'info' | 'warn' | 'error', msg: string): void
   appInfo(): Promise<{ version: string; platform: string; userData: string }>
@@ -294,8 +294,8 @@ export interface Api {
   /** Tested engine builds published for this app (see ENGINE_LIST_URL), and changes to them. */
   getEngineList(): Promise<EngineEntry[]>
   onEngineList(cb: (entries: EngineEntry[]) => void): () => void
-  /** Queue videos (file paths or YouTube URLs) with the current settings. */
-  /** links: per checked YouTube link, its title and the quality chosen on Create. */
+  /** Queue videos (file paths or web links) with the current settings. */
+  /** links: per checked web link, its title and the quality chosen on Create. */
   addJobs(sources: string[], links?: Record<string, YoutubeChoice>): Promise<Job[]>
   listJobs(): Promise<Job[]>
   cancelJob(id: string): Promise<void>

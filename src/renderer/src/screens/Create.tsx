@@ -9,19 +9,22 @@ import { useJobs } from '../state/jobs'
 import { useModels } from '../state/models'
 import { useOwnLlamaBuild, useSettings } from '../state/settings'
 
-function isYouTubeUrl(value: string): boolean {
+/** Any web link; yt-dlp knows YouTube, Facebook, TikTok, X, Instagram and many more. */
+function isVideoUrl(value: string): boolean {
   try {
     const url = new URL(value.trim())
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') return false
-    const host = url.hostname.toLowerCase()
-    return (
-      host === 'youtube.com' ||
-      host === 'www.youtube.com' ||
-      host === 'm.youtube.com' ||
-      host === 'youtu.be'
-    )
+    return url.protocol === 'http:' || url.protocol === 'https:'
   } catch {
     return false
+  }
+}
+
+/** "facebook.com" for https://www.facebook.com/share/v/… */
+function siteOf(link: string): string {
+  try {
+    return new URL(link).hostname.replace(/^(www|m)\./, '')
+  } catch {
+    return 'Link'
   }
 }
 
@@ -66,7 +69,7 @@ function VideoRow(props: {
   onInfo: (info: VideoInfo) => void
   onRemove: () => void
 }) {
-  const youtube = isYouTubeUrl(props.source)
+  const youtube = isVideoUrl(props.source)
   const yt = typeof props.youtube === 'object' ? props.youtube : null
   const atHeight = yt ? (props.quality ?? defaultHeight(yt.heights)) : undefined
   return (
@@ -94,16 +97,16 @@ function VideoRow(props: {
         <span className={typeof props.youtube === 'string' ? 'muted video-row-error' : 'muted'}>
           {youtube
             ? typeof props.youtube === 'string'
-              ? `YouTube · could not check the link (${props.youtube})`
+              ? `${siteOf(props.source)} · could not check the link (${props.youtube})`
               : yt
                 ? [
-                    'YouTube',
+                    siteOf(props.source),
                     yt.durationMs ? formatClock(yt.durationMs) : null,
                     yt.heights.length ? `up to ${yt.heights[0]}p` : null
                   ]
                     .filter(Boolean)
                     .join(' · ')
-                : 'YouTube · checking the link…'
+                : `${siteOf(props.source)} · checking the link…`
             : [
                 props.info ? formatClock(props.info.durationMs) : null,
                 props.info?.height ? `${props.info.height}p` : null,
@@ -175,8 +178,8 @@ export default function Create() {
     const yt = youtube[video]
     return sum + (info[video]?.durationMs ?? (typeof yt === 'object' ? yt.durationMs : 0))
   }, 0)
-  const youtubeCount = videos.filter(isYouTubeUrl).length
-  const checking = videos.some((video) => isYouTubeUrl(video) && youtube[video] === undefined)
+  const youtubeCount = videos.filter(isVideoUrl).length
+  const checking = videos.some((video) => isVideoUrl(video) && youtube[video] === undefined)
 
   const addVideos = (paths: string[]): void => {
     const clean = paths.filter((path) => path.trim().length > 0)
@@ -209,8 +212,8 @@ export default function Create() {
   const addUrl = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault()
     const value = url.trim()
-    if (!isYouTubeUrl(value)) {
-      setUrlError('Paste a youtube.com or youtu.be link.')
+    if (!isVideoUrl(value)) {
+      setUrlError('Paste a link that starts with http:// or https://.')
       return
     }
     setUrlError('')
@@ -286,8 +289,8 @@ export default function Create() {
                 type="text"
                 value={url}
                 onChange={(event) => setUrl(event.target.value)}
-                placeholder="Paste a YouTube link…"
-                aria-label="YouTube link"
+                placeholder="Paste a video link (YouTube, Facebook, TikTok…)"
+                aria-label="Video link"
               />
               <button type="submit" className="button">
                 Add
@@ -326,7 +329,7 @@ export default function Create() {
               <li>
                 <span className="step-dot one" aria-hidden="true" />
                 <strong>Add a long video</strong>
-                <span className="muted">A podcast, stream, interview or vlog. Files or YouTube links.</span>
+                <span className="muted">A podcast, stream, interview or vlog. Files or links from YouTube, Facebook, TikTok and more.</span>
               </li>
               <li>
                 <span className="step-dot two" aria-hidden="true" />
@@ -548,7 +551,7 @@ export default function Create() {
             : [
                 `${videos.length} ${videos.length === 1 ? 'video' : 'videos'}`,
                 totalMs > 0 ? `${formatClock(totalMs)} of video` : null,
-                youtubeCount > 0 ? `${youtubeCount} from YouTube` : null
+                youtubeCount > 0 ? `${youtubeCount} from the web` : null
               ]
                 .filter(Boolean)
                 .join(' · ')}

@@ -3,7 +3,7 @@ import type { Layout, SubtitleStyle } from './types'
 
 export type JobStage =
   | 'queued'
-  | 'download' // YouTube links
+  | 'download' // web links
   | 'audio'
   | 'transcribe'
   | 'speakers'
@@ -95,7 +95,7 @@ export function renderStyleKey(subtitle: SubtitleStyle, layout: Layout): string 
 
 export interface Job {
   id: string
-  /** File path or YouTube URL. */
+  /** File path or web link. */
   source: string
   /** Local video file (same as source for files; set after download for URLs). */
   videoPath: string | null
