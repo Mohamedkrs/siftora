@@ -7,6 +7,10 @@
 
 <p align="center"><strong>Sift your long videos for the moments worth sharing.</strong></p>
 
+<p align="center">
+  <a href="../../releases/latest/download/Siftora-Setup.exe"><img src="resources/brand/download-windows.svg" alt="Download for Windows" height="60"></a>
+</p>
+
 Siftora is a free desktop app that turns long videos (podcasts, streams, interviews, vlogs) into vertical clips for TikTok, Instagram Reels and YouTube Shorts. It transcribes the video, finds the moments with a hook, a setup and a payoff, and renders them as 1080×1920 reels with animated captions.
 
 Everything runs on your own computer. Your videos and transcripts are never uploaded.
@@ -29,7 +33,7 @@ Everything runs on your own computer. Your videos and transcripts are never uplo
 
 ## Install
 
-1. Download `Siftora Setup.exe` from the [Releases](../../releases) page.
+1. Click **Download for Windows** above, or pick a version on the [Releases](../../releases) page.
 2. Run it. Windows may show "Windows protected your PC", because the app is not code-signed yet: choose **More info → Run anyway**.
 3. On first start, Siftora checks your hardware, recommends models that fit it, and shows what it found already on your computer. Then it downloads what is missing.
 

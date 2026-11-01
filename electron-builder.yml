@@ -27,6 +27,8 @@ win:
 nsis:
   # Asks on uninstall whether to delete downloaded models and settings (never on updates)
   include: build/installer.nsh
+  # A fixed name, so releases/latest/download/Siftora-Setup.exe always gets the newest installer
+  artifactName: Siftora-Setup.${ext}
 mac:
   target: dmg
 linux:
