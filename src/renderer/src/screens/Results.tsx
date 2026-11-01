@@ -50,7 +50,7 @@ function TrimRow(props: {
 }
 
 function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: number; stale: boolean }) {
-  const { render, deleteReel, setClipRange } = useJobs()
+  const { render, deleteReel, setClipRange, setClipHeart, deleteClips } = useJobs()
   const dialog = useDialog()
   const [showText, setShowText] = useState(false)
   const [adjusting, setAdjusting] = useState(false)
@@ -107,6 +107,16 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
           <h3>
             {rank}. {clip.title}
           </h3>
+          <button
+            type="button"
+            className={clip.hearted ? 'heart-button on' : 'heart-button'}
+            aria-pressed={clip.hearted === true}
+            aria-label={clip.hearted ? 'Remove heart' : 'Heart this moment'}
+            title={clip.hearted ? 'Remove heart' : 'Heart this moment; "Delete unhearted" keeps it'}
+            onClick={() => setClipHeart(job.id, clip.id, !clip.hearted)}
+          >
+            {clip.hearted ? '♥' : '♡'}
+          </button>
           <span className={scoreClass(clip.score)} title="Score out of 100">
             {clip.score}
           </span>
@@ -226,6 +236,26 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
               Render reel
             </button>
           )}
+          {busy ? null : (
+            <button
+              type="button"
+              className="button danger"
+              onClick={() => {
+                void dialog
+                  .confirm({
+                    title: 'Delete this moment?',
+                    message: done
+                      ? 'The moment is removed from this list and its reel goes to the Recycle Bin.'
+                      : 'The moment is removed from this list. “Find moments again” can find it again.',
+                    confirmLabel: 'Delete moment',
+                    danger: true
+                  })
+                  .then((ok) => ok && deleteClips(job.id, [clip.id]))
+              }}
+            >
+              Delete moment
+            </button>
+          )}
         </div>
         {sharing && done ? <SharePanel clip={clip} reelPath={clip.render.path} /> : null}
         {done && stale ? (
@@ -240,10 +270,11 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
 }
 
 export default function Results() {
-  const { jobs, render, findAgain, rewritePosts, deleteJob } = useJobs()
+  const { jobs, render, findAgain, rewritePosts, deleteJob, deleteClips } = useJobs()
   const dialog = useDialog()
   const { settings } = useSettings()
   const [params, setParams] = useSearchParams()
+  const [topic, setTopic] = useState<string | null>(null)
   const doneJobs = jobs.filter((job) => job.stage === 'done')
   const job = doneJobs.find((item) => item.id === params.get('job')) ?? doneJobs[0]
 
@@ -261,6 +292,10 @@ export default function Results() {
   }
 
   const clips = [...job.clips].sort((a, b) => b.score - a.score)
+  const topics = new Map<string, number>()
+  for (const clip of clips) topics.set(clip.category, (topics.get(clip.category) ?? 0) + 1)
+  // A topic picked on another video, or whose last clip was deleted, shows everything again.
+  const shownTopic = topic !== null && topics.has(topic) ? topic : null
   const notRendered = clips.filter((clip) => clip.render.status === 'idle' || clip.render.status === 'error')
   const reels = clips.filter((clip) => clip.render.status === 'done').length
   const rendering = clips.some((clip) => clip.render.status === 'queued' || clip.render.status === 'rendering')
@@ -280,6 +315,23 @@ export default function Results() {
         setParams({})
         deleteJob(job.id)
       })
+  }
+  const hearted = clips.filter((clip) => clip.hearted).length
+  const unhearted = clips.filter(
+    (clip) => !clip.hearted && clip.render.status !== 'queued' && clip.render.status !== 'rendering'
+  )
+  const deleteUnhearted = (): void => {
+    const reelCount = unhearted.filter((clip) => clip.render.status === 'done').length
+    void dialog
+      .confirm({
+        title: `Delete ${unhearted.length} unhearted ${unhearted.length === 1 ? 'moment' : 'moments'}?`,
+        message: `The ${hearted} hearted ${hearted === 1 ? 'moment stays' : 'moments stay'}.${
+          reelCount > 0 ? ` ${reelCount} rendered ${reelCount === 1 ? 'reel goes' : 'reels go'} to the Recycle Bin.` : ''
+        }`,
+        confirmLabel: 'Delete',
+        danger: true
+      })
+      .then((ok) => ok && deleteClips(job.id, unhearted.map((clip) => clip.id)))
   }
   const styleKey = renderStyleKey(settings.subtitle, settings.layout)
   // Older reels have no saved range; only a known, different one counts as changed.
@@ -315,6 +367,7 @@ export default function Results() {
           <p className="muted">
             {job.durationMs ? `${formatClock(job.durationMs)} · ` : ''}
             {clips.length} clips
+            {hearted > 0 ? ` · ${hearted} hearted` : ''}
             {job.speakerCount ? ` · ${job.speakerCount} speakers` : ''}
           </p>
         </div>
@@ -346,6 +399,15 @@ export default function Results() {
           </button>
           <button type="button" className="button" onClick={() => findAgain(job.id)}>
             Find moments again
+          </button>
+          <button
+            type="button"
+            className="button danger"
+            disabled={hearted === 0 || unhearted.length === 0}
+            title={hearted === 0 ? 'Heart the moments you want to keep first' : 'Delete every moment without a heart'}
+            onClick={deleteUnhearted}
+          >
+            Delete unhearted ({unhearted.length})
           </button>
           <button
             type="button"
@@ -381,7 +443,31 @@ export default function Results() {
           No clips passed the minimum score. Lower it in Settings, then use “Find moments again”.
         </p>
       ) : (
-        clips.map((clip, index) => <ClipCard key={clip.id} job={job} clip={clip} rank={index + 1} stale={isStale(clip)} />)
+        <>
+          {topics.size > 1 ? (
+            <div className="model-chips topic-filter" role="radiogroup" aria-label="Show moments by topic">
+              <span className="chips-label">Show</span>
+              {[null, ...topics.keys()].map((name) => (
+                <button
+                  key={name ?? 'all'}
+                  type="button"
+                  role="radio"
+                  aria-checked={shownTopic === name}
+                  className={shownTopic === name ? 'chip selected' : 'chip'}
+                  onClick={() => setTopic(name)}
+                >
+                  {name === null ? `All (${clips.length})` : `${name[0].toUpperCase()}${name.slice(1)} (${topics.get(name)})`}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {/* Rank stays the place in the full list, so it matches the reel's file name. */}
+          {clips.map((clip, index) =>
+            shownTopic === null || clip.category === shownTopic ? (
+              <ClipCard key={clip.id} job={job} clip={clip} rank={index + 1} stale={isStale(clip)} />
+            ) : null
+          )}
+        </>
       )}
     </div>
   )

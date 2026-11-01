@@ -1,11 +1,11 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Job } from '../../../shared/jobs'
-import type { YoutubeChoice } from '../../../shared/types'
+import type { ClipLimits, YoutubeChoice } from '../../../shared/types'
 
 interface JobsContextValue {
   /** Newest first. */
   jobs: Job[]
-  add: (sources: string[], links?: Record<string, YoutubeChoice>) => Promise<void>
+  add: (sources: string[], links?: Record<string, YoutubeChoice>, limits?: Record<string, ClipLimits>) => Promise<void>
   cancel: (id: string) => void
   remove: (id: string) => void
   retry: (id: string) => void
@@ -14,6 +14,8 @@ interface JobsContextValue {
   render: (jobId: string, clipIds: string[]) => void
   deleteReel: (jobId: string, clipId: string) => void
   setClipRange: (jobId: string, clipId: string, start: number, end: number) => void
+  setClipHeart: (jobId: string, clipId: string, hearted: boolean) => void
+  deleteClips: (jobId: string, clipIds: string[]) => void
   /** Removes a video with its reels and data. */
   deleteJob: (id: string) => void
 }
@@ -34,8 +36,8 @@ export function JobsProvider({ children }: { children: ReactNode }) {
 
   const value: JobsContextValue = {
     jobs,
-    add: async (sources, links) => {
-      await window.api.addJobs(sources, links)
+    add: async (sources, links, limits) => {
+      await window.api.addJobs(sources, links, limits)
     },
     cancel: (id) => void window.api.cancelJob(id),
     remove: (id) => {
@@ -49,6 +51,8 @@ export function JobsProvider({ children }: { children: ReactNode }) {
     render: (jobId, clipIds) => void window.api.renderClips(jobId, clipIds),
     deleteReel: (jobId, clipId) => void window.api.deleteReel(jobId, clipId),
     setClipRange: (jobId, clipId, start, end) => void window.api.setClipRange(jobId, clipId, start, end),
+    setClipHeart: (jobId, clipId, hearted) => void window.api.setClipHeart(jobId, clipId, hearted),
+    deleteClips: (jobId, clipIds) => void window.api.deleteClips(jobId, clipIds),
     deleteJob: (id) => {
       setJobs((current) => current.filter((job) => job.id !== id))
       void window.api.deleteJob(id)

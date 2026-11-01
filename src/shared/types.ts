@@ -155,7 +155,15 @@ export interface Settings {
   transcriptionProvider: 'app' | 'openai-whisper'
   openaiWhisperPath: string | null
   openaiWhisperModel: string | null
+  /** Browser whose sign-in yt-dlp borrows, for age-restricted or members-only videos; null = none. */
+  cookiesBrowser: CookiesSource | null
 }
+
+/** Browsers yt-dlp can read cookies from (--cookies-from-browser). */
+export const COOKIES_BROWSERS = ['firefox', 'chrome', 'edge', 'brave', 'opera', 'vivaldi', 'chromium'] as const
+export type CookiesBrowser = (typeof COOKIES_BROWSERS)[number]
+/** A browser, or 'file' = a cookies.txt the user loaded (kept in the app's data folder). */
+export type CookiesSource = CookiesBrowser | 'file'
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
@@ -196,7 +204,8 @@ export const DEFAULT_SETTINGS: Settings = {
   ollamaModel: null,
   transcriptionProvider: 'app',
   openaiWhisperPath: null,
-  openaiWhisperModel: null
+  openaiWhisperModel: null,
+  cookiesBrowser: null
 }
 
 export interface GpuInfo {
@@ -255,6 +264,8 @@ export interface Api {
   getSettings(): Promise<Settings>
   setSettings(patch: Partial<Settings>): Promise<Settings>
   pickOutputDir(): Promise<string | null>
+  /** Asks for a cookies.txt with a YouTube sign-in and keeps a copy; error says why it was not used. */
+  importCookiesFile(): Promise<{ imported: boolean; error?: string }>
   pickVideos(): Promise<string[]>
   /** Asks the site about a video link (downloads yt-dlp the first time). */
   youtubeInfo(url: string): Promise<YoutubeInfo>
@@ -296,7 +307,8 @@ export interface Api {
   onEngineList(cb: (entries: EngineEntry[]) => void): () => void
   /** Queue videos (file paths or web links) with the current settings. */
   /** links: per checked web link, its title and the quality chosen on Create. */
-  addJobs(sources: string[], links?: Record<string, YoutubeChoice>): Promise<Job[]>
+  /** links: quality per checked link; limits: clip settings for single videos, else the ones in Settings. */
+  addJobs(sources: string[], links?: Record<string, YoutubeChoice>, limits?: Record<string, ClipLimits>): Promise<Job[]>
   listJobs(): Promise<Job[]>
   cancelJob(id: string): Promise<void>
   /** Finished videos are only hidden from the Queue; others are deleted. */
@@ -311,6 +323,10 @@ export interface Api {
   deleteJob(id: string): Promise<void>
   /** Moves a rendered reel to the Recycle Bin / Trash and marks the clip as not rendered. */
   deleteReel(jobId: string, clipId: string): Promise<void>
+  /** Marks a found moment as a keeper. */
+  setClipHeart(jobId: string, clipId: string, hearted: boolean): Promise<void>
+  /** Removes found moments; their rendered reels go to the Recycle Bin / Trash. */
+  deleteClips(jobId: string, clipIds: string[]): Promise<void>
   /** Sets a clip's start/end (ms in the source video) by hand. */
   setClipRange(jobId: string, clipId: string, start: number, end: number): Promise<void>
   openPath(path: string): Promise<void>
@@ -332,6 +348,14 @@ export interface YoutubeChoice {
   title: string
 }
 
+/** Clip settings chosen for one video on Create. */
+export interface ClipLimits {
+  minClipSeconds: number
+  maxClipSeconds: number
+  /** 0-10. */
+  minScore: number
+}
+
 export const IPC = {
   findSystemEngines: 'engines:find-system',
   pickEngineBinary: 'engines:pick-binary',
@@ -342,6 +366,7 @@ export const IPC = {
   getSettings: 'settings:get',
   setSettings: 'settings:set',
   pickOutputDir: 'dialog:pick-output-dir',
+  importCookiesFile: 'dialog:import-cookies',
   pickVideos: 'dialog:pick-videos',
   youtubeInfo: 'youtube:info',
   log: 'app:log',
@@ -378,6 +403,8 @@ export const IPC = {
   renderClips: 'jobs:render',
   deleteJob: 'jobs:delete',
   deleteReel: 'jobs:delete-reel',
+  setClipHeart: 'jobs:set-clip-heart',
+  deleteClips: 'jobs:delete-clips',
   setClipRange: 'jobs:set-clip-range',
   openPath: 'shell:open-path',
   openUploadPage: 'shell:open-upload-page',

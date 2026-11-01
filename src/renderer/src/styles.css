@@ -260,6 +260,7 @@ select {
   border-radius: 8px;
   color: var(--text);
   font-size: 13px;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -596,6 +597,7 @@ select {
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
 }
@@ -1208,6 +1210,13 @@ select {
 .results-head {
   margin-bottom: 14px;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Title takes the room it needs; the buttons move below it when they do not fit beside it. */
+.results-head > div:first-child {
+  flex: 1 1 320px;
+  min-width: 0;
 }
 
 .results-head h2 {
@@ -1235,6 +1244,28 @@ select {
 
 .clip-source {
   max-height: 360px;
+}
+
+.heart-button {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  padding: 0 4px;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.heart-button:hover,
+.heart-button.on {
+  color: var(--danger);
+}
+
+.heart-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 .score {
@@ -1575,6 +1606,49 @@ select {
   color: var(--danger);
 }
 
+.signin-help {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--warning-border);
+  border-radius: 8px;
+  background: rgba(255, 196, 0, 0.06);
+  font-size: 13px;
+  white-space: normal;
+}
+
+.signin-help .muted {
+  white-space: normal;
+}
+
+.video-row-limits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.video-row-limit-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 360px;
+  margin-top: 4px;
+}
+
+.signin-help strong {
+  color: var(--warning-text);
+}
+
+.signin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .icon-button {
   flex: none;
   width: 30px;
@@ -1853,6 +1927,10 @@ select {
   align-items: center;
   gap: 6px;
   margin-top: 8px;
+}
+
+.topic-filter {
+  margin: 0 0 12px;
 }
 
 .chips-label {

@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node
 import { dirname, join } from 'node:path'
 import { CATALOG } from '../shared/catalog'
 import {
+  COOKIES_BROWSERS,
   CAPTION_FONTS,
   DEFAULT_SETTINGS,
   MAX_SPEAKER_COLORS,
@@ -164,7 +165,9 @@ function sanitize(input: unknown): Settings {
     ollamaModel: shortStringOr(raw.ollamaModel),
     transcriptionProvider: raw.transcriptionProvider === 'openai-whisper' ? 'openai-whisper' : 'app',
     openaiWhisperPath: shortStringOr(raw.openaiWhisperPath, 1024),
-    openaiWhisperModel: shortStringOr(raw.openaiWhisperModel)
+    openaiWhisperModel: shortStringOr(raw.openaiWhisperModel),
+    cookiesBrowser:
+      raw.cookiesBrowser === 'file' ? 'file' : (COOKIES_BROWSERS.find((browser) => browser === raw.cookiesBrowser) ?? null)
   }
 }
 

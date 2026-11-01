@@ -2,7 +2,8 @@ import { useState, type DragEvent, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CATALOG, REACTION_MODEL_IDS, llamaTooOld, SPEAKER_MODEL_IDS } from '../../../shared/catalog'
 import { DEFAULT_YOUTUBE_HEIGHT, mediaUrl } from '../../../shared/jobs'
-import type { YoutubeChoice, YoutubeInfo } from '../../../shared/types'
+import type { ClipLimits, YoutubeChoice, YoutubeInfo } from '../../../shared/types'
+import SignInPicker from '../components/SignInPicker'
 import VideoCard from '../components/VideoCard'
 import { formatBytes, formatClock } from '../lib/format'
 import { useJobs } from '../state/jobs'
@@ -57,6 +58,86 @@ function defaultHeight(heights: number[]): number | undefined {
   return heights.find((h) => h <= DEFAULT_YOUTUBE_HEIGHT) ?? heights.at(-1)
 }
 
+const SIGN_IN = 'Sign-in needed: '
+
+const capital = (text: string): string => `${text[0].toUpperCase()}${text.slice(1)}`
+
+/** Age-restricted / members-only link: walk the user through borrowing their browser's sign-in. */
+function SignInHelp(props: { reason: string; onCheckAgain: () => void }) {
+  const { settings } = useSettings()
+  return (
+    <span className="signin-help" role="alert">
+      <strong>🔒 {capital(props.reason.slice(SIGN_IN.length))}</strong>
+      <span>
+        The site only shows it to a signed-in account. Sign in to it in your web browser (an adult account for
+        age-restricted videos), then pick that browser so the downloader can use the sign-in.
+      </span>
+      <span className="signin-actions">
+        <SignInPicker noneLabel="Choose your browser…" onChosen={props.onCheckAgain} />
+        <button type="button" className="button small" disabled={!settings.cookiesBrowser} onClick={props.onCheckAgain}>
+          Check again
+        </button>
+      </span>
+      <span className="muted">
+        Firefox works best. Chrome, Edge and Brave must be fully quit first, and newer versions may refuse anyway; then
+        export a cookies.txt on youtube.com with an extension such as “Get cookies.txt LOCALLY” and pick “cookies.txt
+        file…”.
+      </span>
+    </span>
+  )
+}
+
+/** "20–45s · score 60+" */
+function limitsText(limits: ClipLimits): string {
+  return `${limits.minClipSeconds}–${limits.maxClipSeconds}s · score ${Math.round(limits.minScore * 10)}+`
+}
+
+/** Clip length and minimum score; on Create's side panel for all videos, or on one video's row. */
+function ClipLimitFields(props: { limits: ClipLimits; onChange: (next: Partial<ClipLimits>) => void }) {
+  const { limits, onChange } = props
+  const seconds = (key: 'minClipSeconds' | 'maxClipSeconds', value: string): void => {
+    const number = Number(value)
+    if (Number.isFinite(number) && number > 0) onChange({ [key]: number })
+  }
+  return (
+    <>
+      <div className="clip-length">
+        <label className="field">
+          Shortest (s)
+          <input
+            type="number"
+            min={5}
+            max={limits.maxClipSeconds}
+            value={limits.minClipSeconds}
+            onChange={(event) => seconds('minClipSeconds', event.target.value)}
+          />
+        </label>
+        <label className="field">
+          Longest (s)
+          <input
+            type="number"
+            min={limits.minClipSeconds}
+            max={600}
+            value={limits.maxClipSeconds}
+            onChange={(event) => seconds('maxClipSeconds', event.target.value)}
+          />
+        </label>
+      </div>
+      <label className="field">
+        Keep clips scoring at least {Math.round(limits.minScore * 10)}
+        <input
+          type="range"
+          min={0}
+          max={10}
+          step={0.5}
+          value={limits.minScore}
+          onChange={(event) => onChange({ minScore: Number(event.target.value) })}
+        />
+      </label>
+    </>
+  )
+}
+
 /** A video waiting to be analysed: a frame, its name, length and resolution once known. */
 function VideoRow(props: {
   source: string
@@ -68,7 +149,13 @@ function VideoRow(props: {
   onQuality: (height: number) => void
   onInfo: (info: VideoInfo) => void
   onRemove: () => void
+  onCheckAgain: () => void
+  /** Clip settings for this video only; undefined = the ones for all videos. */
+  limits?: ClipLimits
+  defaultLimits: ClipLimits
+  onLimits: (limits: ClipLimits | undefined) => void
 }) {
+  const [editing, setEditing] = useState(false)
   const youtube = isVideoUrl(props.source)
   const yt = typeof props.youtube === 'object' ? props.youtube : null
   const atHeight = yt ? (props.quality ?? defaultHeight(yt.heights)) : undefined
@@ -97,7 +184,9 @@ function VideoRow(props: {
         <span className={typeof props.youtube === 'string' ? 'muted video-row-error' : 'muted'}>
           {youtube
             ? typeof props.youtube === 'string'
-              ? `${siteOf(props.source)} · could not check the link (${props.youtube})`
+              ? props.youtube.startsWith(SIGN_IN)
+                ? `${siteOf(props.source)} · needs you to sign in`
+                : `${siteOf(props.source)} · could not check the link (${props.youtube})`
               : yt
                 ? [
                     siteOf(props.source),
@@ -115,6 +204,45 @@ function VideoRow(props: {
                 .filter(Boolean)
                 .join(' · ')}
         </span>
+        {typeof props.youtube === 'string' && props.youtube.startsWith(SIGN_IN) ? (
+          <SignInHelp reason={props.youtube} onCheckAgain={props.onCheckAgain} />
+        ) : null}
+        <span className="video-row-limits">
+          <button
+            type="button"
+            className="link-button"
+            aria-expanded={editing}
+            onClick={() => {
+              if (!editing && !props.limits) {
+                const { minClipSeconds, maxClipSeconds, minScore } = props.defaultLimits
+                props.onLimits({ minClipSeconds, maxClipSeconds, minScore })
+              }
+              setEditing(!editing)
+            }}
+          >
+            {props.limits ? `Clips: ${limitsText(props.limits)} (this video)` : 'Clips: same as all videos'}
+          </button>
+          {props.limits ? (
+            <button
+              type="button"
+              className="link-button"
+              onClick={() => {
+                props.onLimits(undefined)
+                setEditing(false)
+              }}
+            >
+              Use the settings for all
+            </button>
+          ) : null}
+        </span>
+        {editing && props.limits ? (
+          <span className="video-row-limit-fields">
+            <ClipLimitFields
+              limits={props.limits}
+              onChange={(next) => props.onLimits({ ...(props.limits as ClipLimits), ...next })}
+            />
+          </span>
+        ) : null}
       </span>
       {yt && atHeight ? (
         <select
@@ -146,6 +274,7 @@ export default function Create() {
   const [info, setInfo] = useState<Record<string, VideoInfo>>({})
   const [youtube, setYoutube] = useState<Record<string, YoutubeInfo | string>>({})
   const [quality, setQuality] = useState<Record<string, number>>({})
+  const [limits, setLimits] = useState<Record<string, ClipLimits>>({})
   const [dragging, setDragging] = useState(false)
   const [url, setUrl] = useState('')
   const [urlError, setUrlError] = useState('')
@@ -219,20 +348,24 @@ export default function Create() {
     setUrlError('')
     setUrl('')
     addVideos([value])
-    if (youtube[value] === undefined) {
-      window.api
-        .youtubeInfo(value)
-        .then((result) => setYoutube((current) => ({ ...current, [value]: result })))
-        .catch((err: unknown) => {
-          window.api.log('warn', `youtubeInfo failed: ${String(err)}`)
-          // Keep only yt-dlp's own words, e.g. "Private video" or "Video unavailable".
-          const reason = (err instanceof Error ? err.message : String(err))
-            .replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
-            .replace(/^.*?exited with code \d+: /, '')
-            .replace(/^.*ERROR: (\[[^\]]+\] [^:]+: )?/, '')
-          setYoutube((current) => ({ ...current, [value]: reason || 'unknown error' }))
-        })
-    }
+    if (youtube[value] === undefined) checkLink(value)
+  }
+
+  /** Looks the link up; again after the user picked a browser to sign in with. */
+  const checkLink = (value: string): void => {
+    setYoutube(({ [value]: _old, ...rest }) => rest) // back to "checking the link…"
+    window.api
+      .youtubeInfo(value)
+      .then((result) => setYoutube((current) => ({ ...current, [value]: result })))
+      .catch((err: unknown) => {
+        window.api.log('warn', `youtubeInfo failed: ${String(err)}`)
+        // Keep only yt-dlp's own words, e.g. "Private video" or "Video unavailable".
+        const reason = (err instanceof Error ? err.message : String(err))
+          .replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
+          .replace(/^.*?exited with code \d+: /, '')
+          .replace(/^.*ERROR: (\[[^\]]+\] [^:]+: )?/, '')
+        setYoutube((current) => ({ ...current, [value]: reason || 'unknown error' }))
+      })
   }
 
   const start = (): void => {
@@ -244,7 +377,11 @@ export default function Create() {
       const height = typeof yt === 'object' ? (quality[video] ?? defaultHeight(yt.heights)) : undefined
       if (typeof yt === 'object' && height !== undefined) links[video] = { height, title: yt.title }
     }
-    void add(videos, links)
+    void add(
+      videos,
+      links,
+      Object.fromEntries(videos.flatMap((video) => (limits[video] ? [[video, limits[video]]] : [])))
+    )
       .then(() => {
         setVideos([])
         navigate('/queue')
@@ -320,6 +457,12 @@ export default function Create() {
                     onQuality={(height) => setQuality((current) => ({ ...current, [video]: height }))}
                     onInfo={(next) => setInfo((current) => ({ ...current, [video]: next }))}
                     onRemove={() => setVideos((current) => current.filter((item) => item !== video))}
+                    onCheckAgain={() => checkLink(video)}
+                    limits={limits[video]}
+                    defaultLimits={settings}
+                    onLimits={(next) =>
+                      setLimits(({ [video]: _old, ...rest }) => (next ? { ...rest, [video]: next } : rest))
+                    }
                   />
                 ))}
               </ul>
@@ -400,48 +543,8 @@ export default function Create() {
 
           <section className="card side-panel">
             <h2>Clips</h2>
-            <div className="clip-length">
-              <label className="field">
-                Shortest (s)
-                <input
-                  id="min-clip"
-                  type="number"
-                  min={5}
-                  max={settings.maxClipSeconds}
-                  value={settings.minClipSeconds}
-                  onChange={(event) => {
-                    const value = Number(event.target.value)
-                    if (Number.isFinite(value)) update({ minClipSeconds: value })
-                  }}
-                />
-              </label>
-              <label className="field">
-                Longest (s)
-                <input
-                  id="max-clip"
-                  type="number"
-                  min={settings.minClipSeconds}
-                  max={600}
-                  value={settings.maxClipSeconds}
-                  onChange={(event) => {
-                    const value = Number(event.target.value)
-                    if (Number.isFinite(value)) update({ maxClipSeconds: value })
-                  }}
-                />
-              </label>
-            </div>
-            <label className="field">
-              Keep clips scoring at least {Math.round(settings.minScore * 10)}
-              <input
-                id="min-score"
-                type="range"
-                min={0}
-                max={10}
-                step={0.5}
-                value={settings.minScore}
-                onChange={(event) => update({ minScore: Number(event.target.value) })}
-              />
-            </label>
+            <p className="muted">For all videos. To change one video only, use “Clips” on its row.</p>
+            <ClipLimitFields limits={settings} onChange={update} />
 
             <div className="toggles">
               <label className={vadInstalled ? 'toggle' : 'toggle disabled'}>

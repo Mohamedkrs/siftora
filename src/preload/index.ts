@@ -7,6 +7,7 @@ const api: Api = {
   getSettings: () => ipcRenderer.invoke(IPC.getSettings),
   setSettings: (patch) => ipcRenderer.invoke(IPC.setSettings, patch),
   pickOutputDir: () => ipcRenderer.invoke(IPC.pickOutputDir),
+  importCookiesFile: () => ipcRenderer.invoke(IPC.importCookiesFile),
   pickVideos: () => ipcRenderer.invoke(IPC.pickVideos),
   youtubeInfo: (url) => ipcRenderer.invoke(IPC.youtubeInfo, url),
   log: (level, msg) => {
@@ -50,7 +51,7 @@ const api: Api = {
     ipcRenderer.on(IPC.onModelState, listener)
     return () => ipcRenderer.removeListener(IPC.onModelState, listener)
   },
-  addJobs: (sources, links) => ipcRenderer.invoke(IPC.addJobs, sources, links),
+  addJobs: (sources, links, limits) => ipcRenderer.invoke(IPC.addJobs, sources, links, limits),
   listJobs: () => ipcRenderer.invoke(IPC.listJobs),
   cancelJob: (id) => ipcRenderer.invoke(IPC.cancelJob, id),
   removeJob: (id) => ipcRenderer.invoke(IPC.removeJob, id),
@@ -60,6 +61,8 @@ const api: Api = {
   renderClips: (jobId, clipIds) => ipcRenderer.invoke(IPC.renderClips, jobId, clipIds),
   deleteJob: (id) => ipcRenderer.invoke(IPC.deleteJob, id),
   deleteReel: (jobId, clipId) => ipcRenderer.invoke(IPC.deleteReel, jobId, clipId),
+  setClipHeart: (jobId, clipId, hearted) => ipcRenderer.invoke(IPC.setClipHeart, jobId, clipId, hearted),
+  deleteClips: (jobId, clipIds) => ipcRenderer.invoke(IPC.deleteClips, jobId, clipIds),
   setClipRange: (jobId, clipId, start, end) => ipcRenderer.invoke(IPC.setClipRange, jobId, clipId, start, end),
   openPath: (path) => ipcRenderer.invoke(IPC.openPath, path),
   openUploadPage: (platform) => ipcRenderer.invoke(IPC.openUploadPage, platform),

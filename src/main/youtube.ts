@@ -1,10 +1,11 @@
 import { app } from 'electron'
 import { createHash } from 'node:crypto'
-import { chmodSync, existsSync, mkdirSync, readdirSync, renameSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { YoutubeInfo } from '../shared/types'
 import { log } from './logger'
-import { ffmpegPaths, run } from './pipeline/run'
+import { getSettings } from './settings'
+import { ffmpegPaths, run, type RunOptions } from './pipeline/run'
 
 /** A web link for yt-dlp to try: YouTube, Facebook, TikTok, X, Instagram and many more sites. */
 export function isVideoUrl(source: string): boolean {
@@ -55,17 +56,92 @@ async function installYtDlp(dir: string, file: string): Promise<string> {
   return file
 }
 
+/** Facebook puts "916K views · 28K reactions | " in front of titles. */
+function cleanTitle(title: string | undefined): string | undefined {
+  const clean = title?.replace(/^\s*[\d.,]+\s*[KMB]?\s+(views|reactions|likes|plays)\b[^|]*\|\s*/i, '').trim()
+  return clean || title
+}
+
+/** The user's cookies.txt, copied here: yt-dlp rewrites the file it is given, and the original may move. */
+function cookiesFile(): string {
+  return join(app.getPath('userData'), 'engines', 'yt-dlp', 'cookies.txt')
+}
+
+/** Keeps a copy of a Netscape-format cookies.txt that has YouTube cookies; returns why not otherwise. */
+export function importCookies(path: string): string | null {
+  if (statSync(path).size > 5 * 1024 * 1024) return 'That file is too big to be a cookies.txt.'
+  const text = readFileSync(path, 'utf8')
+  // "#HttpOnly_" lines are cookies too, not comments.
+  const lines = text.split(/\r?\n/).filter((line) => line.trim() && (!line.startsWith('#') || line.startsWith('#HttpOnly_')))
+  if (lines.length === 0 || lines.some((line) => line.split('\t').length !== 7)) {
+    return 'That is not a cookies.txt file. Export one with a "cookies.txt" browser extension.'
+  }
+  if (!lines.some((line) => /^(#HttpOnly_)?\.?([\w-]+\.)*youtube\.com\t/.test(line))) {
+    return 'That file has no YouTube sign-in. Open youtube.com while signed in, then export the cookies again.'
+  }
+  mkdirSync(dirname(cookiesFile()), { recursive: true })
+  writeFileSync(cookiesFile(), text)
+  log.info('youtube', 'loaded a cookies.txt for signed-in downloads')
+  return null
+}
+
+/** Lets yt-dlp use the user's YouTube sign-in, when a browser or cookies file is chosen in Settings. */
+function cookieArgs(): string[] {
+  const source = getSettings().cookiesBrowser
+  if (source === 'file') return existsSync(cookiesFile()) ? ['--cookies', cookiesFile()] : []
+  return source ? ['--cookies-from-browser', source] : []
+}
+
+const NEEDS_SIGN_IN = /confirm your age|sign in to confirm|members-only|private video|login required/i
+
+/**
+ * Runs yt-dlp signed out first, and with the user's sign-in only when the site asks for one, so
+ * public videos never depend on the sign-in (e.g. Brave being open locks its cookies).
+ */
+async function runYtDlp(ytDlp: string, args: string[], opts: RunOptions): Promise<{ stdout: string; stderr: string }> {
+  try {
+    return await run(ytDlp, args, opts)
+  } catch (err) {
+    const signIn = cookieArgs()
+    if (signIn.length === 0 || !NEEDS_SIGN_IN.test(String(err))) throw explain(err)
+    return await run(ytDlp, [...signIn, ...args], opts).catch((retryErr: unknown) => {
+      throw explain(retryErr)
+    })
+  }
+}
+
+/** yt-dlp's errors for sign-in problems, said in a way the user can act on. */
+function explain(err: unknown): Error {
+  const message = err instanceof Error ? err.message : String(err)
+  const browser = getSettings().cookiesBrowser
+  // Not just /cookie/: the age-gate error itself says "use --cookies-from-browser".
+  if (/cookies? database|DPAPI|failed to decrypt/i.test(message) && browser && browser !== 'file') {
+    return new Error(`Sign-in needed: could not read ${browser}'s sign-in. Close ${browser} completely and check again, or pick Firefox.`)
+  }
+  if (NEEDS_SIGN_IN.test(message)) {
+    return new Error(
+      browser === 'file'
+        ? 'Sign-in needed: the cookies.txt has no working YouTube sign-in (it may have expired). Export a new one and load it.'
+        : browser
+        ? `Sign-in needed: ${browser} is not signed in to YouTube with an account that may watch this video.`
+        : 'Sign-in needed: this video is age-restricted or members-only.'
+    )
+  }
+  return err instanceof Error ? err : new Error(message)
+}
+
 /** Title, length and available qualities of a link, without downloading the video. */
 export async function youtubeInfo(url: string, signal?: AbortSignal): Promise<YoutubeInfo> {
   const ytDlp = await ytDlpPath()
-  const info = JSON.parse((await run(ytDlp, ['--no-playlist', '-J', '--', url], { signal })).stdout) as {
+  const output = await runYtDlp(ytDlp, ['--no-playlist', '-J', '--', url], { signal })
+  const info = JSON.parse(output.stdout) as {
     title?: string
     duration?: number
     formats?: { height?: number | null; vcodec?: string }[]
   }
   const heights = (info.formats ?? []).flatMap((f) => (f.height && f.vcodec !== 'none' ? [f.height] : []))
   return {
-    title: info.title ?? 'Online video',
+    title: cleanTitle(info.title) ?? 'Online video',
     durationMs: Math.round((info.duration ?? 0) * 1000),
     heights: [...new Set(heights)].sort((a, b) => b - a)
   }
@@ -87,7 +163,7 @@ export async function downloadYoutube(
 
   const title = knownTitle ?? (await youtubeInfo(url, signal)).title
 
-  await run(
+  await runYtDlp(
     ytDlp,
     [
       '--no-playlist',

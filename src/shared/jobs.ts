@@ -51,6 +51,8 @@ export interface Clip {
   end: number
   /** The AI's cut, kept once the user changes start/end by hand, so it can be restored. */
   original?: { start: number; end: number }
+  /** Marked as a keeper by the user; "Delete unhearted" spares it. */
+  hearted?: boolean
   title: string
   hook: string
   /**

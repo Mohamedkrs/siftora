@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { PALETTES, type StorageUsage, type Theme } from '../../../shared/types'
+import SignInPicker from '../components/SignInPicker'
 import { useDialog } from '../components/Dialog'
 import { formatBytes } from '../lib/format'
 import { useSettings } from '../state/settings'
@@ -276,6 +277,21 @@ export default function SettingsScreen() {
             </select>
           </label>
         </div>
+      </section>
+
+      <section className="card">
+        <h2>Video links</h2>
+        <label className="field">
+          Use my sign-in from
+          <span className="signin-actions">
+            <SignInPicker noneLabel="Nothing (signed out)" />
+          </span>
+        </label>
+        <p className="muted">
+          Needed for age-restricted or members-only videos. Firefox works best; Chrome, Edge and Brave must be
+          fully quit first and may still refuse. Otherwise export a cookies.txt on youtube.com with an extension
+          such as “Get cookies.txt LOCALLY”.
+        </p>
       </section>
 
       <StorageSection />

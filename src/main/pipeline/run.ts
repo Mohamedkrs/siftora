@@ -9,7 +9,7 @@ export class Cancelled extends Error {
   }
 }
 
-interface RunOptions {
+export interface RunOptions {
   cwd?: string
   signal?: AbortSignal
   /** Called for every line on stderr (progress output). */

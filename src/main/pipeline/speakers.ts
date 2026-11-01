@@ -39,10 +39,33 @@ export async function detectSpeakers(opts: {
 }
 
 /**
+ * Makes turns non-overlapping. sherpa-onnx can report one long turn for the main speaker that
+ * spans minutes, with the other speaker's short turns inside it; the long one would then win
+ * every line. Where turns overlap, the shortest (most specific) one covers that time.
+ */
+export function flatten(turns: Turn[]): Turn[] {
+  const points = [...new Set(turns.flatMap((turn) => [turn.start, turn.end]))].sort((a, b) => a - b)
+  const flat: Turn[] = []
+  for (let i = 0; i + 1 < points.length; i++) {
+    const [start, end] = [points[i], points[i + 1]]
+    let best: Turn | null = null
+    for (const turn of turns) {
+      if (turn.start <= start && turn.end >= end && (!best || turn.end - turn.start < best.end - best.start)) best = turn
+    }
+    if (!best) continue
+    const last = flat.at(-1)
+    if (last && last.speaker === best.speaker && last.end === start) last.end = end
+    else flat.push({ start, end, speaker: best.speaker })
+  }
+  return flat
+}
+
+/**
  * Gives each segment the speaker who overlaps it most. Speakers are ranked by total talk
  * time, so 0 = talks most (gets the first caption color). Returns the number of speakers.
  */
-export function assignSpeakers(segments: Segment[], turns: Turn[]): number {
+export function assignSpeakers(segments: Segment[], allTurns: Turn[]): number {
+  const turns = flatten(allTurns)
   const talk = new Map<string, number>()
   for (const turn of turns) talk.set(turn.speaker, (talk.get(turn.speaker) ?? 0) + turn.end - turn.start)
   const rank = new Map([...talk.entries()].sort((a, b) => b[1] - a[1]).map(([speaker], index) => [speaker, index]))

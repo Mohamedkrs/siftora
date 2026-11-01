@@ -5,7 +5,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { CATALOG, REACTION_MODEL_IDS, llamaTooOld, SPEAKER_MODEL_IDS } from '../shared/catalog'
 import { pickEngine } from '../shared/engines'
 import type { Clip, Job, JobOptions } from '../shared/jobs'
-import { IPC, type YoutubeChoice } from '../shared/types'
+import { IPC, type ClipLimits, type YoutubeChoice } from '../shared/types'
 import { downloadModels, enginePath, listModels, modelFilePath } from './downloads'
 import { readGgufInfo } from './gguf'
 import { log } from './logger'
@@ -91,7 +91,11 @@ function safeName(name: string): string {
   return name.replace(/[<>:"/\\|?*\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'video'
 }
 
-export function addJobs(sources: string[], links: Record<string, YoutubeChoice> = {}): Job[] {
+export function addJobs(
+  sources: string[],
+  links: Record<string, YoutubeChoice> = {},
+  limits: Record<string, ClipLimits> = {}
+): Job[] {
   const settings = getSettings()
   const options: JobOptions = {
     useVad: settings.useVad,
@@ -117,7 +121,11 @@ export function addJobs(sources: string[], links: Record<string, YoutubeChoice> 
         videoPath: url ? null : source,
         title,
         createdAt: Date.now(),
-        options: link ? { ...options, youtubeMaxHeight: link.height } : options,
+        options: {
+          ...options,
+          ...(Object.hasOwn(limits, source) ? limits[source] : {}),
+          ...(link ? { youtubeMaxHeight: link.height } : {})
+        },
         stage: 'queued',
         progress: 0,
         clips: [],
@@ -187,7 +195,6 @@ export function retryJob(id: string): void {
   void work()
 }
 
-/** "Find moments again": keep audio/transcript/speakers, redo discovery. */
 /** Rewrites the titles, captions and descriptions of a video's clips; the clips themselves stay. */
 export function rewritePosts(id: string): void {
   const job = jobs.get(id)
@@ -197,6 +204,7 @@ export function rewritePosts(id: string): void {
   void work()
 }
 
+/** "Find moments again": keep audio/transcript/speakers, redo discovery. */
 export function findAgain(id: string): void {
   const job = jobs.get(id)
   if (!job || job.stage !== 'done') return
@@ -321,8 +329,8 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
   // 4. Speakers (cached, optional; in 'clip' mode they are found per clip at render)
   if (job.options.speakers && job.options.speakersWhen !== 'clip') {
     const speakersFile = join(dir, 'speakers.json')
-    const cached = readJson<{ count: number; speakers: (number | null)[] }>(speakersFile)
-    if (cached) {
+    const cached = readJson<{ count: number; speakers: (number | null)[]; version?: number }>(speakersFile)
+    if (cached?.version === SPEAKERS_VERSION) {
       transcript.segments.forEach((segment, i) => {
         if (cached.speakers[i] !== null) segment.speaker = cached.speakers[i] as number
       })
@@ -336,7 +344,10 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
         'Listening for who speaks when — this takes a few minutes…'
       )
       const count = assignSpeakers(transcript.segments, turns)
-      writeFileSync(speakersFile, JSON.stringify({ count, speakers: transcript.segments.map((s) => s.speaker ?? null) }))
+      writeFileSync(
+        speakersFile,
+        JSON.stringify({ count, speakers: transcript.segments.map((s) => s.speaker ?? null), version: SPEAKERS_VERSION })
+      )
       update(job, { speakerCount: count })
     }
   }
@@ -440,6 +451,9 @@ function videoContext(title: string, dir: string): string {
     .join('\n')
 }
 
+/** Bump when speaker assignment changes, so saved results are redone (2: overlapping turns). */
+const SPEAKERS_VERSION = 2
+
 async function speakerTurns(
   wav: string,
   signal: AbortSignal,
@@ -464,7 +478,7 @@ async function clipSpeakers(
   onMessage: (message: string) => void
 ): Promise<void> {
   const dir = join(jobDir(job.id), 'speakers')
-  const file = join(dir, `${clip.id}-${clip.start}-${clip.end}.json`)
+  const file = join(dir, `${clip.id}-${clip.start}-${clip.end}-v${SPEAKERS_VERSION}.json`)
   const inClip = segments.filter((s) => s.end > clip.start && s.start < clip.end)
   const cached = readJson<(number | null)[]>(file)
   if (cached) {
@@ -543,6 +557,28 @@ export async function deleteReel(jobId: string, clipId: string): Promise<void> {
   if (path && existsSync(path) && isInside(path, job.outputDir)) await shell.trashItem(path)
   clip.render = { status: 'idle', progress: 0 }
   update(job)
+}
+
+export function setClipHeart(jobId: string, clipId: string, hearted: boolean): void {
+  const job = jobs.get(jobId)
+  const clip = job?.clips.find((c) => c.id === clipId)
+  if (!job || !clip) return
+  clip.hearted = hearted || undefined
+  update(job)
+}
+
+/** Removes found moments; their rendered reels go to the Recycle Bin / Trash. Clips being rendered stay. */
+export async function deleteClips(jobId: string, clipIds: string[]): Promise<void> {
+  const job = jobs.get(jobId)
+  if (!job) return
+  const gone = job.clips.filter(
+    (clip) => clipIds.includes(clip.id) && clip.render.status !== 'queued' && clip.render.status !== 'rendering'
+  )
+  for (const clip of gone) {
+    const path = clip.render.path
+    if (clip.render.status === 'done' && path && existsSync(path) && isInside(path, job.outputDir)) await shell.trashItem(path)
+  }
+  update(job, { clips: job.clips.filter((clip) => !gone.includes(clip)) })
 }
 
 /** Shortest clip a user can trim to. */
