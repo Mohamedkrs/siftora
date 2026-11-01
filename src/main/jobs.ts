@@ -7,6 +7,7 @@ import { pickEngine } from '../shared/engines'
 import type { Clip, Job, JobOptions } from '../shared/jobs'
 import { IPC, type ClipLimits, type YoutubeChoice } from '../shared/types'
 import { downloadModels, enginePath, listModels, modelFilePath } from './downloads'
+import { logFeedback } from './feedback'
 import { readGgufInfo } from './gguf'
 import { log } from './logger'
 import { findMoments, ollamaClient, startLlamaServer, writePosts, type LlmClient } from './pipeline/discover'
@@ -407,6 +408,7 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
       minClipSeconds: job.options.minClipSeconds,
       maxClipSeconds: job.options.maxClipSeconds,
       minScore: job.options.minScore,
+      videoContext: videoContext(job.title, dir),
       replay: readJson<{ heatmap?: { start_time: number; end_time: number; value: number }[] }>(
         join(dir, 'video.info.json')
       )?.heatmap?.map((p) => ({ start: p.start_time * 1000, end: p.end_time * 1000, value: p.value })),
@@ -424,6 +426,7 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
     })
     writeFileSync(join(dir, 'clips.json'), JSON.stringify(clips))
     update(job, { clips, rewritePosts: undefined })
+    if (!rewriteOnly) logFeedback(job, 'found', clips)
   } finally {
     client.close()
   }
@@ -565,6 +568,7 @@ export function setClipHeart(jobId: string, clipId: string, hearted: boolean): v
   if (!job || !clip) return
   clip.hearted = hearted || undefined
   update(job)
+  logFeedback(job, hearted ? 'heart' : 'unheart', [clip])
 }
 
 /** Removes found moments; their rendered reels go to the Recycle Bin / Trash. Clips being rendered stay. */
@@ -578,6 +582,7 @@ export async function deleteClips(jobId: string, clipIds: string[]): Promise<voi
     const path = clip.render.path
     if (clip.render.status === 'done' && path && existsSync(path) && isInside(path, job.outputDir)) await shell.trashItem(path)
   }
+  logFeedback(job, 'delete', gone) // before removing, so the rank is still known
   update(job, { clips: job.clips.filter((clip) => !gone.includes(clip)) })
 }
 
@@ -608,6 +613,7 @@ export function setClipRange(jobId: string, clipId: string, start: number, end: 
   const spoken = words.filter((word) => word.start >= from && word.end <= to)
   if (spoken.length > 0) clip.text = spoken.map((word) => word.text.trim()).join(' ')
   update(job)
+  logFeedback(job, 'trim', [clip])
 }
 
 async function renderNext(): Promise<void> {
@@ -680,6 +686,7 @@ async function renderOne(job: Job, clip: Clip): Promise<void> {
       range: rangeKey(clip),
       at: Date.now()
     }
+    logFeedback(job, 'render', [clip])
   } catch (err) {
     log.error('render', `${job.title} / ${clip.title}: ${String(err)}`)
     clip.render = { status: 'error', progress: 0, error: err instanceof Error ? err.message : String(err) }

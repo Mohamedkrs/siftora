@@ -52,6 +52,13 @@ interface Moment {
   scores: ClipScores
 }
 
+/**
+ * Bump when the finder's prompt or scoring changes; saved with each found moment so
+ * scripts/eval-clips.mjs can compare versions (2: reasons before choosing edges, video context, skip ads).
+ */
+export const FINDER_VERSION = 2
+
+// Fields are generated in this order: the reasoning comes before the edges and scores it justifies.
 const SCHEMA = {
   type: 'object',
   properties: {
@@ -60,14 +67,14 @@ const SCHEMA = {
       items: {
         type: 'object',
         properties: {
-          start_id: { type: 'integer' },
-          end_id: { type: 'integer' },
-          title: { type: 'string' },
-          hook: { type: 'string' },
-          category: { type: 'string', enum: ['funny', 'educational', 'controversial', 'emotional', 'surprising', 'conversation'] },
           rationale: { type: 'string' },
           payoff_quote: { type: 'string' },
+          start_id: { type: 'integer' },
+          end_id: { type: 'integer' },
           needs_earlier_context: { type: 'boolean' },
+          category: { type: 'string', enum: ['funny', 'educational', 'controversial', 'emotional', 'surprising', 'conversation'] },
+          title: { type: 'string' },
+          hook: { type: 'string' },
           scores: {
             type: 'object',
             properties: Object.fromEntries(
@@ -77,14 +84,14 @@ const SCHEMA = {
           }
         },
         required: [
-          'start_id',
-          'end_id',
-          'title',
-          'hook',
-          'category',
           'rationale',
           'payoff_quote',
+          'start_id',
+          'end_id',
           'needs_earlier_context',
+          'category',
+          'title',
+          'hook',
           'scores'
         ]
       }
@@ -96,6 +103,8 @@ const SCHEMA = {
 function systemPrompt(minS: number, maxS: number): string {
   return `You are an expert short-form video editor. You find moments in a video transcript that work as standalone TikTok / Instagram Reels / YouTube Shorts clips of ${minS}-${maxS} seconds.
 
+The message starts with what the video is (title, channel, description, tags), when known. Use it to understand the format (a challenge, an interview, a stream…) and who is talking; it is not part of the transcript.
+
 Transcript lines look like: [id] (m:ss) S1: text   (S1, S2… = speaker, when known)
 A line may end with sound markers: (laughter), (cheering), (shouting), (crying), (gasp). That sound was heard right there. Laughter and cheering mean a joke or payoff landed; gasps, shouting and crying mark surprise or strong emotion. Markers are not spoken text; never copy them into payoff_quote.
 
@@ -106,7 +115,13 @@ A good moment:
 - is understandable by someone who has not seen the rest of the video;
 - starts and ends at complete sentences.
 
+Never pick:
+- sponsor reads, ads and product plugs;
+- intros, outros, "like and subscribe", channel news and other housekeeping;
+- reading out donations, chat or comments, unless the reaction to them is the moment.
+
 Rules:
+- Fill the fields in order: first rationale (what happens and why it works as a clip) and payoff_quote, then choose start_id and end_id to fit them.
 - Swearing, shouting or a single funny word alone is NOT a hook or a payoff.
 - payoff_quote: copy 3-12 words of the payoff EXACTLY as they appear in the transcript lines you selected. If you cannot, the moment has no real payoff — do not return it.
 - needs_earlier_context: true if the clip only makes sense with something said just before start_id.
@@ -319,6 +334,8 @@ export async function findMoments(opts: {
   minClipSeconds: number
   maxClipSeconds: number
   minScore: number
+  /** What the video is: title, channel, description, tags. */
+  videoContext?: string
   /** YouTube links only, and only when YouTube has enough views to show it. */
   replay?: ReplayPoint[]
   /** Reaction levels per SLICE_MS of audio, when reaction detection ran. */
@@ -351,12 +368,13 @@ export async function findMoments(opts: {
     opts.onProgress(w / windows)
     if (lines.length === 0) continue
 
-    const user = lines
+    const transcript = lines
       .map(
         (s) =>
           `[${s.id}] (${clock(s.start)}) ${hasSpeakers && s.speaker !== undefined ? `S${s.speaker + 1}: ` : ''}${s.text}${markers(s)}`
       )
       .join('\n')
+    const user = opts.videoContext ? `${opts.videoContext}\n\nTranscript:\n${transcript}` : transcript
     let moments: Moment[] = []
     try {
       moments = (JSON.parse(await opts.client.chat(system, user)) as { moments: Moment[] }).moments ?? []
