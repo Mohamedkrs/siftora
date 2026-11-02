@@ -2460,3 +2460,23 @@ option {
 .share-text {
   resize: vertical;
 }
+
+.kofi-note {
+  text-align: center;
+}
+
+.kofi-button {
+  display: block;
+  width: fit-content;
+  margin: 0 auto;
+  border-radius: 12px;
+  transition: transform 0.15s;
+}
+
+.kofi-button:hover {
+  transform: translateY(-1px);
+}
+
+.kofi-button img {
+  display: block;
+}

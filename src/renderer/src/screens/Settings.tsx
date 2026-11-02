@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { PALETTES, type StorageUsage, type Theme } from '../../../shared/types'
+import kofiButton from '../../../../resources/brand/support-kofi.svg'
 import NumberField from '../components/NumberField'
 import SignInPicker from '../components/SignInPicker'
 import { useDialog } from '../components/Dialog'
@@ -322,13 +323,10 @@ export default function SettingsScreen() {
         ) : (
           <p className="muted">Loading…</p>
         )}
-        <p className="muted">
-          Siftora is free, with no ads or accounts. If it saves you time,{' '}
-          <a href="https://ko-fi.com/mohamedkrs" target="_blank" rel="noreferrer">
-            support it on Ko-fi ☕
-          </a>
-          .
-        </p>
+        <p className="muted kofi-note">Siftora is free, with no ads or accounts. If it saves you time, you can support it.</p>
+        <a className="kofi-button" href="https://ko-fi.com/mohamedkrs" target="_blank" rel="noreferrer">
+          <img src={kofiButton} alt="Buy me a coffee on Ko-fi" height={48} />
+        </a>
       </section>
     </div>
   )

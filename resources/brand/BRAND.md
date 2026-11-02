@@ -14,6 +14,7 @@
 | `siftora-horizontal-small.svg` / `-small-on-dark.svg` | Same with the simpler symbol, for small sizes such as the app's sidebar |
 | `siftora-stacked.svg` | Symbol above the wordmark |
 | `favicon.ico` | 16/32/48 px, from the small version |
+| `download-windows.svg` / `support-kofi.svg` | README buttons: download the installer, and buy me a coffee on Ko-fi (ink with an orange outline, so it shows on light and dark pages) |
 
 ## Colours
 

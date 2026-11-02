@@ -9,9 +9,9 @@
 
 <p align="center">
   <a href="../../releases/latest/download/Siftora-Setup.exe"><img src="resources/brand/download-windows.svg" alt="Download for Windows" height="60"></a>
+  &nbsp;
+  <a href="https://ko-fi.com/mohamedkrs"><img src="resources/brand/support-kofi.svg" alt="Buy me a coffee on Ko-fi" height="60"></a>
 </p>
-
-<p align="center">Free, no ads, no accounts · <a href="https://ko-fi.com/mohamedkrs">☕ Support on Ko-fi</a></p>
 
 Siftora is a free desktop app that turns long videos (podcasts, streams, interviews, vlogs) into vertical clips for TikTok, Instagram Reels and YouTube Shorts. It transcribes the video, finds the moments with a hook, a setup and a payoff, and renders them as 1080×1920 reels with animated captions.
 
@@ -132,7 +132,9 @@ The original design notes are in [docs/planning](docs/planning).
 
 ## Support Siftora
 
-Siftora is free, with no ads, accounts or subscriptions. If it saves you editing time, you can [buy me a coffee on Ko-fi](https://ko-fi.com/mohamedkrs) ☕. No account needed. Testing on other computers helps just as much: see [Tested on](#tested-on).
+Siftora is free, with no ads, accounts or subscriptions. If it saves you editing time, you can buy me a coffee on Ko-fi (no account needed). Testing on other computers helps just as much: see [Tested on](#tested-on).
+
+<a href="https://ko-fi.com/mohamedkrs"><img src="resources/brand/support-kofi.svg" alt="Buy me a coffee on Ko-fi" height="48"></a>
 
 ## Contributing
 
