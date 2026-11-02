@@ -107,6 +107,8 @@ if (!app.requestSingleInstanceLock()) {
   app
     .whenReady()
     .then(() => {
+      // macOS takes the Dock icon from the app bundle, which in dev is Electron's.
+      if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(appIcon())
       protocol.handle('siftora-media', serveMedia)
       registerIpc()
       loadJobs()
