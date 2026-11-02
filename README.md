@@ -42,7 +42,7 @@ Everything runs on your own computer. Your videos and transcripts are never uplo
 
 ## How to use it
 
-1. **Create:** drop in a video or paste a link, then **Find clips**. Add as many as you like; the sidebar shows how many are still to do.
+1. **Create:** drop in a video or paste a link, then **Find clips**. Add as many as you like; the sidebar shows how many are still to do. If you add a video Siftora already has, it offers to open its results instead (or add it again anyway).
 2. **Queue:** follow the progress. Finished steps are saved, so a retry does not start over.
 3. **Results:** review the clips by score, pick a caption style and layout, and render the reels. They are saved in `Videos\Siftora`.
 
@@ -71,6 +71,27 @@ Your rendered reels are never deleted by either.
 |---|---|---|---|
 | Status | Tested | Should work, untested | Not ready yet |
 | Fast transcription | NVIDIA GPU | CPU only for now | Needs our own build (planned) |
+
+### Tested on
+
+So far Siftora has been tested on one computer:
+
+| | |
+|---|---|
+| System | Windows 11 Pro, 64-bit |
+| Processor | Intel Core i9-11900KF (8 cores) |
+| Memory | 16 GB |
+| Graphics | NVIDIA GeForce RTX 4060 Ti, 16 GB (driver 621) |
+
+**More testing is needed**, especially on:
+
+- graphics cards with less memory (6–8 GB) and older NVIDIA cards
+- AMD and Intel graphics (Vulkan), and computers without a graphics card (CPU only)
+- 8 GB of RAM
+- Windows 10
+- Linux and macOS
+
+If you try it on another setup, please fill in a [test report](../../issues/new?template=test_report.yml): your computer, which models you used, how long a video took and how it went, even if everything worked.
 
 ## Building from source
 

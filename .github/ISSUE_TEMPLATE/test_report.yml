@@ -1,0 +1,79 @@
+name: Test report
+description: You tried Siftora on your computer. Tell us how it went, even if everything worked.
+labels: [test report]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks! Only your computer's specs and how it went are required; the rest helps if you know it. Reports from different computers show where Siftora works well and what needs fixing. If something broke, a bug report is better.
+  - type: input
+    id: version
+    attributes:
+      label: Siftora version
+      description: Shown in Settings → About.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: System
+      placeholder: Windows 11, Windows 10, Ubuntu 24.04…
+    validations:
+      required: true
+  - type: input
+    id: cpu
+    attributes:
+      label: Processor
+      placeholder: Intel Core i5-10400, AMD Ryzen 7 5800X…
+    validations:
+      required: true
+  - type: input
+    id: ram
+    attributes:
+      label: Memory (RAM)
+      placeholder: 16 GB
+    validations:
+      required: true
+  - type: input
+    id: gpu
+    attributes:
+      label: Graphics card and its memory
+      placeholder: NVIDIA RTX 3060 12 GB, AMD RX 6600 8 GB, none…
+    validations:
+      required: true
+  - type: dropdown
+    id: runs-on
+    attributes:
+      label: What Siftora ran on
+      description: Shown on Create under "How Siftora will work".
+      options:
+        - NVIDIA GPU
+        - Vulkan (AMD or Intel GPU)
+        - CPU
+        - Not sure
+  - type: input
+    id: models
+    attributes:
+      label: Models used
+      description: Shown on Create under "How Siftora will work".
+      placeholder: Whisper Large v3 Turbo, Qwen3.5 9B
+  - type: textarea
+    id: timing
+    attributes:
+      label: How long it took
+      description: Video length and how long each video took from Find clips to done. Rendering a reel too, if you did.
+      placeholder: A 1-hour podcast took 9 minutes. Rendering a 45-second reel took 20 seconds.
+  - type: dropdown
+    id: result
+    attributes:
+      label: How did it go?
+      options:
+        - Everything worked
+        - Worked, with small problems
+        - Did not work
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Were the clips good? Anything slow, confusing or broken? Settings like speaker or reaction detection you turned on.
