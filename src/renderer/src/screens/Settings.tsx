@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { PALETTES, type StorageUsage, type Theme } from '../../../shared/types'
+import NumberField from '../components/NumberField'
 import SignInPicker from '../components/SignInPicker'
 import { useDialog } from '../components/Dialog'
 import { formatBytes } from '../lib/format'
@@ -229,27 +230,24 @@ export default function SettingsScreen() {
       <section className="card">
         <h2>Clips</h2>
         <div className="field-grid">
-          <label className="field">
-            Minimum length (seconds)
-            <input
-              type="number"
-              min={1}
-              max={3600}
-              value={settings.minClipSeconds}
-              onChange={(event) => updateNumber('minClipSeconds', event.target.value)}
-            />
-          </label>
+          <NumberField
+            label="Minimum length (seconds)"
+            value={settings.minClipSeconds}
+            min={1}
+            max={settings.maxClipSeconds}
+            tooBig={`Can't be longer than the maximum (${settings.maxClipSeconds} s).`}
+            onCommit={(minClipSeconds) => update({ minClipSeconds })}
+          />
 
-          <label className="field">
-            Maximum length (seconds)
-            <input
-              type="number"
-              min={1}
-              max={3600}
-              value={settings.maxClipSeconds}
-              onChange={(event) => updateNumber('maxClipSeconds', event.target.value)}
-            />
-          </label>
+          <NumberField
+            label="Maximum length (seconds)"
+            value={settings.maxClipSeconds}
+            min={settings.minClipSeconds}
+            max={3600}
+            tooSmall={`Can't be shorter than the minimum (${settings.minClipSeconds} s).`}
+            tooBig="At most 3600 (an hour)."
+            onCommit={(maxClipSeconds) => update({ maxClipSeconds })}
+          />
 
           <label className="field">
             Minimum score — {settings.minScore.toFixed(1)}

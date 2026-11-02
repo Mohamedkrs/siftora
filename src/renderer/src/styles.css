@@ -105,6 +105,108 @@ select {
   outline-offset: 2px;
 }
 
+/* One look for every dropdown: theme colours, a themed chevron instead of the system arrow. */
+select {
+  appearance: none;
+  min-height: 34px;
+  padding: 6px 32px 6px 10px;
+  background-color: var(--sunken);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    right 15px center,
+    right 10px center;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+
+select:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background-color: var(--raised);
+}
+
+select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+option {
+  background: var(--panel);
+  color: var(--text);
+}
+
+/* Chromium's customizable select: the open list itself follows the theme too. */
+@supports (appearance: base-select) {
+  select,
+  ::picker(select) {
+    appearance: base-select;
+  }
+
+  select::picker-icon {
+    display: none; /* the chevron above stays */
+  }
+
+  ::picker(select) {
+    margin-top: 4px;
+    padding: 4px;
+    background: var(--panel);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    transition:
+      opacity 0.12s,
+      overlay 0.12s allow-discrete,
+      display 0.12s allow-discrete;
+  }
+
+  ::picker(select):popover-open {
+    opacity: 1;
+  }
+
+  @starting-style {
+    ::picker(select):popover-open {
+      opacity: 0;
+    }
+  }
+
+  option {
+    padding: 7px 10px;
+    border-radius: 6px;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  option:hover,
+  option:focus-visible {
+    outline: none;
+    background: var(--raised-hover);
+  }
+
+  option:checked {
+    color: var(--accent-text);
+    font-weight: 600;
+  }
+
+  option::checkmark {
+    color: var(--accent);
+  }
+}
+
 .app {
   display: flex;
   height: 100%;
@@ -139,7 +241,9 @@ select {
 }
 
 .nav-link {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 9px 12px;
   border-radius: 8px;
   color: var(--muted);
@@ -149,6 +253,22 @@ select {
 
 .nav-link:hover {
   background: var(--raised);
+  color: var(--text);
+}
+
+.nav-count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+}
+
+.added-note {
   color: var(--text);
 }
 
@@ -343,15 +463,27 @@ select {
   font-size: 12px;
 }
 
-.field input[type='text'],
-.field input[type='number'],
 .field select {
+  width: 100%;
+}
+
+.field input[type='text'],
+.field input[type='number'] {
   width: 100%;
   padding: 8px 10px;
   background: var(--sunken);
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text);
+}
+
+.field input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.field-error {
+  color: var(--danger);
+  font-size: 12px;
 }
 
 .field input[type='range'] {
@@ -1576,11 +1708,6 @@ select {
 
 .video-row-quality {
   flex-shrink: 0;
-  padding: 6px 8px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
 }
 
 .video-row-text {

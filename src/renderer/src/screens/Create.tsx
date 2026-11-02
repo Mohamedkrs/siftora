@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { CATALOG, REACTION_MODEL_IDS, llamaTooOld, SPEAKER_MODEL_IDS } from '../../../shared/catalog'
 import { DEFAULT_YOUTUBE_HEIGHT, mediaUrl } from '../../../shared/jobs'
 import type { ClipLimits, YoutubeChoice, YoutubeInfo } from '../../../shared/types'
+import NumberField from '../components/NumberField'
 import SignInPicker from '../components/SignInPicker'
 import VideoCard from '../components/VideoCard'
 import { formatBytes, formatClock } from '../lib/format'
@@ -95,33 +96,26 @@ function limitsText(limits: ClipLimits): string {
 /** Clip length and minimum score; on Create's side panel for all videos, or on one video's row. */
 function ClipLimitFields(props: { limits: ClipLimits; onChange: (next: Partial<ClipLimits>) => void }) {
   const { limits, onChange } = props
-  const seconds = (key: 'minClipSeconds' | 'maxClipSeconds', value: string): void => {
-    const number = Number(value)
-    if (Number.isFinite(number) && number > 0) onChange({ [key]: number })
-  }
   return (
     <>
       <div className="clip-length">
-        <label className="field">
-          Shortest (s)
-          <input
-            type="number"
-            min={5}
-            max={limits.maxClipSeconds}
-            value={limits.minClipSeconds}
-            onChange={(event) => seconds('minClipSeconds', event.target.value)}
-          />
-        </label>
-        <label className="field">
-          Longest (s)
-          <input
-            type="number"
-            min={limits.minClipSeconds}
-            max={600}
-            value={limits.maxClipSeconds}
-            onChange={(event) => seconds('maxClipSeconds', event.target.value)}
-          />
-        </label>
+        <NumberField
+          label="Shortest (s)"
+          value={limits.minClipSeconds}
+          min={1}
+          max={limits.maxClipSeconds}
+          tooBig={`Can't be longer than the longest (${limits.maxClipSeconds} s).`}
+          onCommit={(minClipSeconds) => onChange({ minClipSeconds })}
+        />
+        <NumberField
+          label="Longest (s)"
+          value={limits.maxClipSeconds}
+          min={limits.minClipSeconds}
+          max={3600}
+          tooSmall={`Can't be shorter than the shortest (${limits.minClipSeconds} s).`}
+          tooBig="At most 3600 (an hour)."
+          onCommit={(maxClipSeconds) => onChange({ maxClipSeconds })}
+        />
       </div>
       <label className="field">
         Keep clips scoring at least {Math.round(limits.minScore * 10)}
@@ -279,6 +273,8 @@ export default function Create() {
   const [url, setUrl] = useState('')
   const [urlError, setUrlError] = useState('')
   const [starting, setStarting] = useState(false)
+  /** How many videos the last "Find clips" queued; shown until more are added. */
+  const [added, setAdded] = useState(0)
 
   const speakersInstalled = SPEAKER_MODEL_IDS.every((id) => models[id]?.status === 'installed')
   const reactionsInstalled = REACTION_MODEL_IDS.every((id) => models[id]?.status === 'installed')
@@ -383,8 +379,8 @@ export default function Create() {
       Object.fromEntries(videos.flatMap((video) => (limits[video] ? [[video, limits[video]]] : [])))
     )
       .then(() => {
+        setAdded(videos.length)
         setVideos([])
-        navigate('/queue')
       })
       .finally(() => setStarting(false))
   }
@@ -641,6 +637,42 @@ export default function Create() {
                   </span>
                 </span>
               </label>
+              <label className="toggle">
+                <input
+                  type="checkbox"
+                  checked={settings.readComments}
+                  onChange={(event) => update({ readComments: event.target.checked })}
+                />
+                <span>
+                  <strong>Read viewers' comments</strong>
+                  <span className="muted">
+                    YouTube links only. Comments like “14:22 I lost it” show what viewers loved, so titles and
+                    descriptions hit the right angle. Makes the download slower (about a minute per 1,000 comments)
+                    and needs a video with timestamped comments to help.
+                  </span>
+                </span>
+              </label>
+              {settings.readComments ? (
+                <div className="video-row-limit-fields">
+                  <NumberField
+                    label="How many"
+                    value={settings.commentsMax}
+                    min={20}
+                    max={5000}
+                    onCommit={(commentsMax) => update({ commentsMax })}
+                  />
+                  <label className="field">
+                    Which ones
+                    <select
+                      value={settings.commentsSort}
+                      onChange={(event) => update({ commentsSort: event.target.value === 'new' ? 'new' : 'top' })}
+                    >
+                      <option value="top">Top (most liked)</option>
+                      <option value="new">Newest</option>
+                    </select>
+                  </label>
+                </div>
+              ) : null}
             </div>
             <p className="muted small">Each video keeps the settings it was added with.</p>
           </section>
@@ -648,8 +680,12 @@ export default function Create() {
       </div>
 
       <div className="start-bar">
-        <span className="muted">
-          {videos.length === 0
+        <span className="muted" role="status">
+          {videos.length === 0 && added > 0 ? (
+            <span className="added-note">
+              ✓ {added === 1 ? 'Video added' : `${added} videos added`} to the queue. <Link to="/queue">View queue</Link>
+            </span>
+          ) : videos.length === 0
             ? 'Add a video to start.'
             : [
                 `${videos.length} ${videos.length === 1 ? 'video' : 'videos'}`,

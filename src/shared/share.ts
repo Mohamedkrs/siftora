@@ -45,16 +45,17 @@ export function shareText(clip: Clip, platform: SharePlatform): { title?: string
   // Never the hook: it is a raw transcript quote, not something to post.
   const caption = clip.caption?.trim() || clip.title
   const description = clip.description?.trim()
+  const credit = clip.credit ? `🎥 ${clip.credit}` : undefined
   const body = (lines: (string | undefined)[]): string => lines.filter(Boolean).join('\n\n')
   if (platform === 'youtube') {
     return {
       title: cut(clip.title, YOUTUBE_TITLE_MAX),
-      text: body([description ?? caption, hashtags([...tags, 'shorts'])])
+      text: body([description ?? caption, credit, hashtags([...tags, 'shorts'])])
     }
   }
   if (platform === 'tiktok') {
     // TikTok shows the first line in the feed: lead with the caption.
-    return { text: cut(`${caption} ${hashtags([...tags, 'fyp'])}`, CAPTION_MAX) }
+    return { text: cut(`${caption}${credit ? ` ${credit}` : ''} ${hashtags([...tags, 'fyp'])}`, CAPTION_MAX) }
   }
-  return { text: cut(body([caption, description, hashtags([...tags, 'reels'].slice(0, INSTAGRAM_TAGS_MAX))]), CAPTION_MAX) }
+  return { text: cut(body([caption, description, credit, hashtags([...tags, 'reels'].slice(0, INSTAGRAM_TAGS_MAX))]), CAPTION_MAX) }
 }

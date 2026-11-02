@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { createHash } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import type { JobOptions } from '../shared/jobs'
 import type { YoutubeInfo } from '../shared/types'
 import { log } from './logger'
 import { getSettings } from './settings'
@@ -12,6 +13,15 @@ export function isVideoUrl(source: string): boolean {
   try {
     const url = new URL(source.trim())
     return url.protocol === 'https:' || url.protocol === 'http:'
+  } catch {
+    return false
+  }
+}
+
+/** Only YouTube gets comments: other sites' extractors may have no cap on how many they fetch. */
+export function isYoutubeUrl(source: string): boolean {
+  try {
+    return /(^|\.)youtube\.com$|^youtu\.be$/.test(new URL(source.trim()).hostname)
   } catch {
     return false
   }
@@ -155,7 +165,8 @@ export async function downloadYoutube(
   signal: AbortSignal,
   onProgress: (progress: number, message?: string) => void,
   /** Known from the check on Create; saves asking the site again. */
-  knownTitle?: string
+  knownTitle?: string,
+  comments?: JobOptions['comments']
 ): Promise<{ path: string; title: string }> {
   onProgress(0, 'Preparing the video downloader…')
   const ytDlp = await ytDlpPath()
@@ -172,6 +183,10 @@ export async function downloadYoutube(
       '-f', maxHeight > 0 ? `bv*[height<=${maxHeight}]+ba/b[height<=${maxHeight}]/b` : 'bv*+ba/b',
       '--merge-output-format', 'mp4',
       '--write-info-json', // video.info.json: has YouTube's "Most replayed" heatmap
+      // Top-level comments only, into video.info.json.
+      ...(comments
+        ? ['--write-comments', '--extractor-args', `youtube:comment_sort=${comments.sort};max_comments=${comments.max},all,0`]
+        : []),
       '-o', join(dir, 'video.%(ext)s'),
       url
     ],

@@ -19,10 +19,13 @@ Everything runs on your own computer. Your videos and transcripts are never uplo
 
 - **Finds the moments for you.** A local AI model reads the whole transcript and picks clips with a real payoff, scored and explained. It is told to start where the setup starts, not to treat swearing as a hook, and to quote the payoff word for word, so clips are not cut off or invented.
 - **Accurate captions.** Word-by-word timing from Whisper, voice detection so silence and music do not turn into made-up lines, and four caption fonts with an optional highlight on the spoken word.
+- **Hears the room.** Optional reaction detection picks up laughter, applause and cheering, and YouTube's "Most replayed" graph gives a boost to the parts viewers rewatch.
 - **Colour per speaker.** Optional speaker detection gives each person their own caption colour.
-- **Preview before you render.** Pick the caption style and layout on a real frame of your clip, drag the captions where you want them, then render one reel or all of them.
+- **Review fast.** Filter moments by topic (funny, emotional, educational…), heart the keepers, delete the rest in one click, and nudge a clip's start and end.
+- **Preview before you render.** Pick the caption style and layout on a real frame of your clip, drag the captions where you want them (or turn them off), then render one reel or all of them.
+- **Ready to post.** Each rendered reel comes with a title, description and hashtags per platform.
 - **Uses what you already have.** Finds Ollama, Python Whisper, FFmpeg and model files on your computer, so you download as little as possible.
-- **Files or YouTube links.**
+- **Files or links.** YouTube, Facebook, TikTok, X, Instagram and the many other sites [yt-dlp](https://github.com/yt-dlp/yt-dlp) supports. Clip length and score limits can be set for all videos or per video.
 
 ## Requirements
 
@@ -39,16 +42,20 @@ Everything runs on your own computer. Your videos and transcripts are never uplo
 
 ## How to use it
 
-1. **Create:** drop in a video or paste a YouTube link, then **Find clips**.
+1. **Create:** drop in a video or paste a link, then **Find clips**.
 2. **Queue:** follow the progress. Finished steps are saved, so a retry does not start over.
 3. **Results:** review the clips by score, pick a caption style and layout, and render the reels. They are saved in `Videos\Siftora`.
+
+Age-restricted or members-only videos need your sign-in: in **Settings → Video links**, choose the browser you are signed in with (Firefox works best; Chrome-based browsers must be closed) or load a `cookies.txt` file. Siftora only uses it when a site asks for it.
 
 Scores are estimates to help you choose. They do not guarantee that a clip will do well.
 
 ## Privacy
 
 - Your videos, transcripts and clips **never leave your computer**. There is no account, no tracking and no analytics.
-- Siftora goes online only to download its engines and AI models (from GitHub and Hugging Face), to check for engine updates, and to download YouTube videos you add.
+- Siftora goes online only to download its engines and AI models (from GitHub and Hugging Face), to check for engine updates, and to download the videos you add by link.
+- If you choose a sign-in for video links, your browser's cookies (or your `cookies.txt`) are passed to yt-dlp on your computer, and only sent to the site of the video.
+- What you do with found moments (hearts, deletes, trims, renders) is written to `feedback.jsonl` in the app's data folder, so you can measure how good the picks are. It stays there.
 - If you point Ollama at another computer (its `OLLAMA_HOST` setting), transcripts are sent to that computer for the clip-finding step.
 
 ## Removing Siftora
@@ -75,7 +82,11 @@ npm run dev
 
 Also available: `npm run typecheck`, `npm run build`, and `npm run dist` to build the installer into `release/`. If Electron starts as plain Node from a VS Code terminal, unset `ELECTRON_RUN_AS_NODE`.
 
-The app is Electron, React and TypeScript. The work happens in `src/main/pipeline`: transcription (`transcribe.ts`), speaker detection (`speakers.ts`), finding moments (`discover.ts`) and rendering (`render.ts`).
+The app is Electron, React and TypeScript. The work happens in `src/main/pipeline`: transcription (`transcribe.ts`), speaker detection (`speakers.ts`), reaction detection (`reactions.ts`), finding moments (`discover.ts`) and rendering (`render.ts`).
+
+### Measuring the picks
+
+`npm run eval` reads `feedback.jsonl` and reports, per AI model and finder version: precision@3/5/10 (share of the top moments you kept), acceptance, how far you moved the start and end, and duplicates. Only videos you reviewed count. Bump `FINDER_VERSION` in `discover.ts` whenever you change the prompt, so versions can be compared. Options: `npm run eval -- path/to/feedback.jsonl --k 3,5`.
 
 ### Releasing
 
@@ -106,4 +117,4 @@ Siftora is free software under the [GNU GPL v3](LICENSE).
 
 The Siftora name and logo are not covered by the GPL. You are welcome to fork and modify Siftora under its license, but please give a modified version that you publish its own name and logo, so people can tell it apart from the original. Using the name to refer to Siftora itself, for example in a review or tutorial, is fine.
 
-It builds on [whisper.cpp](https://github.com/ggml-org/whisper.cpp) and [llama.cpp](https://github.com/ggml-org/llama.cpp) (MIT), [FFmpeg](https://ffmpeg.org) (GPL), [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (Apache 2.0), OpenAI's Whisper models (MIT), Qwen models (Apache 2.0), Silero VAD (MIT), and the caption fonts listed in [resources/fonts](resources/fonts/README.md) (SIL Open Font License). The engines and models are downloaded from their publishers when you need them.
+It builds on [whisper.cpp](https://github.com/ggml-org/whisper.cpp) and [llama.cpp](https://github.com/ggml-org/llama.cpp) (MIT), [FFmpeg](https://ffmpeg.org) (GPL), [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (Apache 2.0), [yt-dlp](https://github.com/yt-dlp/yt-dlp) (Unlicense), OpenAI's Whisper models (MIT), the CED audio tagger (Apache 2.0), Qwen models (Apache 2.0), Silero VAD (MIT), and the caption fonts listed in [resources/fonts](resources/fonts/README.md) (SIL Open Font License). The engines and models are downloaded from their publishers when you need them.

@@ -1,5 +1,5 @@
 // Jobs and clips shared by the pipeline (main) and the Queue/Results screens (renderer).
-import type { Layout, SubtitleStyle } from './types'
+import type { CommentsSort, Layout, SubtitleStyle } from './types'
 
 export type JobStage =
   | 'queued'
@@ -30,6 +30,8 @@ export interface JobOptions {
   minScore: number
   /** Highest YouTube download height, picked per link on Create; missing = DEFAULT_YOUTUBE_HEIGHT. */
   youtubeMaxHeight?: number
+  /** YouTube links only: download this many comments in this order. Missing = off. */
+  comments?: { max: number; sort: CommentsSort }
 }
 
 /** YouTube quality when none was picked (the link check failed): best up to this height. */
@@ -51,6 +53,8 @@ export interface Clip {
   end: number
   /** The AI's cut, kept once the user changes start/end by hand, so it can be restored. */
   original?: { start: number; end: number }
+  /** The source channel's @handle, credited in the share kit. */
+  credit?: string
   /** Marked as a keeper by the user; "Delete unhearted" spares it. */
   hearted?: boolean
   title: string

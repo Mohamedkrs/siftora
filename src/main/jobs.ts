@@ -19,7 +19,7 @@ import { DEFAULT_YOUTUBE_HEIGHT, rangeKey, renderStyleKey } from '../shared/jobs
 import { fitWordsToSegments, transcribePython, transcribeWhisperCpp, type Transcript } from './pipeline/transcribe'
 import { getSettings } from './settings'
 import { ownLlamaBuild } from './systemEngines'
-import { downloadYoutube, isVideoUrl } from './youtube'
+import { downloadYoutube, isVideoUrl, isYoutubeUrl } from './youtube'
 
 const jobs = new Map<string, Job>()
 const controllers = new Map<string, AbortController>()
@@ -125,7 +125,10 @@ export function addJobs(
         options: {
           ...options,
           ...(Object.hasOwn(limits, source) ? limits[source] : {}),
-          ...(link ? { youtubeMaxHeight: link.height } : {})
+          ...(link ? { youtubeMaxHeight: link.height } : {}),
+          ...(settings.readComments && isYoutubeUrl(source)
+            ? { comments: { max: settings.commentsMax, sort: settings.commentsSort } }
+            : {})
         },
         stage: 'queued',
         progress: 0,
@@ -266,7 +269,8 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
       dir,
       signal,
       progressUpdater(job),
-      job.title !== job.source ? job.title : undefined
+      job.title !== job.source ? job.title : undefined,
+      job.options.comments
     )
     update(job, { videoPath: result.path, title: result.title, outputDir: join(outputRoot(), safeName(result.title)) })
   }
@@ -409,9 +413,7 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
       maxClipSeconds: job.options.maxClipSeconds,
       minScore: job.options.minScore,
       videoContext: videoContext(job.title, dir),
-      replay: readJson<{ heatmap?: { start_time: number; end_time: number; value: number }[] }>(
-        join(dir, 'video.info.json')
-      )?.heatmap?.map((p) => ({ start: p.start_time * 1000, end: p.end_time * 1000, value: p.value })),
+      replay: readVideoInfo(dir)?.heatmap?.map((p) => ({ start: p.start_time * 1000, end: p.end_time * 1000, value: p.value })),
       reactions,
       signal,
       onProgress: (fraction) => onProgress(fraction, 'Reading the transcript…')
@@ -421,6 +423,9 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
       clips,
       segments: transcript.segments,
       videoContext: videoContext(job.title, dir),
+      chapters: readVideoInfo(dir)?.chapters,
+      comments: readVideoInfo(dir)?.comments,
+      credit: handle(readVideoInfo(dir)),
       signal,
       onProgress: (fraction) => onProgress(fraction, 'Writing titles and captions…')
     })
@@ -434,10 +439,11 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
 
 /** What the writing step should know about the long video: title, plus channel, description and tags for links. */
 function videoContext(title: string, dir: string): string {
-  const info = readJson<{ channel?: string; uploader?: string; description?: string; tags?: string[] }>(
-    join(dir, 'video.info.json')
-  )
+  const info = readVideoInfo(dir)
   const channel = info?.channel ?? info?.uploader
+  const date = info?.upload_date?.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3')
+  // The creator's own hashtags, before the link lines go; "#11" is a number, not a tag.
+  const creatorTags = [...new Set(info?.description?.match(/#(?=[\p{N}_]*\p{L})[\p{L}\p{N}_]+/gu) ?? [])].slice(0, 10)
   // Social and merch links say nothing about the video; @handles and plain text do.
   const description = (info?.description ?? '')
     .split('\n')
@@ -446,12 +452,41 @@ function videoContext(title: string, dir: string): string {
     .slice(0, 500)
   return [
     `Video title: ${title}`,
-    channel ? `Channel: ${channel}` : null,
+    channel ? `Channel: ${channel}${handle(info) ? ` (${handle(info)})` : ''}` : null,
+    date ? `Uploaded: ${date}` : null,
+    info?.language ? `Video language: ${info.language}` : null,
+    info?.categories?.length ? `Video category: ${info.categories.join(', ')}` : null,
     description ? `Video description: ${description}` : null,
-    info?.tags?.length ? `Video tags: ${info.tags.slice(0, 15).join(', ')}` : null
+    info?.tags?.length ? `Video tags: ${info.tags.slice(0, 15).join(', ')}` : null,
+    creatorTags.length ? `Creator's hashtags: ${creatorTags.join(' ')}` : null
   ]
     .filter(Boolean)
     .join('\n')
+}
+
+interface VideoInfo {
+  channel?: string
+  uploader?: string
+  uploader_id?: string
+  description?: string
+  tags?: string[]
+  upload_date?: string
+  language?: string
+  categories?: string[]
+  chapters?: { start_time: number; end_time: number; title: string }[]
+  /** Only when comments were downloaded. */
+  comments?: { text: string; like_count?: number }[]
+  heatmap?: { start_time: number; end_time: number; value: number }[]
+}
+
+/** yt-dlp's metadata for links; null for local files. */
+function readVideoInfo(dir: string): VideoInfo | null {
+  return readJson<VideoInfo>(join(dir, 'video.info.json'))
+}
+
+/** "@KSI"; Facebook and others give a number, which is no use as a credit. */
+function handle(info: VideoInfo | null): string | undefined {
+  return info?.uploader_id?.startsWith('@') ? info.uploader_id : undefined
 }
 
 /** Bump when speaker assignment changes, so saved results are redone (2: overlapping turns). */

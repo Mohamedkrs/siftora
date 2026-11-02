@@ -167,7 +167,10 @@ function sanitize(input: unknown): Settings {
     openaiWhisperPath: shortStringOr(raw.openaiWhisperPath, 1024),
     openaiWhisperModel: shortStringOr(raw.openaiWhisperModel),
     cookiesBrowser:
-      raw.cookiesBrowser === 'file' ? 'file' : (COOKIES_BROWSERS.find((browser) => browser === raw.cookiesBrowser) ?? null)
+      raw.cookiesBrowser === 'file' ? 'file' : (COOKIES_BROWSERS.find((browser) => browser === raw.cookiesBrowser) ?? null),
+    readComments: raw.readComments === true,
+    commentsMax: Math.round(clamp(numberOr(raw.commentsMax, defaults.commentsMax), 20, 5000)),
+    commentsSort: raw.commentsSort === 'new' ? 'new' : 'top'
   }
 }
 

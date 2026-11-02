@@ -262,21 +262,41 @@ const POST_SCHEMA = {
   required: ['title', 'caption', 'description', 'hashtags']
 }
 
-const POST_PROMPT = `You write the post for one short-form clip (YouTube Shorts, TikTok, Instagram Reels) cut from a longer video. You get the long video's title, channel, description and tags (its format and who is in it), what kind of moment the clip is, sounds the audience made, and the clip's transcript.
+const POST_PROMPT = `You write the post for one short-form clip (YouTube Shorts, TikTok, Instagram Reels) cut from a longer video. You get the long video's title, channel, upload date, language, category, description, tags and the creator's hashtags (its format and who is in it), the chapter the clip is in, viewers' comments about this moment, what kind of moment the clip is, sounds the audience made, and the clip's transcript.
 
 Write, in the transcript's language:
 - title: max 60 characters. Make a stranger curious enough to watch. Be specific to this clip: name the channel's host or a guest when the transcript shows they are in it, and the situation (the challenge, the game, the topic). Do not give away the punchline. No quotation marks, no ALL CAPS, no emoji, no clickbait the clip does not deliver.
 - caption: the first line people see in the feed, max 100 characters. Sets up the moment in your own words; never a quote copied from the transcript.
 - description: 1-2 sentences, max 200 characters. Tells a stranger who is in it, what the setup is and what happens, and why it is worth watching. Your own words, no hashtags.
-- hashtags: 3-6 plain words without '#': the host or show, the format (e.g. trynottolaugh, podcast), the topic.
+- hashtags: 3-6 plain words without '#': the host or show, the format (e.g. trynottolaugh, podcast), the topic. Reuse the creator's hashtags when they fit this clip.
 
 Rules:
 - Only describe what the context and the transcript show. Never invent people, roles (like a heckler or a host), places or events.
 - Use the video's format from its title, description and tags: if it is a challenge or game, say so.
+- The chapter title, when given, is the creator's own name for this part of the video: use it to understand the topic.
+- Viewers' comments show what people noticed or loved in this moment: use them to pick the angle. Never copy them, quote them or take names from them.
+- Do not call the video new or recent unless the upload date is in the last few weeks.
 - The transcript comes from speech recognition: ignore filler, false starts and misheard words; never repeat them.
 - Speech recognition mishears names. Spell names the way the video title, description or tags spell them. If you cannot tell who someone is, say what they are (a comedian, a guest) instead of guessing a name.
 - Say what actually happens. Never use filler like hilarious, wild, chaos, epic, "you won't believe", "worth watching", "don't miss".
 - The caption must not repeat the title; it adds the setup or the stakes.`
+
+/** "14:22", "1:02:33": a time a viewer points at in a comment, in ms. */
+const TIMESTAMP = /\b(?:(\d{1,2}):)?(\d{1,2}):([0-5]\d)\b/g
+
+/** Up to 5 most-liked comments that point inside the clip (or just before it, as people round down). */
+export function momentComments(comments: { text: string; like_count?: number }[], clip: { start: number; end: number }): string[] {
+  return comments
+    .filter((comment) =>
+      [...comment.text.matchAll(TIMESTAMP)].some(([, h, m, s]) => {
+        const ms = ((Number(h ?? 0) * 60 + Number(m)) * 60 + Number(s)) * 1000
+        return ms >= clip.start - 5000 && ms <= clip.end
+      })
+    )
+    .sort((a, b) => (b.like_count ?? 0) - (a.like_count ?? 0))
+    .slice(0, 5)
+    .map((comment) => comment.text.replace(/\s+/g, ' ').slice(0, 200))
+}
 
 /**
  * Writes each clip's title, feed caption, description and hashtags in its own call, with the
@@ -288,6 +308,12 @@ export async function writePosts(opts: {
   segments: Segment[]
   /** Long video's title, channel, description and tags, one per line. */
   videoContext: string
+  /** The creator's chapters (seconds), for links that have them. */
+  chapters?: { start_time: number; end_time: number; title: string }[]
+  /** The channel's @handle, credited in the share kit. */
+  credit?: string
+  /** Viewers' comments, when downloaded; the ones with a timestamp inside a clip go with it. */
+  comments?: { text: string; like_count?: number }[]
   signal: AbortSignal
   onProgress: (fraction: number) => void
 }): Promise<void> {
@@ -297,15 +323,20 @@ export async function writePosts(opts: {
     const lines = opts.segments
       .filter((s) => s.end > clip.start && s.start < clip.end)
       .map((s) => `${s.speaker !== undefined ? `S${s.speaker + 1}: ` : ''}${s.text}`)
+    const chapter = opts.chapters?.find((c) => c.start_time * 1000 <= clip.start && clip.start < c.end_time * 1000)
+    const said = momentComments(opts.comments ?? [], clip)
     const sounds = clip.notes.filter((note) => /laughed|cheering|gasps|shouting|crying/.test(note))
     const user = [
       opts.videoContext,
+      chapter ? `Chapter: ${chapter.title}` : null,
+      said.length > 0 ? `Viewers' comments about this moment:\n${said.map((text) => `- ${text}`).join('\n')}` : null,
       `Kind of moment: ${clip.category}`,
       sounds.length > 0 ? `Audience: ${sounds.join(', ')}` : null,
       `Clip transcript:\n${lines.join('\n')}`
     ]
       .filter(Boolean)
       .join('\n')
+    clip.credit = opts.credit
     try {
       const post = JSON.parse(await opts.client.chat(POST_PROMPT, user, { schema: POST_SCHEMA, temperature: 0.7 })) as {
         title?: string

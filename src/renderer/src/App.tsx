@@ -42,6 +42,7 @@ export default function App() {
 
   const activeJob = jobs.find(isActive)
   const waiting = jobs.filter((job) => job.stage === 'queued').length
+  const toDo = waiting + jobs.filter(isActive).length
 
   return (
     <div className="app">
@@ -57,6 +58,11 @@ export default function App() {
               className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
             >
               {item.label}
+              {item.to === '/queue' && toDo > 0 ? (
+                <span className="nav-count" title={`${toDo} to do`}>
+                  {toDo}
+                </span>
+              ) : null}
             </NavLink>
           ))}
         </nav>

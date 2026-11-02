@@ -14,7 +14,7 @@ To report a security problem, don't open an issue: see [SECURITY.md](SECURITY.md
 2. Fork the repository and create a branch from `main`.
 3. Set it up and run it: see [Building from source](README.md#building-from-source).
 4. Keep the change focused on one thing, and match the style of the code around it.
-5. Before opening the pull request, make sure `npm run typecheck` and `npm run build` pass. The same checks run automatically on every pull request.
+5. Before opening the pull request, make sure `npm run typecheck` and `npm run build` pass. The same checks run automatically on every pull request. If you change how moments are found, bump `FINDER_VERSION` and compare with `npm run eval` (see [Measuring the picks](README.md#measuring-the-picks)).
 6. Open the pull request and fill in the form: what changed, why, and how you tested it. Screenshots help for anything visible.
 
 Every pull request is reviewed by the maintainer before it is merged. Releases are made by the maintainer only.

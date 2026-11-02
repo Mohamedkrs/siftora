@@ -269,6 +269,9 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
   )
 }
 
+/** The video last shown, so the sidebar's Results link comes back to it. */
+let lastJobId: string | null = null
+
 export default function Results() {
   const { jobs, render, findAgain, rewritePosts, deleteJob, deleteClips } = useJobs()
   const dialog = useDialog()
@@ -276,7 +279,9 @@ export default function Results() {
   const [params, setParams] = useSearchParams()
   const [topic, setTopic] = useState<string | null>(null)
   const doneJobs = jobs.filter((job) => job.stage === 'done')
-  const job = doneJobs.find((item) => item.id === params.get('job')) ?? doneJobs[0]
+  const job =
+    doneJobs.find((item) => item.id === params.get('job')) ?? doneJobs.find((item) => item.id === lastJobId) ?? doneJobs[0]
+  lastJobId = job?.id ?? null
 
   if (!job) {
     return (

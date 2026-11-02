@@ -157,7 +157,14 @@ export interface Settings {
   openaiWhisperModel: string | null
   /** Browser whose sign-in yt-dlp borrows, for age-restricted or members-only videos; null = none. */
   cookiesBrowser: CookiesSource | null
+  /** Download viewers' comments with YouTube links, for the post texts. */
+  readComments: boolean
+  commentsMax: number
+  commentsSort: CommentsSort
 }
+
+/** YouTube's own orders: 'top' = most liked and replied first, 'new' = newest first. */
+export type CommentsSort = 'top' | 'new'
 
 /** Browsers yt-dlp can read cookies from (--cookies-from-browser). */
 export const COOKIES_BROWSERS = ['firefox', 'chrome', 'edge', 'brave', 'opera', 'vivaldi', 'chromium'] as const
@@ -205,7 +212,10 @@ export const DEFAULT_SETTINGS: Settings = {
   transcriptionProvider: 'app',
   openaiWhisperPath: null,
   openaiWhisperModel: null,
-  cookiesBrowser: null
+  cookiesBrowser: null,
+  readComments: false,
+  commentsMax: 300,
+  commentsSort: 'top'
 }
 
 export interface GpuInfo {
