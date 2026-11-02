@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 
 /**
  * A whole-number field that lets you type freely (clear it, type 33 over 1) and saves only once the
@@ -17,38 +17,46 @@ export default function NumberField(props: {
   const { value, min, max, onCommit } = props
   const [text, setText] = useState(String(value))
   const errorId = useId()
+  const input = useRef<HTMLInputElement>(null)
 
-  // Changed elsewhere ("Use the settings for all", another screen): show the new value.
+  // Changed elsewhere ("Use the settings for all", another screen): show the new value. Not while
+  // typing: an older save coming back would overwrite what is being typed.
   useEffect(() => {
-    setText((current) => (Number(current) === value && current.trim() !== '' ? current : String(value)))
+    if (document.activeElement !== input.current) setText(String(value))
   }, [value])
 
-  const number = Number(text)
-  const error =
-    text.trim() === ''
+  const problem = (draft: string): string | null =>
+    draft.trim() === ''
       ? 'Enter a number.'
-      : number < min
+      : Number(draft) < min
         ? (props.tooSmall ?? `At least ${min}.`)
-        : number > max
+        : Number(draft) > max
           ? (props.tooBig ?? `At most ${max}.`)
           : null
+  const error = problem(text)
 
-  // Also re-checked when the bounds move, so 33 saves as soon as the longest becomes 33 or more.
+  // Saves only on typing, and when the bounds move (33 saves once the longest becomes 33 or
+  // more); saving on every render ping-pongs with the settings round trip.
   useEffect(() => {
-    if (!error && number !== value) onCommit(number)
-  }, [error, number, value, onCommit])
+    if (!problem(text) && Number(text) !== value) onCommit(Number(text))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [min, max])
 
   return (
     <label className="field">
       {props.label}
       <input
+        ref={input}
         type="text"
         inputMode="numeric"
         value={text}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
         onChange={(event) => {
-          if (/^\d{0,6}$/.test(event.target.value)) setText(event.target.value)
+          const draft = event.target.value
+          if (!/^\d{0,6}$/.test(draft)) return
+          setText(draft)
+          if (!problem(draft) && Number(draft) !== value) onCommit(Number(draft))
         }}
       />
       {error ? (

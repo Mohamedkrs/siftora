@@ -1,7 +1,7 @@
 import { useState, type DragEvent, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CATALOG, REACTION_MODEL_IDS, llamaTooOld, SPEAKER_MODEL_IDS } from '../../../shared/catalog'
-import { DEFAULT_YOUTUBE_HEIGHT, mediaUrl } from '../../../shared/jobs'
+import { DEFAULT_YOUTUBE_HEIGHT, mediaUrl, type Job } from '../../../shared/jobs'
 import type { ClipLimits, YoutubeChoice, YoutubeInfo } from '../../../shared/types'
 import NumberField from '../components/NumberField'
 import SignInPicker from '../components/SignInPicker'
@@ -130,6 +130,38 @@ function ClipLimitFields(props: { limits: ClipLimits; onChange: (next: Partial<C
       </label>
     </>
   )
+}
+
+/** YouTube's video id, so youtu.be, watch?v=, shorts and live links of one video match. */
+function youtubeId(link: string): string | null {
+  try {
+    const url = new URL(link)
+    if (url.hostname === 'youtu.be') return url.pathname.slice(1) || null
+    if (!/(^|\.)youtube\.com$/.test(url.hostname)) return null
+    return url.searchParams.get('v') ?? url.pathname.match(/^\/(?:shorts|live|embed)\/([\w-]+)/)?.[1] ?? null
+  } catch {
+    return null
+  }
+}
+
+/** Same file (Windows paths ignore case) or the same online video. */
+function sameVideo(a: string, b: string): boolean {
+  if (a === b) return true
+  if (isVideoUrl(a) && isVideoUrl(b)) {
+    const id = youtubeId(a)
+    return id !== null && id === youtubeId(b)
+  }
+  return !isVideoUrl(a) && !isVideoUrl(b) && a.toLowerCase() === b.toLowerCase()
+}
+
+function timeAgo(ms: number): string {
+  const minutes = Math.round((Date.now() - ms) / 60000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours} h ago`
+  const days = Math.round(hours / 24)
+  return days === 1 ? 'yesterday' : `${days} days ago`
 }
 
 /** A video waiting to be analysed: a frame, its name, length and resolution once known. */
@@ -275,6 +307,8 @@ export default function Create() {
   const [starting, setStarting] = useState(false)
   /** How many videos the last "Find clips" queued; shown until more are added. */
   const [added, setAdded] = useState(0)
+  /** Picked videos that Siftora already has; the user chooses: open its results or add it again. */
+  const [already, setAlready] = useState<string[]>([])
 
   const speakersInstalled = SPEAKER_MODEL_IDS.every((id) => models[id]?.status === 'installed')
   const reactionsInstalled = REACTION_MODEL_IDS.every((id) => models[id]?.status === 'installed')
@@ -306,9 +340,24 @@ export default function Create() {
   const youtubeCount = videos.filter(isVideoUrl).length
   const checking = videos.some((video) => isVideoUrl(video) && youtube[video] === undefined)
 
-  const addVideos = (paths: string[]): void => {
+  /** The earlier job for this video, unless it failed or was cancelled (then adding it again is normal). */
+  const existingJob = (source: string): Job | undefined =>
+    jobs.find((job) => job.stage !== 'error' && job.stage !== 'cancelled' && sameVideo(job.source, source))
+
+  /** Adds new videos; ones Siftora already has wait in "Already added" unless `force`. Returns the ones added. */
+  const addVideos = (paths: string[], force = false): string[] => {
     const clean = paths.filter((path) => path.trim().length > 0)
-    if (clean.length > 0) setVideos((current) => Array.from(new Set([...current, ...clean])))
+    const known = force ? [] : clean.filter((path) => existingJob(path))
+    const fresh = clean.filter((path) => !known.includes(path))
+    if (known.length > 0) setAlready((current) => Array.from(new Set([...current, ...known])))
+    if (fresh.length > 0) setVideos((current) => Array.from(new Set([...current, ...fresh])))
+    return fresh
+  }
+
+  const addAgain = (source: string): void => {
+    setAlready((current) => current.filter((item) => item !== source))
+    addVideos([source], true)
+    if (isVideoUrl(source) && youtube[source] === undefined) checkLink(source)
   }
 
   const browse = async (): Promise<void> => {
@@ -343,8 +392,7 @@ export default function Create() {
     }
     setUrlError('')
     setUrl('')
-    addVideos([value])
-    if (youtube[value] === undefined) checkLink(value)
+    if (addVideos([value]).length > 0 && youtube[value] === undefined) checkLink(value)
   }
 
   /** Looks the link up; again after the user picked a browser to sign in with. */
@@ -431,6 +479,50 @@ export default function Create() {
             </form>
             {urlError ? <p className="error">{urlError}</p> : null}
           </section>
+
+          {already.length > 0 ? (
+            <section className="card already" role="status">
+              <h2>Already in Siftora</h2>
+              <ul className="already-rows">
+                {already.map((source) => {
+                  const job = existingJob(source)
+                  if (!job) return null
+                  const done = job.stage === 'done'
+                  return (
+                    <li key={source} className="already-row">
+                      <VideoCard job={job} selected={false} onSelect={() => navigate(done ? `/results?job=${job.id}` : '/queue')} />
+                      <div className="already-text">
+                        <strong>{job.title}</strong>
+                        <span className="muted">
+                          Added {timeAgo(job.createdAt)} ·{' '}
+                          {done ? `${job.clips.length} ${job.clips.length === 1 ? 'clip' : 'clips'} found` : 'still in the queue'}
+                        </span>
+                        <div className="already-actions">
+                          <button
+                            type="button"
+                            className="button primary small"
+                            onClick={() => navigate(done ? `/results?job=${job.id}` : '/queue')}
+                          >
+                            {done ? 'Go to results' : 'Open queue'} →
+                          </button>
+                          <button type="button" className="button small" onClick={() => addAgain(source)}>
+                            Add again anyway
+                          </button>
+                          <button
+                            type="button"
+                            className="link-button"
+                            onClick={() => setAlready((current) => current.filter((item) => item !== source))}
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          ) : null}
 
           {videos.length > 0 ? (
             <section className="card">
