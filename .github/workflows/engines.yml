@@ -55,7 +55,8 @@ jobs:
           WANTED: ${{ inputs.version }}
           FORCE: ${{ inputs.force }}
         run: |
-          version="${WANTED:-$(gh api "repos/$UPSTREAM/releases/latest" --jq .tag_name)}"
+          # Newest release with binaries: upstream tags each version twice (vX.Y.Z source only, bNNNN with builds).
+          version="${WANTED:-$(gh api "repos/$UPSTREAM/releases?per_page=20" --jq '[.[] | select(any(.assets[]; .name == "whisper-bin-x64.zip"))][0].tag_name')}"
           # Only plain release tags, so the value is safe to use in names and URLs below.
           [[ "$version" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "unexpected tag: $version"; exit 1; }
           published=""
