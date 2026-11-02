@@ -13,9 +13,28 @@
   <a href="https://ko-fi.com/mohamedkrs"><img src="resources/brand/support-kofi.svg" alt="Buy me a coffee on Ko-fi" height="60"></a>
 </p>
 
-Siftora is a free desktop app that turns long videos (podcasts, streams, interviews, vlogs) into vertical clips for TikTok, Instagram Reels and YouTube Shorts. It transcribes the video, finds the moments with a hook, a setup and a payoff, and renders them as 1080×1920 reels with animated captions.
+Siftora is a free, open-source AI clip maker that turns long videos (podcasts, streams, interviews, vlogs) into vertical clips for TikTok, Instagram Reels and YouTube Shorts. It transcribes the video, finds the moments with a hook, a setup and a payoff, and renders them as 1080×1920 reels with animated captions. Think of it as an open-source alternative to Opus Clip that runs on your own PC, with no subscription.
 
 Everything runs on your own computer. Your videos and transcripts are never uploaded.
+
+<p align="center">
+  <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/results-dark.png"><img src="docs/screenshots/results-light.png" alt="Results: the moments Siftora found, each with a score, a topic and why it works as a clip" width="900"></picture>
+</p>
+
+<table>
+  <tr>
+    <td width="33%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/captions-dark.png"><img src="docs/screenshots/captions-light.png" alt="Caption style and layout with a live preview on a real frame" width="100%"></picture></td>
+    <td width="33%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/share-dark.png"><img src="docs/screenshots/share-light.png" alt="Share kit: ready-to-paste titles, descriptions and hashtags per platform" width="100%"></picture></td>
+    <td width="33%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/create-dark.png"><img src="docs/screenshots/create-light.png" alt="Create: add videos or links and see how Siftora will work" width="100%"></picture></td>
+  </tr>
+  <tr>
+    <td align="center">Captions with a live preview</td>
+    <td align="center">Post texts for every platform</td>
+    <td align="center">Add files or links</td>
+  </tr>
+</table>
+
+<sub>Screenshots show <a href="https://www.youtube.com/watch?v=bhVdsCqLJho">Live Q&amp;A with NASA Astronauts in Space</a> (video: NASA). NASA does not endorse Siftora.</sub>
 
 ## Features
 

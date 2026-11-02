@@ -230,6 +230,12 @@ option {
   padding: 0 10px;
 }
 
+/* The wordmark is white on dark and ink on light: show the version for the theme. */
+:root[data-theme='light'] .brand .logo-on-dark,
+:root:not([data-theme='light']) .brand .logo-on-light {
+  display: none;
+}
+
 /* The small-symbol logo lockup (resources/brand); 26 px tall is about 103 px wide. */
 .brand img {
   display: block;

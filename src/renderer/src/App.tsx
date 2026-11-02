@@ -13,6 +13,7 @@ import { isActive, useJobs } from './state/jobs'
 import { useModels } from './state/models'
 import { useSettings } from './state/settings'
 import logo from '../../../resources/brand/siftora-horizontal-small-on-dark.svg'
+import logoLight from '../../../resources/brand/siftora-horizontal-small.svg'
 import symbol from '../../../resources/brand/siftora-symbol-small.svg'
 
 /** 20 px line icons in the text colour. */
@@ -77,7 +78,14 @@ export default function App() {
     <div className="app">
       <aside className={collapsed ? 'sidebar collapsed' : 'sidebar'}>
         <div className="brand">
-          <img src={collapsed ? symbol : logo} alt="Siftora" />
+          {collapsed ? (
+            <img src={symbol} alt="Siftora" />
+          ) : (
+            <>
+              <img className="logo-on-dark" src={logo} alt="Siftora" />
+              <img className="logo-on-light" src={logoLight} alt="Siftora" />
+            </>
+          )}
         </div>
         <nav className="nav" aria-label="Main">
           {navItems.map((item) => (
