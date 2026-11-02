@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { CATALOG, llamaTooOld, type ModelEntry } from '../../../shared/catalog'
 import { ENGINES, engineBytes, engineLabel } from '../../../shared/engines'
 import type { CustomModel, EngineOption, ModelState, ScannedModel } from '../../../shared/types'
@@ -103,7 +104,7 @@ function ModelCard(props: CardProps) {
   }
 
   return (
-    <article className="model-card">
+    <article className="model-card" id={`model-${props.entries[0]?.id}`}>
       <div className="model-head">
         <div>
           <h3>
@@ -223,6 +224,11 @@ function ModelCard(props: CardProps) {
 export default function Models() {
   const dialog = useDialog()
   const { models, hardware, recommendation, requiredEngines, download, cancel, remove } = useModels()
+  // ?model=<id> (from Create's "Download it" link) scrolls to that model's card.
+  const focus = useSearchParams()[0].get('model')
+  useEffect(() => {
+    if (focus) document.getElementById(`model-${focus}`)?.scrollIntoView({ block: 'center' })
+  }, [focus])
   const { settings, update, refresh } = useSettings()
   const [engineOptions, setEngineOptions] = useState<EngineOption[] | null>(null)
   // Bumped when the user starts/stops using their own engines, so sizes are recomputed.

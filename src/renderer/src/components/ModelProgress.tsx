@@ -19,12 +19,12 @@ export default function ModelProgress({ state, totalBytes }: Props) {
   const extracting = state.status === 'extracting'
   const queued = state.status === 'queued'
 
-  const parts = [`${percent}%`]
+  const rate: string[] = []
   if (!verifying && !extracting && !queued && state.bytesPerSec > 0) {
-    parts.push(`${formatBytes(state.bytesPerSec)}/s`)
+    rate.push(`${formatBytes(state.bytesPerSec)}/s`)
   }
   if (!verifying && !extracting && !queued && state.etaSec) {
-    parts.push(`${formatEta(state.etaSec)} left`)
+    rate.push(`${formatEta(state.etaSec)} left`)
   }
 
   return (
@@ -45,7 +45,11 @@ export default function ModelProgress({ state, totalBytes }: Props) {
             ? 'Verifying…'
             : queued
               ? 'Waiting…'
-              : parts.join(' · ')}
+              : (
+                <>
+                  {percent}%{rate.length > 0 ? <span className="progress-rate">{rate.join(' · ')}</span> : null}
+                </>
+              )}
       </p>
     </div>
   )

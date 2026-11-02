@@ -1,12 +1,14 @@
-import { useState, type DragEvent, type FormEvent } from 'react'
+import { useState, type DragEvent, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CATALOG, REACTION_MODEL_IDS, llamaTooOld, SPEAKER_MODEL_IDS } from '../../../shared/catalog'
+import { ENGINES, engineBytes, engineLabel, type EngineName } from '../../../shared/engines'
 import { DEFAULT_YOUTUBE_HEIGHT, mediaUrl, type Job } from '../../../shared/jobs'
-import type { ClipLimits, YoutubeChoice, YoutubeInfo } from '../../../shared/types'
+import type { ClipLimits, ModelState, YoutubeChoice, YoutubeInfo } from '../../../shared/types'
+import ModelProgress from '../components/ModelProgress'
 import NumberField from '../components/NumberField'
 import SignInPicker from '../components/SignInPicker'
 import VideoCard from '../components/VideoCard'
-import { formatBytes, formatClock } from '../lib/format'
+import { formatBytes, formatClock, formatEta } from '../lib/format'
 import { useJobs } from '../state/jobs'
 import { useModels } from '../state/models'
 import { useOwnLlamaBuild, useSettings } from '../state/settings'
@@ -172,6 +174,10 @@ function VideoRow(props: {
   youtube?: YoutubeInfo | string
   /** Quality picked on this row; else defaultHeight(). */
   quality?: number
+  /** yt-dlp is still downloading (first link after install), so checking takes longer. */
+  fetchingYtDlp: boolean
+  /** Its download progress, once the first update arrived. */
+  ytDlp?: ModelState
   onQuality: (height: number) => void
   onInfo: (info: VideoInfo) => void
   onRemove: () => void
@@ -221,7 +227,18 @@ function VideoRow(props: {
                   ]
                     .filter(Boolean)
                     .join(' · ')
-                : `${siteOf(props.source)} · checking the link…`
+                : props.fetchingYtDlp
+                  ? [
+                      `${siteOf(props.source)} · downloading yt-dlp for links`,
+                      props.ytDlp?.status === 'downloading' && props.ytDlp.totalBytes
+                        ? `${Math.min(100, Math.round((props.ytDlp.receivedBytes / props.ytDlp.totalBytes) * 100))}%`
+                        : '(about 40 MB)',
+                      props.ytDlp?.status === 'downloading' && props.ytDlp.bytesPerSec > 0 ? `${formatBytes(props.ytDlp.bytesPerSec)}/s` : null,
+                      props.ytDlp?.status === 'downloading' && props.ytDlp.etaSec ? `${formatEta(props.ytDlp.etaSec)} left` : null
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')
+                  : `${siteOf(props.source)} · checking the link…`
             : [
                 props.info ? formatClock(props.info.durationMs) : null,
                 props.info?.height ? `${props.info.height}p` : null,
@@ -309,6 +326,7 @@ export default function Create() {
   const [added, setAdded] = useState(0)
   /** Picked videos that Siftora already has; the user chooses: open its results or add it again. */
   const [already, setAlready] = useState<string[]>([])
+  const [fetchingYtDlp, setFetchingYtDlp] = useState(false)
 
   const speakersInstalled = SPEAKER_MODEL_IDS.every((id) => models[id]?.status === 'installed')
   const reactionsInstalled = REACTION_MODEL_IDS.every((id) => models[id]?.status === 'installed')
@@ -331,6 +349,41 @@ export default function Create() {
       : llamaTooOld(CATALOG.find((m) => m.id === settings.llmModel)?.gguf?.architecture, llamaBuild)
   const finder =
     settings.llmProvider === 'ollama' ? (settings.ollamaModel ? `Ollama · ${settings.ollamaModel}` : null) : modelName(settings.llmModel)
+
+  const busy = (state: ModelState | undefined): boolean =>
+    state !== undefined && ['queued', 'downloading', 'verifying', 'extracting'].includes(state.status)
+  /** A catalog model that is chosen but not downloaded and not on its way, e.g. after a cancelled download. */
+  const notDownloaded = (id: string | null): boolean =>
+    id !== null && CATALOG.some((m) => m.id === id) && models[id]?.status !== 'installed' && !busy(models[id])
+  const transcriberMissing = settings.transcriptionProvider !== 'openai-whisper' && notDownloaded(settings.transcriptionModel)
+  const finderMissing = settings.llmProvider !== 'ollama' && notDownloaded(settings.llmModel)
+  /** Progress of the chosen model and of the engine that runs it, while they download. */
+  const progressOf = (id: string | null, engineName: EngineName, on: boolean): ReactNode =>
+    on ? (
+      <>
+        {ENGINES.filter((entry) => entry.engine === engineName && busy(models[entry.id])).map((entry) => (
+          <div key={entry.id} className="spaced">
+            <span className="muted">{engineLabel(entry)}</span>
+            <ModelProgress state={models[entry.id]} totalBytes={engineBytes(entry)} />
+          </div>
+        ))}
+        {id && busy(models[id]) ? (
+          <div className="spaced">
+            <span className="muted">{modelName(id)}</span>
+            <ModelProgress state={models[id]} totalBytes={CATALOG.find((m) => m.id === id)?.bytes ?? 0} />
+          </div>
+        ) : null}
+      </>
+    ) : null
+
+  const stillDownloading = Object.values(models)
+    .filter(busy)
+    // yt-dlp only matters for web links.
+    .filter((state) => state.id !== 'yt-dlp' || videos.some(isVideoUrl))
+    .map((state) => {
+      const engine = ENGINES.find((entry) => entry.id === state.id)
+      return CATALOG.find((m) => m.id === state.id)?.name ?? (engine ? engineLabel(engine) : state.id)
+    })
 
   const recent = jobs.filter((job) => job.stage === 'done').slice(0, 4)
   const totalMs = videos.reduce((sum, video) => {
@@ -399,8 +452,13 @@ export default function Create() {
   const checkLink = (value: string): void => {
     setYoutube(({ [value]: _old, ...rest }) => rest) // back to "checking the link…"
     window.api
+      .ytDlpInstalled()
+      .then((installed) => setFetchingYtDlp(!installed))
+      .catch(() => undefined)
+    window.api
       .youtubeInfo(value)
       .then((result) => setYoutube((current) => ({ ...current, [value]: result })))
+      .finally(() => setFetchingYtDlp(false))
       .catch((err: unknown) => {
         window.api.log('warn', `youtubeInfo failed: ${String(err)}`)
         // Keep only yt-dlp's own words, e.g. "Private video" or "Video unavailable".
@@ -542,6 +600,8 @@ export default function Create() {
                     info={info[video]}
                     youtube={youtube[video]}
                     quality={quality[video]}
+                    fetchingYtDlp={fetchingYtDlp || busy(models['yt-dlp'])}
+                    ytDlp={models['yt-dlp']}
                     onQuality={(height) => setQuality((current) => ({ ...current, [video]: height }))}
                     onInfo={(next) => setInfo((current) => ({ ...current, [video]: next }))}
                     onRemove={() => setVideos((current) => current.filter((item) => item !== video))}
@@ -593,19 +653,28 @@ export default function Create() {
         <aside className="create-side-panels">
           <section className="card side-panel">
             <h2>How Siftora will work</h2>
+            {stillDownloading.length > 0 ? (
+              <p className="model-warning" role="status">
+                <strong>Still downloading: {stillDownloading.join(', ')}.</strong> Wait until it is done before you find clips, or they will stop at that step.
+              </p>
+            ) : null}
             <dl className="plan">
               <div>
                 <dt>Transcribe</dt>
-                <dd className={transcriber ? undefined : 'model-warning'}>
+                <dd className={transcriber && !transcriberMissing ? undefined : 'model-warning'}>
                   {transcriber ?? 'No model chosen'}
                   {transcriber && runsOn && settings.transcriptionProvider !== 'openai-whisper' ? <span className="muted"> · {runsOn}</span> : null}
+                  {transcriberMissing ? (<><br />Not downloaded. <Link to={`/models?model=${settings.transcriptionModel}`}>Download it</Link></>) : null}
+                  {progressOf(settings.transcriptionModel, 'whisper', settings.transcriptionProvider !== 'openai-whisper')}
                 </dd>
               </div>
               <div>
                 <dt>Find moments</dt>
-                <dd className={finder && !finderProblem ? undefined : 'model-warning'}>
+                <dd className={finder && !finderProblem && !finderMissing ? undefined : 'model-warning'}>
                   {finder ?? 'No model chosen'}
                   {finder && runsOn && settings.llmProvider !== 'ollama' ? <span className="muted"> · {runsOn}</span> : null}
+                  {finderMissing ? (<><br />Not downloaded. <Link to={`/models?model=${settings.llmModel}`}>Download it</Link></>) : null}
+                  {progressOf(settings.llmModel, 'llama', settings.llmProvider !== 'ollama')}
                   {finderProblem ? (<><br />{finderProblem}</>) : null}
                 </dd>
               </div>

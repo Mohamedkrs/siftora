@@ -5,6 +5,7 @@ import { loadJobs } from './jobs'
 import { serveMedia } from './media'
 import { registerIpc } from './ipc'
 import { initLogger, log } from './logger'
+import { ytDlpPath } from './youtube'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -113,6 +114,8 @@ if (!app.requestSingleInstanceLock()) {
       registerIpc()
       loadJobs()
       loadEngineList()
+      // Only needed for video links, but the first link should not wait for it.
+      ytDlpPath().catch((err: unknown) => log.warn('youtube', `could not download yt-dlp: ${describe(err)}`))
       createWindow()
 
       app.on('activate', () => {

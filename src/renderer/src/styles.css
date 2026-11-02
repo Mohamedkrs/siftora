@@ -1020,6 +1020,19 @@ option {
   font-size: 12px;
 }
 
+.progress-rate::before {
+  content: ' · ';
+}
+
+/* The Create side panel is narrow: speed and time left go on their own line. */
+.side-panel .progress-rate {
+  display: block;
+}
+
+.side-panel .progress-rate::before {
+  content: none;
+}
+
 .warning-card {
   background: rgba(255, 196, 0, 0.06);
   border-color: var(--warning-border);
@@ -1968,7 +1981,7 @@ option {
   margin: 0;
 }
 
-.plan div {
+.plan > div {
   display: grid;
   grid-template-columns: 96px 1fr;
   gap: 8px;

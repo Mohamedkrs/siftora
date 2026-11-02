@@ -4,6 +4,7 @@ import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync
 import { dirname, join } from 'node:path'
 import type { JobOptions } from '../shared/jobs'
 import type { YoutubeInfo } from '../shared/types'
+import { emitModelState } from './downloads'
 import { log } from './logger'
 import { getSettings } from './settings'
 import { ffmpegPaths, run, type RunOptions } from './pipeline/run'
@@ -31,30 +32,61 @@ const ASSET = process.platform === 'win32' ? 'yt-dlp.exe' : process.platform ===
 
 let installing: Promise<string> | null = null
 
-/** yt-dlp is a single file; fetch the newest release, verified with GitHub's SHA-256 digest. */
-async function ytDlpPath(): Promise<string> {
-  const dir = join(app.getPath('userData'), 'engines', 'yt-dlp')
-  const file = join(dir, process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp')
+function ytDlpFile(): string {
+  return join(app.getPath('userData'), 'engines', 'yt-dlp', process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp')
+}
+
+export function ytDlpInstalled(): boolean {
+  return existsSync(ytDlpFile())
+}
+
+/**
+ * yt-dlp is a single file; fetch the newest release, verified with GitHub's SHA-256 digest.
+ * Also called at startup, so the first pasted link does not wait for the download.
+ */
+export async function ytDlpPath(): Promise<string> {
+  const file = ytDlpFile()
+  const dir = dirname(file)
   if (existsSync(file)) return file
   // Several links pasted at once must not download it in parallel.
-  installing ??= installYtDlp(dir, file).finally(() => (installing = null))
+  installing ??= installYtDlp(dir, file)
+    .catch((err: unknown) => {
+      const error = err instanceof Error ? err.message : String(err)
+      emitModelState({ id: YT_DLP_ID, status: 'error', error, receivedBytes: 0, bytesPerSec: 0, etaSec: null })
+      throw err
+    })
+    .finally(() => (installing = null))
   return installing
 }
 
 async function installYtDlp(dir: string, file: string): Promise<string> {
-
+  log.info('youtube', 'downloading yt-dlp')
   const response = await fetch('https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest', {
     headers: { Accept: 'application/vnd.github+json' },
     signal: AbortSignal.timeout(15000)
   })
   if (!response.ok) throw new Error(`Could not look up yt-dlp (HTTP ${response.status}).`)
-  const release = (await response.json()) as { tag_name: string; assets: { name: string; digest?: string; browser_download_url: string }[] }
+  const release = (await response.json()) as {
+    tag_name: string
+    assets: { name: string; size: number; digest?: string; browser_download_url: string }[]
+  }
   const asset = release.assets.find((a) => a.name === ASSET)
   if (!asset?.digest?.startsWith('sha256:')) throw new Error('No verified yt-dlp download for this system.')
 
-  const download = await fetch(asset.browser_download_url, { signal: AbortSignal.timeout(300000) })
-  if (!download.ok) throw new Error(`Could not download yt-dlp (HTTP ${download.status}).`)
-  const data = Buffer.from(await download.arrayBuffer())
+  // No limit on the whole download (GitHub can be slow). A drop or 30 s without data is retried,
+  // resuming where it stopped, before the link gives up.
+  const chunks: Buffer[] = []
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await downloadPart(asset.browser_download_url, asset.size, chunks)
+      break
+    } catch (err) {
+      if (attempt >= 10) throw err
+      log.warn('youtube', `yt-dlp download interrupted (attempt ${attempt}), resuming: ${String(err)}`)
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+    }
+  }
+  const data = Buffer.concat(chunks)
   if (createHash('sha256').update(data).digest('hex') !== asset.digest.slice(7)) {
     throw new Error('yt-dlp download was corrupted (checksum mismatch).')
   }
@@ -63,7 +95,47 @@ async function installYtDlp(dir: string, file: string): Promise<string> {
   renameSync(`${file}.tmp`, file)
   if (process.platform !== 'win32') chmodSync(file, 0o755)
   log.info('youtube', `installed yt-dlp ${release.tag_name}`)
+  emitModelState({ id: YT_DLP_ID, status: 'installed', receivedBytes: data.length, totalBytes: data.length, bytesPerSec: 0, etaSec: null })
   return file
+}
+
+/** Download progress id, shown in Create and the sidebar like a model download. */
+const YT_DLP_ID = 'yt-dlp'
+
+/** Downloads the rest of the file into `chunks` (resuming after what they hold), reporting progress. */
+async function downloadPart(url: string, totalBytes: number, chunks: Buffer[]): Promise<void> {
+  const stalled = new AbortController()
+  let idle = setTimeout(() => stalled.abort(), 30000)
+  try {
+    const have = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
+    const response = await fetch(url, { signal: stalled.signal, headers: have > 0 ? { Range: `bytes=${have}-` } : {} })
+    if (!response.ok || !response.body) throw new Error(`Could not download yt-dlp (HTTP ${response.status}).`)
+    if (response.status !== 206) chunks.length = 0 // the server sent the whole file again
+    let receivedBytes = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
+    const reader = response.body.getReader()
+    const started = Date.now()
+    const startBytes = receivedBytes
+    let lastReport = 0
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      clearTimeout(idle)
+      idle = setTimeout(() => stalled.abort(), 30000)
+      chunks.push(Buffer.from(value))
+      receivedBytes += value.length
+      const now = Date.now()
+      if (now - lastReport < 250) continue
+      lastReport = now
+      const bytesPerSec = (receivedBytes - startBytes) / Math.max(0.001, (now - started) / 1000)
+      const etaSec = totalBytes > receivedBytes && bytesPerSec > 0 ? Math.round((totalBytes - receivedBytes) / bytesPerSec) : null
+      emitModelState({ id: YT_DLP_ID, status: 'downloading', receivedBytes, totalBytes, bytesPerSec, etaSec })
+    }
+    if (receivedBytes < totalBytes) throw new Error('connection closed early')
+  } catch (err) {
+    throw stalled.signal.aborted ? new Error('no data for 30 seconds') : err
+  } finally {
+    clearTimeout(idle)
+  }
 }
 
 /** Facebook puts "916K views · 28K reactions | " in front of titles. */
