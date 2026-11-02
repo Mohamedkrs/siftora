@@ -10,6 +10,7 @@ const api: Api = {
   importCookiesFile: () => ipcRenderer.invoke(IPC.importCookiesFile),
   pickVideos: () => ipcRenderer.invoke(IPC.pickVideos),
   youtubeInfo: (url) => ipcRenderer.invoke(IPC.youtubeInfo, url),
+  ytDlpInstalled: () => ipcRenderer.invoke(IPC.ytDlpInstalled),
   log: (level, msg) => {
     ipcRenderer.send(IPC.log, level, msg)
   },

@@ -31,7 +31,7 @@ import {
 } from './systemEngines'
 import { Cancelled } from './pipeline/run'
 import { getSettings, setSettings } from './settings'
-import { importCookies, isVideoUrl, youtubeInfo } from './youtube'
+import { importCookies, isVideoUrl, youtubeInfo, ytDlpInstalled, ytDlpPath } from './youtube'
 
 export function registerIpc(): void {
   ipcMain.handle(IPC.getSettings, () => getSettings())
@@ -139,11 +139,13 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.youtubeInfo, (_event, url: unknown) => {
     if (typeof url !== 'string' || !isVideoUrl(url)) throw new Error('Not a web link.')
-    // Bounded so a stalled yt-dlp cannot keep Create's Start button disabled.
-    return youtubeInfo(url.trim(), AbortSignal.timeout(60_000)).catch((err: unknown) => {
+    // Bounded so a stalled yt-dlp cannot keep Create's Start button disabled; the minute starts
+    // once yt-dlp is downloaded (that can take longer on a slow connection).
+    return ytDlpPath().then(() => youtubeInfo(url.trim(), AbortSignal.timeout(60_000))).catch((err: unknown) => {
       throw err instanceof Cancelled ? new Error('The site did not answer within a minute.') : err
     })
   })
+  ipcMain.handle(IPC.ytDlpInstalled, () => ytDlpInstalled())
   ipcMain.handle(IPC.addJobs, (_event, sources: unknown, links: unknown, limits: unknown) => {
     const valid: Record<string, YoutubeChoice> = {}
     if (links && typeof links === 'object') {

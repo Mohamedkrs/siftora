@@ -1,10 +1,11 @@
-# Keeps the app's engines up to date without shipping a new app version (Windows).
+# Keeps the app's engines up to date without shipping a new app version.
 #
 # Weekly (opt-in, see below) or on demand, it looks for a new whisper.cpp release. If there is
 # one, it smoke-tests the upstream Windows build with the app's own flags
-# (scripts/engines/smoke-whisper.mjs) and, only if that passes, publishes engines.json to the
-# release "engines": the tested list the app reads (ENGINE_LIST_URL). A failing run publishes
-# nothing; GitHub emails the failure.
+# (scripts/engines/smoke-whisper.mjs), builds and smoke-tests whisper-cli for macOS (upstream
+# has no macOS build), and, only if all of that passes, uploads the macOS builds and publishes
+# engines.json to the release "engines": the tested list the app reads (ENGINE_LIST_URL).
+# A failing run publishes nothing; GitHub emails the failure.
 #
 # Not smoke-tested: the Windows CUDA build (GitHub runners have no GPU). It comes from the same
 # upstream release as the Windows CPU build that is tested.
@@ -54,7 +55,8 @@ jobs:
           WANTED: ${{ inputs.version }}
           FORCE: ${{ inputs.force }}
         run: |
-          version="${WANTED:-$(gh api "repos/$UPSTREAM/releases/latest" --jq .tag_name)}"
+          # Newest release with binaries: upstream tags each version twice (vX.Y.Z source only, bNNNN with builds).
+          version="${WANTED:-$(gh api "repos/$UPSTREAM/releases?per_page=20" --jq '[.[] | select(any(.assets[]; .name == "whisper-bin-x64.zip"))][0].tag_name')}"
           # Only plain release tags, so the value is safe to use in names and URLs below.
           [[ "$version" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "unexpected tag: $version"; exit 1; }
           published=""
@@ -99,8 +101,49 @@ jobs:
       - name: Smoke test
         run: node scripts/engines/smoke-whisper.mjs "$CLI" models/ggml-base.bin models/ggml-silero.bin jfk.wav work
 
+  build-mac:
+    needs: check
+    if: needs.check.outputs.build == 'true'
+    # macOS 15: its Rosetta runs AVX2, so the Intel build can be smoke-tested on this Apple Silicon runner.
+    runs-on: macos-15
+    strategy:
+      matrix:
+        include:
+          - arch: arm64
+            cmake: -DCMAKE_OSX_ARCHITECTURES=arm64 -DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON
+            run: ''
+          - arch: x64
+            cmake: -DCMAKE_OSX_ARCHITECTURES=x86_64 -DGGML_METAL=OFF
+            run: arch -x86_64
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build whisper-cli (static, one file)
+        run: |
+          git clone -q --depth 1 --branch "$VERSION" "https://github.com/$UPSTREAM.git" upstream
+          cmake -S upstream -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3 -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=OFF ${{ matrix.cmake }}
+          cmake --build build --config Release -j 4 --target whisper-cli
+          otool -L build/bin/whisper-cli
+          # Only system libraries, or it will not run on other Macs.
+          if otool -L build/bin/whisper-cli | tail -n +2 | grep -v -E '^\s*/(usr/lib|System/Library)/'; then exit 1; fi
+          curl -fsSL -o jfk.wav "https://raw.githubusercontent.com/$UPSTREAM/$VERSION/samples/jfk.wav"
+      - uses: ./.github/actions/smoke-models
+      - name: Smoke test
+        run: |
+          printf '#!/bin/sh\nexec ${{ matrix.run }} "%s" "$@"\n' "$PWD/build/bin/whisper-cli" > cli && chmod +x cli
+          node scripts/engines/smoke-whisper.mjs ./cli models/ggml-base.bin models/ggml-silero.bin jfk.wav work
+      - name: Package
+        run: |
+          mkdir mac && tar -czf "mac/whisper-$VERSION-macos-${{ matrix.arch }}.tar.gz" -C build/bin whisper-cli -C ../../upstream LICENSE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-${{ matrix.arch }}
+          path: mac/*.tar.gz
+
   publish:
-    needs: [check, test-windows]
+    needs: [check, test-windows, build-mac]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -109,12 +152,18 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mac-*
+          merge-multiple: true
+          path: mac
       - name: Publish the engine list
         run: |
           gh release view engines >/dev/null 2>&1 || gh release create engines --latest=false --title "Engine list" \
             --notes "engines.json lists the tested engine builds the app downloads. Updated by the Engines workflow."
           gh release download engines -p engines.json -O previous.json 2>/dev/null || echo '{"schema":1,"engines":[]}' > previous.json
           gh api "repos/$UPSTREAM/releases/tags/$VERSION" > upstream.json
-          node scripts/engines/make-list.mjs "$VERSION" upstream.json previous.json engines.json
+          gh release upload engines mac/*.tar.gz --clobber
+          node scripts/engines/make-list.mjs "$VERSION" upstream.json previous.json engines.json mac
           gh release upload engines engines.json --clobber
           cat engines.json

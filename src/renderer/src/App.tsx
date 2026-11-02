@@ -63,7 +63,7 @@ export default function App() {
   const model = downloading ? CATALOG.find((entry) => entry.id === downloading.id) : undefined
   const engine =
     downloading && !model ? ENGINES.find((entry) => entry.id === downloading.id) : undefined
-  const totalBytes = model ? model.bytes : engine ? engineBytes(engine) : 0
+  const totalBytes = model ? model.bytes : engine ? engineBytes(engine) : (downloading?.totalBytes ?? 0)
   const name = model ? model.name : engine ? engineLabel(engine) : downloading?.id
   const percent =
     downloading && totalBytes > 0

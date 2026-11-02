@@ -5,6 +5,7 @@ import { loadJobs } from './jobs'
 import { serveMedia } from './media'
 import { registerIpc } from './ipc'
 import { initLogger, log } from './logger'
+import { ytDlpPath } from './youtube'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -107,10 +108,14 @@ if (!app.requestSingleInstanceLock()) {
   app
     .whenReady()
     .then(() => {
+      // macOS takes the Dock icon from the app bundle, which in dev is Electron's.
+      if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(appIcon())
       protocol.handle('siftora-media', serveMedia)
       registerIpc()
       loadJobs()
       loadEngineList()
+      // Only needed for video links, but the first link should not wait for it.
+      ytDlpPath().catch((err: unknown) => log.warn('youtube', `could not download yt-dlp: ${describe(err)}`))
       createWindow()
 
       app.on('activate', () => {

@@ -247,7 +247,10 @@ export async function requiredEngineInfo(): Promise<RequiredEngines> {
   }
 }
 
-/** One engine choice per backend that has a build for this OS/arch (CPU is always offered). */
+/**
+ * One engine choice per backend that this OS/arch has a build of, and only when every core
+ * engine has a build for it (Apple Silicon has Metal builds only, so no CPU choice there).
+ */
 export async function engineOptions(): Promise<EngineOption[]> {
   const hw = await detectHardware()
   const appleSilicon = process.platform === 'darwin' && process.arch === 'arm64'
@@ -260,7 +263,8 @@ export async function engineOptions(): Promise<EngineOption[]> {
         entry.arch === process.arch &&
         entry.backend === backend
     )
-    if (!hasBuild && backend !== 'cpu') continue
+    const complete = ENGINE_NAMES.every((name) => pickEngine(name, process.platform, process.arch, backend) !== null)
+    if (!hasBuild || !complete) continue
 
     const ids = requiredEngines(hw, backend)
     const entries = ids

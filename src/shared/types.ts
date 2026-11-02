@@ -265,6 +265,8 @@ export interface ModelState {
   receivedBytes: number
   bytesPerSec: number
   etaSec: number | null
+  /** Size, for downloads that are not in the catalog or engine list (yt-dlp). */
+  totalBytes?: number
   error?: string
   /** Installed engine with a newer tested version available (the version). */
   update?: string
@@ -279,6 +281,7 @@ export interface Api {
   pickVideos(): Promise<string[]>
   /** Asks the site about a video link (downloads yt-dlp the first time). */
   youtubeInfo(url: string): Promise<YoutubeInfo>
+  ytDlpInstalled(): Promise<boolean>
   log(level: 'info' | 'warn' | 'error', msg: string): void
   appInfo(): Promise<{ version: string; platform: string; userData: string }>
   getPathForFile(file: File): string
@@ -379,6 +382,7 @@ export const IPC = {
   importCookiesFile: 'dialog:import-cookies',
   pickVideos: 'dialog:pick-videos',
   youtubeInfo: 'youtube:info',
+  ytDlpInstalled: 'youtube:installed',
   log: 'app:log',
   appInfo: 'app:info',
   getHardware: 'hardware:get',

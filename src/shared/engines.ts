@@ -1,8 +1,9 @@
 // Engine builds (llama.cpp, whisper.cpp, FFmpeg) per OS/arch/backend. Sizes and SHA-256
 // come from the GitHub release asset digests, checked 2026-10-31.
 // These are the fallback; the tested list published by .github/workflows/engines.yml (see
-// ENGINE_LIST_URL) overrides them with newer tested versions (Windows whisper.cpp for now).
-// TODO before 1.0: mirror FFmpeg too (BtbN prunes old autobuild tags; no macOS build yet).
+// ENGINE_LIST_URL) overrides them with newer tested versions (Windows whisper.cpp) and adds
+// our own macOS whisper.cpp builds.
+// TODO before 1.0: mirror FFmpeg too (BtbN prunes old autobuild tags).
 
 export type EngineName = 'llama' | 'whisper' | 'ffmpeg' | 'sherpa'
 export type Backend = 'cuda' | 'metal' | 'vulkan' | 'cpu'
@@ -38,6 +39,7 @@ const LLAMA = 'https://github.com/ggml-org/llama.cpp/releases/download/b12020'
 const WHISPER = 'https://github.com/ggml-org/whisper.cpp/releases/download/b5454'
 const SHERPA = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1'
 const FFMPEG = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-31-12-59'
+const FFMPEG_MAC = 'https://ffmpeg.martin-riedl.de/download/macos'
 
 export const ENGINES: EngineEntry[] = [
   // ── sherpa-onnx: speaker detection (only installed with the speaker detection feature) ──
@@ -207,7 +209,26 @@ export const ENGINES: EngineEntry[] = [
     latest: { repo: 'BtbN/FFmpeg-Builds', asset: /^ffmpeg-n(\d+)\.(\d+)-latest-linux64-gpl-[\d.]+\.tar\.xz$/ }
   },
 
-  // ── macOS ── (whisper.cpp and FFmpeg: own builds needed, see TODO above)
+  // ── macOS ── (whisper.cpp has no upstream macOS build: engines.yml builds it and publishes
+  // whisper-mac-* in the engine list)
+  // FFmpeg: Martin Riedl's static builds (libass, libx264), ffmpeg and ffprobe as separate zips.
+  ...([
+    { arch: 'arm64', dir: 'arm64/1789931890_9.0.2', ffmpeg: [28395699, 'c8ed4c4e6978a03c485edbfe4e0a5dc2380f8a30bba5150531b31b094492d924'], ffprobe: [28317701, 'fcbe839537485eaee7a7a8bc5cbc0f90d53617e80943e8a5b2e31cb851197ea6'] },
+    { arch: 'x64', dir: 'amd64/1789931006_9.0.2', ffmpeg: [33816391, '7c6b4125b191cbf773832dc51f424cf2b6bb7da43007d1e066f95909e47cacd4'], ffprobe: [33719233, '2322438ed2f6319a691291b247d09c69dcaa3a982460d1f269a7e1af335cfdfd'] }
+  ] as const).map(({ arch, dir, ffmpeg, ffprobe }) => ({
+    id: `ffmpeg-mac-${arch}`,
+    engine: 'ffmpeg' as const,
+    backend: 'cpu' as const,
+    platform: 'darwin' as const,
+    arch,
+    files: [
+      { url: `${FFMPEG_MAC}/${dir}/ffmpeg.zip`, bytes: ffmpeg[0], sha256: ffmpeg[1] },
+      { url: `${FFMPEG_MAC}/${dir}/ffprobe.zip`, bytes: ffprobe[0], sha256: ffprobe[1] }
+    ],
+    binary: 'ffmpeg',
+    license: 'GPL-3.0',
+    version: '9.0.2'
+  })),
   {
     id: 'llama-mac-metal',
     engine: 'llama',
@@ -233,10 +254,10 @@ export const ENGINES: EngineEntry[] = [
 ]
 
 /**
- * Tested engine builds published by .github/workflows/engines.yml. Set ENGINE_REPO to the
- * project's "owner/repo" once it is on GitHub; until then the app only uses the list above.
+ * Tested engine builds published by .github/workflows/engines.yml. Without the published list
+ * (offline, or before the workflow has run) the app only uses the list above.
  */
-export const ENGINE_REPO: string | null = null
+export const ENGINE_REPO: string | null = 'Mohamedkrs/siftora'
 export const ENGINE_LIST_URL = ENGINE_REPO
   ? `https://github.com/${ENGINE_REPO}/releases/download/engines/engines.json`
   : null
