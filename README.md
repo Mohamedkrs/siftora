@@ -50,7 +50,7 @@ Everything runs on your own computer. Your videos and transcripts are never uplo
 
 ## Requirements
 
-- **Windows 10 or 11, 64-bit.** macOS and Linux builds exist but are not ready yet; see [Platforms](#platforms).
+- **Windows 10 or 11, 64-bit.** macOS (Apple Silicon or Intel) and Linux should work but are untested; see [Platforms](#platforms).
 - **8 GB of RAM** at least. 16 GB or more is better.
 - **An NVIDIA graphics card is strongly recommended.** It makes Siftora 5–10 times faster. Other graphics cards work through Vulkan, and any computer works on the CPU, more slowly.
 - **3–12 GB of free disk space** for the engines and AI models, depending on which you choose.
@@ -90,8 +90,8 @@ Your rendered reels are never deleted by either.
 
 | | Windows | Linux | macOS |
 |---|---|---|---|
-| Status | Tested | Should work, untested | Not ready yet |
-| Fast transcription | NVIDIA GPU | CPU only for now | Needs our own build (planned) |
+| Status | Tested | Should work, untested | Should work, untested |
+| Fast transcription | NVIDIA GPU | CPU only for now | Apple Silicon (Metal) |
 
 ### Tested on
 
@@ -147,7 +147,7 @@ For the maintainer: these steps need write access to this repository. In a fork,
 
 Engines are downloaded on demand, never bundled. Besides the built-in list in `src/shared/engines.ts`, the app reads a tested list, `engines.json`, from this repository's `engines` release, and offers an **Update** on the Models screen when a newer tested version exists.
 
-[.github/workflows/engines.yml](.github/workflows/engines.yml) keeps that list current for Windows: on demand, or weekly once the repository variable `ENGINES_WEEKLY` is set to `true`, it picks up a new whisper.cpp release, smoke-tests the Windows build with the app's own settings ([scripts/engines/smoke-whisper.mjs](scripts/engines/smoke-whisper.mjs)), and publishes only if that passes. To enable it, set `ENGINE_REPO` in `src/shared/engines.ts` to this repository's `owner/repo` and run the workflow once from the Actions tab.
+[.github/workflows/engines.yml](.github/workflows/engines.yml) keeps that list current: on demand, or weekly once the repository variable `ENGINES_WEEKLY` is set to `true`, it picks up a new whisper.cpp release, smoke-tests the Windows build with the app's own settings ([scripts/engines/smoke-whisper.mjs](scripts/engines/smoke-whisper.mjs)), builds and smoke-tests whisper-cli for macOS (upstream has no macOS build), and publishes only if all of that passes. Run it once from the Actions tab: until then, Macs have no whisper.cpp to download. A fork must set `ENGINE_REPO` in `src/shared/engines.ts` to its own `owner/repo`.
 
 The original design notes are in [docs/planning](docs/planning).
 
