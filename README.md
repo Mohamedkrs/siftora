@@ -10,6 +10,8 @@
 <p align="center">
   <a href="../../releases/latest/download/Siftora-Setup.exe"><img src="resources/brand/download-windows.svg" alt="Download for Windows" height="60"></a>
   &nbsp;
+  <a href="../../releases/latest/download/Siftora-mac-arm64.dmg"><img src="resources/brand/download-macos.svg" alt="Download for macOS (Apple Silicon)" height="60"></a>
+  &nbsp;
   <a href="https://ko-fi.com/mohamedkrs"><img src="resources/brand/support-kofi.svg" alt="Buy me a coffee on Ko-fi" height="60"></a>
 </p>
 
@@ -50,16 +52,29 @@ Everything runs on your own computer. Your videos and transcripts are never uplo
 
 ## Requirements
 
-- **Windows 10 or 11, 64-bit.** macOS (Apple Silicon or Intel) and Linux should work but are untested; see [Platforms](#platforms).
+- **Windows 10 or 11, 64-bit**, or **macOS 13.3 or newer** (Apple Silicon; Intel Macs work more slowly). The macOS version is new and less tested; Linux should work but is untested. See [Platforms](#platforms).
 - **8 GB of RAM** at least. 16 GB or more is better.
 - **An NVIDIA graphics card is strongly recommended.** It makes Siftora 5–10 times faster. Other graphics cards work through Vulkan, and any computer works on the CPU, more slowly.
 - **3–12 GB of free disk space** for the engines and AI models, depending on which you choose.
 
 ## Install
 
+**Windows**
+
 1. Click **Download for Windows** above, or pick a version on the [Releases](../../releases) page.
 2. Run it. Windows may show "Windows protected your PC", because the app is not code-signed yet: choose **More info → Run anyway**.
-3. On first start, Siftora checks your hardware, recommends models that fit it, and shows what it found already on your computer. Then it downloads what is missing.
+
+**macOS**
+
+1. Click **Download for macOS** above. On an Intel Mac, download [Siftora-mac-x64.dmg](../../releases/latest/download/Siftora-mac-x64.dmg) instead.
+2. Open the disk image and drag Siftora into **Applications**.
+3. Open Siftora. macOS says it cannot check the app for malware, because it is not notarized by Apple yet: click **Done**, then open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to Siftora. You only do this once.
+
+   If macOS instead says the app "is damaged", run `xattr -cr /Applications/Siftora.app` in Terminal and open it again.
+
+**Then, on both**
+
+On first start, Siftora checks your hardware, recommends models that fit it, and shows what it found already on your computer. Then it downloads what is missing.
 
 ## How to use it
 
@@ -90,7 +105,7 @@ Your rendered reels are never deleted by either.
 
 | | Windows | Linux | macOS |
 |---|---|---|---|
-| Status | Tested | Should work, untested | Should work, untested |
+| Status | Tested | Should work, untested | Tested on Apple Silicon (M3 Pro); Intel untested |
 | Fast transcription | NVIDIA GPU | CPU only for now | Apple Silicon (Metal) |
 
 ### Tested on
