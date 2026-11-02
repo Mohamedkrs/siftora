@@ -132,6 +132,8 @@ The app is Electron, React and TypeScript. The work happens in `src/main/pipelin
 
 ### Releasing
 
+For the maintainer: these steps need write access to this repository. In a fork, the same workflow makes releases in your own copy only.
+
 1. Set the new version in `package.json` and commit it.
 2. Open **Actions → Release → Run workflow** and choose what to do:
    - **Only build:** builds the installer as a download on the run, without releasing anything.
