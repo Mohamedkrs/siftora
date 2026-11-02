@@ -1,4 +1,4 @@
-# Builds the Windows installer on a clean machine, and makes releases.
+# Builds the Windows installer and the macOS disk images on clean machines, and makes releases.
 #
 # Actions → Release → Run workflow, then choose what to do:
 #   - Only build: the installer is a download on the run; nothing is released.
@@ -38,6 +38,9 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write # create the release
+    outputs:
+      mode: ${{ steps.version.outputs.mode }}
+      tag: ${{ steps.version.outputs.tag }}
     defaults:
       run:
         shell: bash
@@ -117,3 +120,47 @@ jobs:
               --title "Siftora ${TAG#v}" --generate-notes
             echo "Draft release $TAG is ready: open Releases, review it and publish it."
           fi
+
+  # Runs after the Windows job, which creates the release, and adds the disk images to it.
+  macos:
+    needs: windows
+    runs-on: macos-15
+    permissions:
+      contents: write # upload to the release
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.windows.outputs.tag }}
+      MODE: ${{ needs.windows.outputs.mode }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build the disk images (Apple Silicon and Intel)
+        # Ad-hoc signed (electron-builder.yml), not notarized until there is an Apple Developer ID.
+        run: npm run dist -- --mac --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Check the apps are signed (an unsigned app does not launch on Apple Silicon)
+        run: |
+          for app in release/mac-arm64/Siftora.app release/mac/Siftora.app; do
+            codesign --verify --deep --strict --verbose=2 "$app"
+          done
+          ls -l release/*.dmg
+
+      - name: Keep the disk images with the run
+        uses: actions/upload-artifact@v4
+        with:
+          name: Siftora-mac
+          path: release/Siftora-mac-*.dmg
+          if-no-files-found: error
+
+      - name: Add them to the release
+        if: needs.windows.outputs.mode != 'none'
+        run: gh release upload "$TAG" release/Siftora-mac-arm64.dmg release/Siftora-mac-x64.dmg --clobber

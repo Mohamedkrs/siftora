@@ -30,7 +30,16 @@ nsis:
   # A fixed name, so releases/latest/download/Siftora-Setup.exe always gets the newest installer
   artifactName: Siftora-Setup.${ext}
 mac:
-  target: dmg
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  # Ad-hoc signature (no Apple Developer ID yet): Apple Silicon will not launch an unsigned app.
+  # Ad-hoc signing needs hardened runtime off, or Electron's own frameworks fail library validation.
+  identity: '-'
+  hardenedRuntime: false
+dmg:
+  # Fixed names, so releases/latest/download/Siftora-mac-arm64.dmg always gets the newest build
+  artifactName: Siftora-mac-${arch}.${ext}
 linux:
   target: AppImage
 extraMetadata:
