@@ -23,7 +23,7 @@ Everything runs on your own computer. Your videos and transcripts are never uplo
 - **Colour per speaker.** Optional speaker detection gives each person their own caption colour.
 - **Review fast.** Filter moments by topic (funny, emotional, educational…), heart the keepers, delete the rest in one click, and nudge a clip's start and end.
 - **Preview before you render.** Pick the caption style and layout on a real frame of your clip, drag the captions where you want them (or turn them off), then render one reel or all of them.
-- **Ready to post.** Each rendered reel comes with a title, description and hashtags per platform.
+- **Ready to post.** Each rendered reel comes with a title, description and hashtags per platform, written with the video's chapters, the creator's own hashtags and a credit to their channel. Optionally, Siftora also reads the YouTube comments that point at a moment ("14:22 I lost it") to find the angle viewers loved.
 - **Uses what you already have.** Finds Ollama, Python Whisper, FFmpeg and model files on your computer, so you download as little as possible.
 - **Files or links.** YouTube, Facebook, TikTok, X, Instagram and the many other sites [yt-dlp](https://github.com/yt-dlp/yt-dlp) supports. Clip length and score limits can be set for all videos or per video.
 
@@ -42,7 +42,7 @@ Everything runs on your own computer. Your videos and transcripts are never uplo
 
 ## How to use it
 
-1. **Create:** drop in a video or paste a link, then **Find clips**.
+1. **Create:** drop in a video or paste a link, then **Find clips**. Add as many as you like; the sidebar shows how many are still to do.
 2. **Queue:** follow the progress. Finished steps are saved, so a retry does not start over.
 3. **Results:** review the clips by score, pick a caption style and layout, and render the reels. They are saved in `Videos\Siftora`.
 
@@ -53,7 +53,7 @@ Scores are estimates to help you choose. They do not guarantee that a clip will 
 ## Privacy
 
 - Your videos, transcripts and clips **never leave your computer**. There is no account, no tracking and no analytics.
-- Siftora goes online only to download its engines and AI models (from GitHub and Hugging Face), to check for engine updates, and to download the videos you add by link.
+- Siftora goes online only to download its engines and AI models (from GitHub and Hugging Face), to check for engine updates, and to download the videos you add by link (and their comments, if you turn that on).
 - If you choose a sign-in for video links, your browser's cookies (or your `cookies.txt`) are passed to yt-dlp on your computer, and only sent to the site of the video.
 - What you do with found moments (hearts, deletes, trims, renders) is written to `feedback.jsonl` in the app's data folder, so you can measure how good the picks are. It stays there.
 - If you point Ollama at another computer (its `OLLAMA_HOST` setting), transcripts are sent to that computer for the clip-finding step.
