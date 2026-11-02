@@ -322,6 +322,13 @@ export default function SettingsScreen() {
         ) : (
           <p className="muted">Loading…</p>
         )}
+        <p className="muted">
+          Siftora is free, with no ads or accounts. If it saves you time,{' '}
+          <a href="https://ko-fi.com/mohamedkrs" target="_blank" rel="noreferrer">
+            support it on Ko-fi ☕
+          </a>
+          .
+        </p>
       </section>
     </div>
   )
