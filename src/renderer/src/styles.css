@@ -100,6 +100,16 @@ select {
   font: inherit;
 }
 
+/* Theme defaults, so new screens never fall back to the browser's blue. */
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--accent);
+}
+
+a {
+  color: var(--accent);
+}
+
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -1889,6 +1899,10 @@ option {
   gap: 8px;
 }
 
+.signin-hint {
+  flex-basis: 100%;
+}
+
 .icon-button {
   flex: none;
   width: 30px;
@@ -2428,6 +2442,162 @@ option {
   font-size: 12px;
 }
 
+/* Length timeline: the clip in accent, the AI's cut as a dashed outline, a playhead line. */
+.trim-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trim-track {
+  position: relative;
+  height: 28px;
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.trim-range {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  border-block: 2px solid var(--accent);
+}
+
+.trim-original {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  border: 1px dashed var(--muted);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.trim-playhead {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+  pointer-events: none;
+}
+
+.trim-handle {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 12px;
+  margin-left: -6px;
+  background: var(--accent);
+  border-radius: 4px;
+  cursor: ew-resize;
+}
+
+.trim-handle:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.trim-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.trim-length {
+  color: var(--text);
+}
+
+.trim-length.long {
+  color: var(--warning-text);
+}
+
+.trim-hint {
+  margin: 0;
+  font-size: 12px;
+}
+
+.trim-hint kbd {
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 11px;
+}
+
+.trim-words-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trim-words {
+  max-height: 160px;
+  overflow-y: auto;
+  line-height: 1.9;
+}
+
+.trim-word {
+  padding: 1px 3px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.trim-word.in {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.trim-word:hover:not(:disabled) {
+  outline: 1px solid var(--accent);
+}
+
+/* "Bigger": the clip card fills the window, player on top, editor under it. */
+.clip-media {
+  position: relative;
+}
+
+.expand-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+}
+
+.clip-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgb(0 0 0 / 0.6);
+}
+
+.clip-card.expanded {
+  position: fixed;
+  inset: 24px;
+  z-index: 91;
+  margin: 0;
+  overflow-y: auto;
+  grid-template-columns: 1fr;
+  align-content: start;
+}
+
+.clip-card.expanded .clip-source {
+  max-height: 58vh;
+}
+
+.clip-card.expanded .trim-words {
+  max-height: 240px;
+}
+
 /* Share kit on a clip card */
 .share-panel {
   display: flex;
@@ -2498,4 +2668,291 @@ option {
 
 .kofi-button img {
   display: block;
+}
+
+.job-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+/* Channels screen and the saved-channels pick on Create */
+.channel-fields,
+.saved-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.channel-fields > input[type='text'] {
+  flex: 1 1 200px;
+}
+
+/* Same look as the app's dropdowns. */
+.channel-fields > input[type='text'],
+.channel-row > input[type='text'] {
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 10px;
+  background: var(--sunken);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+
+.channel-fields > input[type='text']::placeholder,
+.channel-row > input[type='text']::placeholder {
+  color: var(--muted);
+}
+
+.channel-fields > input[type='text']:hover,
+.channel-row > input[type='text']:hover {
+  border-color: var(--border-strong);
+  background: var(--raised);
+}
+
+.channel-fields > input[type='text']:focus-visible,
+.channel-row > input[type='text']:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.saved-pick {
+  margin-top: 12px;
+  /* The count field has its label on top; line the controls up on their bottom edge. */
+  align-items: flex-end;
+}
+
+.saved-pick select,
+.saved-pick .button,
+.saved-pick .field input {
+  height: 38px;
+}
+
+.saved-pick .field {
+  position: relative;
+  width: 130px;
+}
+
+/* Below the box without taking space, so the row does not shift while it shows. */
+.saved-pick .field-error {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+.saved-pick p {
+  flex-basis: 100%;
+  margin: 12px 0 0;
+}
+
+.channel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.channel-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 1.5fr) minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.channel-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .channel-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Select several videos (Queue, Results) for bulk actions */
+.bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.bulk-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 4px;
+  cursor: pointer;
+}
+
+.job-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.job-title input {
+  flex: none;
+  margin: 0;
+}
+
+.bulk-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.job-head-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.video-pick {
+  position: relative;
+  flex: 0 0 200px;
+  /* A flex item sizes to its content by default; the card's video would make it the video's width. */
+  min-width: 0;
+}
+
+.video-pick .video-card {
+  width: 100%;
+  height: 100%;
+}
+
+.video-pick-box {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.subs-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px 16px;
+  max-height: 320px;
+  margin: 12px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.subs-list label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+/* Tag field: chips plus a box to type; the dropdown lists tags already in use. */
+.tag-input {
+  position: relative;
+  display: flex;
+  flex: 1 1 220px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 3px 6px;
+  background: var(--sunken);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: text;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+
+.tag-input:hover {
+  border-color: var(--border-strong);
+}
+
+.tag-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.tag-input input {
+  flex: 1 0 80px;
+  min-width: 0;
+  padding: 3px 4px;
+  background: none;
+  border: 0;
+  outline: none;
+  color: var(--text);
+}
+
+.tag-input input::placeholder {
+  color: var(--muted);
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 2px 1px 8px;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.tag-chip button {
+  padding: 0 5px;
+  background: none;
+  border: 0;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tag-chip button:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.tag-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+}
+
+.tag-list li {
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tag-list li.active,
+.tag-list li:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
 }

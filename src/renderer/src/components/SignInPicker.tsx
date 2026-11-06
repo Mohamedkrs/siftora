@@ -4,6 +4,10 @@ import { useSettings } from '../state/settings'
 
 const capital = (text: string): string => `${text[0].toUpperCase()}${text.slice(1)}`
 
+/** Chrome 127+ and its offspring encrypt cookies "app-bound" on Windows; yt-dlp usually cannot read them. */
+const chromiumOnWindows = (source: CookiesSource | null): boolean =>
+  !!source && source !== 'file' && source !== 'firefox' && navigator.userAgent.includes('Windows')
+
 /**
  * Where the downloader gets a sign-in for age-restricted or members-only videos: a browser,
  * or a cookies.txt file (copied into the app). `onChosen` runs once a source is set.
@@ -42,6 +46,17 @@ export default function SignInPicker(props: { noneLabel: string; onChosen?: () =
         <button type="button" className="button small" onClick={() => void choose('file')}>
           Load a newer file…
         </button>
+      ) : null}
+      {chromiumOnWindows(settings.cookiesBrowser) ? (
+        <span className="muted small signin-hint">
+          On Windows, {capital(settings.cookiesBrowser!)} locks its sign-in so other apps can't read it (Firefox can be read).
+          If downloads still ask for a sign-in, open youtube.com in {capital(settings.cookiesBrowser!)} while signed in,
+          export its cookies with a “cookies.txt” extension, and{' '}
+          <button type="button" className="link-button" onClick={() => void choose('file')}>
+            load the file here
+          </button>
+          .
+        </span>
       ) : null}
       {error ? <span className="error">{error}</span> : null}
     </>

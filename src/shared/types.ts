@@ -13,6 +13,14 @@ export interface CustomModel {
   bytes: number
 }
 
+/** A YouTube channel saved on the Channels screen, to add its newest videos from Create. */
+export interface SavedChannel {
+  url: string
+  name: string
+  /** Free labels to group channels by content, e.g. "gaming", "podcasts". */
+  tags: string[]
+}
+
 export interface EngineOption {
   backend: Backend
   label: string
@@ -147,6 +155,7 @@ export interface Settings {
   speakersWhen: 'video' | 'clip'
   engineBackend: EngineBackend
   customModels: CustomModel[]
+  savedChannels: SavedChannel[]
   linkedModels: Record<string, string>
   /** Engine binaries already on the computer, used instead of downloading. */
   enginePaths: Partial<Record<EngineKind, string>>
@@ -205,6 +214,7 @@ export const DEFAULT_SETTINGS: Settings = {
   speakersWhen: 'video',
   engineBackend: 'auto',
   customModels: [],
+  savedChannels: [],
   linkedModels: {},
   enginePaths: {},
   llmProvider: 'app',
@@ -282,6 +292,13 @@ export interface Api {
   /** Asks the site about a video link (downloads yt-dlp the first time). */
   youtubeInfo(url: string): Promise<YoutubeInfo>
   ytDlpInstalled(): Promise<boolean>
+  /** Links to a YouTube channel's `count` newest videos. */
+  /** sinceDays > 0: only videos uploaded in that many days. */
+  channelVideos(url: string, count: number, sinceDays?: number): Promise<string[]>
+  /** A channel's name and a few of its keywords, for the Channels screen. */
+  channelDetails(url: string): Promise<{ name: string; tags: string[] }>
+  /** Channels the user subscribes to (needs the YouTube sign-in from Settings). */
+  subscribedChannels(): Promise<{ url: string; name: string }[]>
   log(level: 'info' | 'warn' | 'error', msg: string): void
   appInfo(): Promise<{ version: string; platform: string; userData: string }>
   getPathForFile(file: File): string
@@ -342,6 +359,8 @@ export interface Api {
   deleteClips(jobId: string, clipIds: string[]): Promise<void>
   /** Sets a clip's start/end (ms in the source video) by hand. */
   setClipRange(jobId: string, clipId: string, start: number, end: number): Promise<void>
+  /** Transcript words (ms) between two times in the source video. */
+  clipWords(jobId: string, from: number, to: number): Promise<{ start: number; end: number; text: string }[]>
   openPath(path: string): Promise<void>
   /** Opens a platform's upload page in the browser. */
   openUploadPage(platform: SharePlatform): Promise<void>
@@ -383,6 +402,9 @@ export const IPC = {
   pickVideos: 'dialog:pick-videos',
   youtubeInfo: 'youtube:info',
   ytDlpInstalled: 'youtube:installed',
+  channelVideos: 'youtube:channel-videos',
+  channelDetails: 'youtube:channel-details',
+  subscribedChannels: 'youtube:subscribed-channels',
   log: 'app:log',
   appInfo: 'app:info',
   getHardware: 'hardware:get',
@@ -420,6 +442,7 @@ export const IPC = {
   setClipHeart: 'jobs:set-clip-heart',
   deleteClips: 'jobs:delete-clips',
   setClipRange: 'jobs:set-clip-range',
+  clipWords: 'jobs:clip-words',
   openPath: 'shell:open-path',
   openUploadPage: 'shell:open-upload-page',
   showInFolder: 'shell:show-in-folder',

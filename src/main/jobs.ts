@@ -67,6 +67,8 @@ export function loadJobs(): void {
       for (const clip of job.clips) {
         if (clip.render.status === 'rendering' || clip.render.status === 'queued') clip.render = { status: 'idle', progress: 0 }
       }
+      // Jobs from before the channel was kept.
+      job.channel ??= channelOf(jobDir(id))
       jobs.set(job.id, job)
     } catch {
       // Not a job folder or unreadable; ignore.
@@ -272,7 +274,12 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
       job.title !== job.source ? job.title : undefined,
       job.options.comments
     )
-    update(job, { videoPath: result.path, title: result.title, outputDir: join(outputRoot(), safeName(result.title)) })
+    update(job, {
+      videoPath: result.path,
+      title: result.title,
+      channel: channelOf(dir),
+      outputDir: join(outputRoot(), safeName(result.title))
+    })
   }
   const video = job.videoPath as string
 
@@ -484,6 +491,11 @@ function readVideoInfo(dir: string): VideoInfo | null {
   return readJson<VideoInfo>(join(dir, 'video.info.json'))
 }
 
+function channelOf(dir: string): string | undefined {
+  const info = readVideoInfo(dir)
+  return info?.channel ?? info?.uploader
+}
+
 /** "@KSI"; Facebook and others give a number, which is no use as a credit. */
 function handle(info: VideoInfo | null): string | undefined {
   return info?.uploader_id?.startsWith('@') ? info.uploader_id : undefined
@@ -628,6 +640,14 @@ const MIN_CLIP_MS = 1000
  * Sets a clip's start/end by hand (ms in the source video). The clip keeps its id; a reel
  * rendered before shows as out of date until it is rendered again.
  */
+/** Transcript words between two times (ms), for picking a clip's start or end by word. */
+export function clipWords(jobId: string, from: number, to: number): { start: number; end: number; text: string }[] {
+  const words = readJson<Transcript>(join(jobDir(jobId), 'transcript.json'))?.segments.flatMap((s) => s.words ?? []) ?? []
+  return words
+    .filter((word) => word.end > from && word.start < to)
+    .map((word) => ({ start: word.start, end: word.end, text: word.text.trim() }))
+}
+
 export function setClipRange(jobId: string, clipId: string, start: number, end: number): void {
   const job = jobs.get(jobId)
   const clip = job?.clips.find((c) => c.id === clipId)

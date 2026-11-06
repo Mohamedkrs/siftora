@@ -54,9 +54,10 @@ interface Moment {
 
 /**
  * Bump when the finder's prompt or scoring changes; saved with each found moment so
- * scripts/eval-clips.mjs can compare versions (2: reasons before choosing edges, video context, skip ads).
+ * scripts/eval-clips.mjs can compare versions (2: reasons before choosing edges, video context, skip ads;
+ * 3: soft minimum length, no padding moments that are only a little short).
  */
-export const FINDER_VERSION = 2
+export const FINDER_VERSION = 3
 
 // Fields are generated in this order: the reasoning comes before the edges and scores it justifies.
 const SCHEMA = {
@@ -101,7 +102,7 @@ const SCHEMA = {
 }
 
 function systemPrompt(minS: number, maxS: number): string {
-  return `You are an expert short-form video editor. You find moments in a video transcript that work as standalone TikTok / Instagram Reels / YouTube Shorts clips of ${minS}-${maxS} seconds.
+  return `You are an expert short-form video editor. You find moments in a video transcript that work as standalone TikTok / Instagram Reels / YouTube Shorts clips of ${minS}-${maxS} seconds. That range is a target, not a rule: give each moment its natural length, and never add filler to reach ${minS} seconds.
 
 The message starts with what the video is (title, channel, description, tags), when known. Use it to understand the format (a challenge, an interview, a stream…) and who is talking; it is not part of the transcript.
 
@@ -467,11 +468,14 @@ function refine(moment: Moment, segments: Segment[], minMs: number, maxMs: numbe
     }
   }
 
-  // Too short: add setup before the start first; a tail after the payoff only drags.
-  while (length() < minMs && (a > 0 || b < segments.length - 1)) {
-    if (a > 0) a--
-    else b++
-    if (!notes.includes('extended to minimum length')) notes.push('extended to minimum length')
+  // Well short: add up to 2 lines of setup (a tail after the payoff only drags). A complete moment
+  // a little under the minimum stays as cut; padding it only adds lines viewers swipe past.
+  if (length() < minMs * 0.6) {
+    for (let i = 0; i < 2 && length() < minMs && (a > 0 || b < segments.length - 1); i++) {
+      if (a > 0) a--
+      else b++
+      if (i === 0) notes.push('extended to minimum length')
+    }
   }
   // Too long: drop what follows the payoff, then the oldest lines, never the payoff itself.
   while (length() > maxMs && (b > payoff || a < payoff)) {

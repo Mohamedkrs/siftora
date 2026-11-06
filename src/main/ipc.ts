@@ -19,7 +19,8 @@ import {
   renderClips,
   retryJob,
   setClipHeart,
-  setClipRange
+  setClipRange,
+  clipWords
 } from './jobs'
 import { log } from './logger'
 import {
@@ -31,7 +32,7 @@ import {
 } from './systemEngines'
 import { Cancelled } from './pipeline/run'
 import { getSettings, setSettings } from './settings'
-import { importCookies, isVideoUrl, youtubeInfo, ytDlpInstalled, ytDlpPath } from './youtube'
+import { channelDetails, channelVideos, importCookies, isChannelUrl, isVideoUrl, subscribedChannels, youtubeInfo, ytDlpInstalled, ytDlpPath } from './youtube'
 
 export function registerIpc(): void {
   ipcMain.handle(IPC.getSettings, () => getSettings())
@@ -146,6 +147,19 @@ export function registerIpc(): void {
     })
   })
   ipcMain.handle(IPC.ytDlpInstalled, () => ytDlpInstalled())
+  ipcMain.handle(IPC.channelVideos, (_event, url: unknown, count: unknown, sinceDays: unknown) => {
+    if (typeof url !== 'string' || !isChannelUrl(url)) throw new Error('Not a YouTube channel link.')
+    if (typeof count !== 'number' || !Number.isInteger(count) || count < 1 || count > 50) throw new Error('Pick 1 to 50 videos.')
+    const days = typeof sinceDays === 'number' && Number.isFinite(sinceDays) ? Math.min(Math.max(0, sinceDays), 3650) : 0
+    return channelVideos(url.trim(), count, days, AbortSignal.timeout(60_000)).catch((err: unknown) => {
+      throw err instanceof Cancelled ? new Error('YouTube did not answer within a minute.') : err
+    })
+  })
+  ipcMain.handle(IPC.channelDetails, (_event, url: unknown) => {
+    if (typeof url !== 'string' || !isChannelUrl(url)) throw new Error('Not a YouTube channel link.')
+    return channelDetails(url.trim(), AbortSignal.timeout(60_000))
+  })
+  ipcMain.handle(IPC.subscribedChannels, () => subscribedChannels(AbortSignal.timeout(180_000)))
   ipcMain.handle(IPC.addJobs, (_event, sources: unknown, links: unknown, limits: unknown) => {
     const valid: Record<string, YoutubeChoice> = {}
     if (links && typeof links === 'object') {
@@ -187,6 +201,9 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.setClipRange, (_event, jobId: unknown, clipId: unknown, start: unknown, end: unknown) => {
     if (typeof start === 'number' && typeof end === 'number') setClipRange(String(jobId), String(clipId), start, end)
   })
+  ipcMain.handle(IPC.clipWords, (_event, jobId: unknown, from: unknown, to: unknown) =>
+    typeof from === 'number' && typeof to === 'number' ? clipWords(String(jobId), from, to) : []
+  )
   // Only the fixed upload pages, never a URL from the renderer.
   ipcMain.handle(IPC.openUploadPage, async (_event, platform: unknown) => {
     const page = SHARE_PLATFORMS.find((item) => item.id === platform)

@@ -25,6 +25,10 @@ win:
   target: nsis
   icon: resources/icon.ico
 nsis:
+  # A short wizard: license, then for-me/all-users, then the install folder
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  license: LICENSE
   # Asks on uninstall whether to delete downloaded models and settings (never on updates)
   include: build/installer.nsh
   # A fixed name, so releases/latest/download/Siftora-Setup.exe always gets the newest installer

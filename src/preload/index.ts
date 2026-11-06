@@ -11,6 +11,9 @@ const api: Api = {
   pickVideos: () => ipcRenderer.invoke(IPC.pickVideos),
   youtubeInfo: (url) => ipcRenderer.invoke(IPC.youtubeInfo, url),
   ytDlpInstalled: () => ipcRenderer.invoke(IPC.ytDlpInstalled),
+  channelVideos: (url, count, sinceDays) => ipcRenderer.invoke(IPC.channelVideos, url, count, sinceDays),
+  channelDetails: (url) => ipcRenderer.invoke(IPC.channelDetails, url),
+  subscribedChannels: () => ipcRenderer.invoke(IPC.subscribedChannels),
   log: (level, msg) => {
     ipcRenderer.send(IPC.log, level, msg)
   },
@@ -65,6 +68,7 @@ const api: Api = {
   setClipHeart: (jobId, clipId, hearted) => ipcRenderer.invoke(IPC.setClipHeart, jobId, clipId, hearted),
   deleteClips: (jobId, clipIds) => ipcRenderer.invoke(IPC.deleteClips, jobId, clipIds),
   setClipRange: (jobId, clipId, start, end) => ipcRenderer.invoke(IPC.setClipRange, jobId, clipId, start, end),
+  clipWords: (jobId, from, to) => ipcRenderer.invoke(IPC.clipWords, jobId, from, to),
   openPath: (path) => ipcRenderer.invoke(IPC.openPath, path),
   openUploadPage: (platform) => ipcRenderer.invoke(IPC.openUploadPage, platform),
   showInFolder: (path) => ipcRenderer.invoke(IPC.showInFolder, path),

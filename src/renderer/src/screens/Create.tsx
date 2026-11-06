@@ -1,4 +1,4 @@
-import { useState, type DragEvent, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type Dispatch, type DragEvent, type FormEvent, type ReactNode, type SetStateAction } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CATALOG, REACTION_MODEL_IDS, llamaTooOld, SPEAKER_MODEL_IDS } from '../../../shared/catalog'
 import { ENGINES, engineBytes, engineLabel, type EngineName } from '../../../shared/engines'
@@ -18,6 +18,16 @@ function isVideoUrl(value: string): boolean {
   try {
     const url = new URL(value.trim())
     return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+/** A YouTube channel page (same test as the main process): /@name, /channel/…, /c/… or /user/…. */
+export function isChannelUrl(value: string): boolean {
+  try {
+    const url = new URL(value.trim())
+    return /(^|\.)youtube\.com$/.test(url.hostname) && /^\/(@[^/]+|(channel|c|user)\/[^/]+)(\/(videos|streams|shorts))?\/?$/.test(url.pathname)
   } catch {
     return false
   }
@@ -308,24 +318,72 @@ function VideoRow(props: {
   )
 }
 
+/** Create's state outlives the screen: switching tabs keeps the list, and link checks that finish meanwhile still land. */
+const kept = new Map<string, unknown>()
+/** The open Create screen's setters per key; work started on an earlier visit updates the screen shown now. */
+const shown = new Map<string, Set<(value: unknown) => void>>()
+
+function useKept<T>(key: string, initial: T): [T, Dispatch<SetStateAction<T>>] {
+  const [value, setValue] = useState<T>(() => (kept.has(key) ? (kept.get(key) as T) : initial))
+  useEffect(() => {
+    const listeners = shown.get(key) ?? new Set()
+    shown.set(key, listeners)
+    const listener = setValue as (value: unknown) => void
+    listeners.add(listener)
+    // Anything that landed between the first render and now.
+    if (kept.has(key)) setValue(kept.get(key) as T)
+    return () => {
+      listeners.delete(listener)
+    }
+  }, [key])
+  const set = useCallback<Dispatch<SetStateAction<T>>>(
+    (next) => {
+      const current = (kept.has(key) ? kept.get(key) : initial) as T
+      const value = typeof next === 'function' ? (next as (old: T) => T)(current) : next
+      kept.set(key, value)
+      for (const listener of shown.get(key) ?? []) listener(value)
+    },
+    // `initial` is only the first value; later ones are ignored, as with useState.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [key]
+  )
+  return [value, set]
+}
+
 export default function Create() {
   const { settings, update } = useSettings()
   const { models, hardware } = useModels()
   const { jobs, add } = useJobs()
   const navigate = useNavigate()
-  const [videos, setVideos] = useState<string[]>([])
-  const [info, setInfo] = useState<Record<string, VideoInfo>>({})
-  const [youtube, setYoutube] = useState<Record<string, YoutubeInfo | string>>({})
-  const [quality, setQuality] = useState<Record<string, number>>({})
-  const [limits, setLimits] = useState<Record<string, ClipLimits>>({})
+  const [videos, setVideos] = useKept<string[]>('videos', [])
+  const [info, setInfo] = useKept<Record<string, VideoInfo>>('info', {})
+  const [youtube, setYoutube] = useKept<Record<string, YoutubeInfo | string>>('youtube', {})
+  const [quality, setQuality] = useKept<Record<string, number>>('quality', {})
+  const [limits, setLimits] = useKept<Record<string, ClipLimits>>('limits', {})
   const [dragging, setDragging] = useState(false)
-  const [url, setUrl] = useState('')
-  const [urlError, setUrlError] = useState('')
-  const [starting, setStarting] = useState(false)
+  const [url, setUrl] = useKept('url', '')
+  const [urlError, setUrlError] = useKept('urlError', '')
+  const [starting, setStarting] = useKept('starting', false)
+  /** How many of a channel's newest videos to add. */
+  const [channelCount, setChannelCount] = useKept('channelCount', 5)
+  const [listingChannel, setListingChannel] = useKept('listingChannel', false)
+  /** Only channel videos uploaded in this many days; 0 = any time. */
+  const [sinceDays, setSinceDays] = useKept('sinceDays', 0)
+  const sincePicker = (
+    <select value={sinceDays} onChange={(event) => setSinceDays(Number(event.target.value))} aria-label="Uploaded within">
+      <option value={0}>Uploaded any time</option>
+      <option value={1}>Uploaded in the last 24 hours</option>
+      <option value={7}>Uploaded in the last week</option>
+      <option value={30}>Uploaded in the last month</option>
+    </select>
+  )
+  /** Saved-channels pick: '' = all, 'tag:<tag>' or 'url:<channel link>'. */
+  const [savedPick, setSavedPick] = useKept('savedPick', '')
+  const [savedStatus, setSavedStatus] = useKept('savedStatus', '')
   /** How many videos the last "Find clips" queued; shown until more are added. */
-  const [added, setAdded] = useState(0)
+  const [added, setAdded] = useKept('added', 0)
   /** Picked videos that Siftora already has; the user chooses: open its results or add it again. */
-  const [already, setAlready] = useState<string[]>([])
+  const [already, setAlready] = useKept<string[]>('already', [])
   const [fetchingYtDlp, setFetchingYtDlp] = useState(false)
 
   const speakersInstalled = SPEAKER_MODEL_IDS.every((id) => models[id]?.status === 'installed')
@@ -444,8 +502,73 @@ export default function Create() {
       return
     }
     setUrlError('')
+    if (isChannelUrl(value)) {
+      setListingChannel(true)
+      window.api
+        .channelVideos(value, channelCount, sinceDays)
+        .then((links) => {
+          if (links.length === 0)
+            return setUrlError(sinceDays > 0 ? 'That channel uploaded nothing in that time.' : 'That channel has no videos.')
+          setUrl('')
+          // Ones already in Siftora go to "Already in Siftora", not the list.
+          for (const link of addVideos(links)) if (youtube[link] === undefined) checkLink(link)
+        })
+        .catch((err: unknown) => {
+          window.api.log('warn', `channelVideos failed: ${String(err)}`)
+          setUrlError(`Could not list that channel: ${(err instanceof Error ? err.message : String(err)).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')}`)
+        })
+        .finally(() => setListingChannel(false))
+      return
+    }
     setUrl('')
     if (addVideos([value]).length > 0 && youtube[value] === undefined) checkLink(value)
+  }
+
+  /** Adds the newest videos of the picked saved channels, skipping ones Siftora already has. */
+  const addFromSaved = async (): Promise<void> => {
+    const picked = settings.savedChannels.filter((channel) =>
+      savedPick.startsWith('tag:')
+        ? channel.tags.includes(savedPick.slice(4))
+        : savedPick.startsWith('url:')
+          ? channel.url === savedPick.slice(4)
+          : true
+    )
+    setListingChannel(true)
+    // Per channel, so the list keeps the channels' order however the listings finish.
+    const found: string[][] = picked.map(() => [])
+    const failed: string[] = []
+    let next = 0
+    let listed = 0
+    setSavedStatus(`Listing ${picked.length} ${picked.length === 1 ? 'channel' : 'channels'}…`)
+    // A few at a time: each listing is its own yt-dlp run, and too many at once trips YouTube's limits.
+    const worker = async (): Promise<void> => {
+      while (next < picked.length) {
+        const index = next++
+        const channel = picked[index]
+        try {
+          found[index] = await window.api.channelVideos(channel.url, channelCount, sinceDays)
+        } catch (err) {
+          window.api.log('warn', `channelVideos ${channel.url} failed: ${String(err)}`)
+          failed.push(channel.name)
+        }
+        listed++
+        setSavedStatus(`Listed ${listed} of ${picked.length} channels…`)
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(4, picked.length) }, worker))
+    const links = found.flat()
+    setListingChannel(false)
+    const fresh = links.filter((link) => !existingJob(link))
+    for (const link of addVideos(fresh)) if (youtube[link] === undefined) checkLink(link)
+    setSavedStatus(
+      [
+        `Added ${fresh.length} new ${fresh.length === 1 ? 'video' : 'videos'}`,
+        links.length > fresh.length ? `skipped ${links.length - fresh.length} already in Siftora` : null,
+        failed.length > 0 ? `could not list ${failed.join(', ')}` : null
+      ]
+        .filter(Boolean)
+        .join('; ') + '.'
+    )
   }
 
   /** Looks the link up; again after the user picked a browser to sign in with. */
@@ -528,14 +651,47 @@ export default function Create() {
                 type="text"
                 value={url}
                 onChange={(event) => setUrl(event.target.value)}
-                placeholder="Paste a video link (YouTube, Facebook, TikTok…)"
-                aria-label="Video link"
+                placeholder="Paste a video or YouTube channel link"
+                aria-label="Video or channel link"
               />
-              <button type="submit" className="button">
-                Add
+              <button type="submit" className="button" disabled={listingChannel}>
+                {listingChannel ? 'Listing…' : isChannelUrl(url) ? `Add ${channelCount} newest` : 'Add'}
               </button>
             </form>
+            {isChannelUrl(url) ? (
+              <div className="saved-pick">
+                <NumberField label="Newest videos" value={channelCount} min={1} max={50} onCommit={setChannelCount} />
+                {sincePicker}
+              </div>
+            ) : null}
             {urlError ? <p className="error">{urlError}</p> : null}
+            {settings.savedChannels.length > 0 ? (
+              <div className="saved-pick">
+                <select value={savedPick} onChange={(event) => setSavedPick(event.target.value)} aria-label="Saved channels to add from">
+                  <option value="">All my channels ({settings.savedChannels.length})</option>
+                  {[...new Set(settings.savedChannels.flatMap((channel) => channel.tags))].sort().map((tag) => (
+                    <option key={tag} value={`tag:${tag}`}>
+                      Tag: {tag} ({settings.savedChannels.filter((channel) => channel.tags.includes(tag)).length})
+                    </option>
+                  ))}
+                  {settings.savedChannels.map((channel) => (
+                    <option key={channel.url} value={`url:${channel.url}`}>
+                      {channel.name}
+                    </option>
+                  ))}
+                </select>
+                <NumberField label="Newest per channel" value={channelCount} min={1} max={50} onCommit={setChannelCount} />
+                {sincePicker}
+                <button type="button" className="button" disabled={listingChannel} onClick={() => void addFromSaved()}>
+                  {listingChannel ? 'Listing…' : 'Add newest'}
+                </button>
+                {savedStatus ? <p className="muted">{savedStatus}</p> : null}
+              </div>
+            ) : (
+              <p className="muted">
+                Tip: save your favourite channels on <Link to="/channels">Channels</Link> to add their newest videos in one click.
+              </p>
+            )}
           </section>
 
           {already.length > 0 ? (
@@ -851,12 +1007,20 @@ export default function Create() {
             : [
                 `${videos.length} ${videos.length === 1 ? 'video' : 'videos'}`,
                 totalMs > 0 ? `${formatClock(totalMs)} of video` : null,
-                youtubeCount > 0 ? `${youtubeCount} from the web` : null
+                youtubeCount > 0 ? `${youtubeCount} from the web` : null,
+                checking ? 'still checking links (you can start anyway)' : null
               ]
                 .filter(Boolean)
                 .join(' · ')}
         </span>
-        <button type="button" className="button primary large" disabled={videos.length === 0 || starting || checking} onClick={start}>
+        <button
+          type="button"
+          className="button primary large"
+          disabled={videos.length === 0 || starting}
+          onClick={start}
+          // Unchecked links still work: they download at the default quality and look up their title then.
+          title={checking ? 'Links still being checked download at the default quality' : undefined}
+        >
           {videos.length > 1 ? `Find clips in ${videos.length} videos` : 'Find clips'} →
         </button>
       </div>

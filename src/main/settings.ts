@@ -9,6 +9,7 @@ import {
   MAX_SPEAKER_COLORS,
   PALETTES,
   type CustomModel,
+  type SavedChannel,
   type EngineBackend,
   type Settings
 } from '../shared/types'
@@ -39,6 +40,21 @@ function modelIdOr(value: unknown, kind: 'transcription' | 'llm', custom: Custom
   if (CATALOG.some((m) => m.id === value && m.kind === kind)) return value
   if (custom.some((m) => m.id === value && m.kind === kind)) return value
   return null
+}
+
+function savedChannelsOr(value: unknown): SavedChannel[] {
+  if (!Array.isArray(value)) return []
+  const channels: SavedChannel[] = []
+  for (const item of value) {
+    if (!isRecord(item) || typeof item.url !== 'string' || !/^https?:\/\//.test(item.url)) continue
+    if (channels.some((channel) => channel.url === item.url)) continue
+    const name = typeof item.name === 'string' && item.name.trim() ? item.name.trim().slice(0, 200) : item.url
+    const tags = Array.isArray(item.tags)
+      ? [...new Set(item.tags.filter((tag): tag is string => typeof tag === 'string').map((tag) => tag.trim().slice(0, 50)).filter(Boolean))]
+      : []
+    channels.push({ url: item.url.slice(0, 1024), name, tags })
+  }
+  return channels
 }
 
 function customModelsOr(value: unknown): CustomModel[] {
@@ -159,6 +175,7 @@ function sanitize(input: unknown): Settings {
     engineBackend:
       ENGINE_BACKENDS.find((backend) => backend === raw.engineBackend) ?? defaults.engineBackend,
     customModels,
+    savedChannels: savedChannelsOr(raw.savedChannels),
     linkedModels: linkedModelsOr(raw.linkedModels),
     enginePaths: enginePathsOr(raw.enginePaths),
     llmProvider: raw.llmProvider === 'ollama' ? 'ollama' : 'app',

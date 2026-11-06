@@ -110,6 +110,8 @@ export interface Job {
   /** Local video file (same as source for files; set after download for URLs). */
   videoPath: string | null
   title: string
+  /** Channel or uploader, for links (from yt-dlp's metadata). */
+  channel?: string
   createdAt: number
   options: JobOptions
   stage: JobStage

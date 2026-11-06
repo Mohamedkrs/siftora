@@ -174,7 +174,7 @@ function cookieArgs(): string[] {
   return source ? ['--cookies-from-browser', source] : []
 }
 
-const NEEDS_SIGN_IN = /confirm your age|sign in to confirm|members-only|private video|login required/i
+const NEEDS_SIGN_IN = /confirm your age|sign in to confirm|members-only|private video|login required|login details are needed/i
 
 /**
  * Runs yt-dlp signed out first, and with the user's sign-in only when the site asks for one, so
@@ -198,7 +198,11 @@ function explain(err: unknown): Error {
   const browser = getSettings().cookiesBrowser
   // Not just /cookie/: the age-gate error itself says "use --cookies-from-browser".
   if (/cookies? database|DPAPI|failed to decrypt/i.test(message) && browser && browser !== 'file') {
-    return new Error(`Sign-in needed: could not read ${browser}'s sign-in. Close ${browser} completely and check again, or pick Firefox.`)
+    return new Error(
+      process.platform === 'win32'
+        ? `Sign-in needed: could not read ${browser}'s sign-in; on Windows it is locked to ${browser}. Pick Firefox, or load a cookies.txt exported from ${browser}.`
+        : `Sign-in needed: could not read ${browser}'s sign-in. Close ${browser} completely and check again, or pick Firefox.`
+    )
   }
   if (NEEDS_SIGN_IN.test(message)) {
     return new Error(
@@ -227,6 +231,77 @@ export async function youtubeInfo(url: string, signal?: AbortSignal): Promise<Yo
     durationMs: Math.round((info.duration ?? 0) * 1000),
     heights: [...new Set(heights)].sort((a, b) => b - a)
   }
+}
+
+/** A YouTube channel page: /@name, /channel/…, /c/… or /user/…, optionally on a tab. */
+export function isChannelUrl(source: string): boolean {
+  try {
+    const url = new URL(source.trim())
+    return /(^|\.)youtube\.com$/.test(url.hostname) && /^\/(@[^/]+|(channel|c|user)\/[^/]+)(\/(videos|streams|shorts))?\/?$/.test(url.pathname)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Links to a channel's `count` newest videos, newest first, without downloading them.
+ * sinceDays > 0 keeps only those uploaded in that many days (YouTube's "3 days ago", so to the day).
+ */
+export async function channelVideos(url: string, count: number, sinceDays = 0, signal?: AbortSignal): Promise<string[]> {
+  const page = new URL(url.trim())
+  // A bare channel link lists its tabs, not videos.
+  if (!/\/(videos|streams|shorts)\/?$/.test(page.pathname)) page.pathname = `${page.pathname.replace(/\/$/, '')}/videos`
+  const ytDlp = await ytDlpPath()
+  const dates = sinceDays > 0 ? ['--extractor-args', 'youtubetab:approximate_date'] : []
+  const output = await runYtDlp(ytDlp, ['--flat-playlist', '-J', ...dates, '--playlist-end', String(count), '--', page.href], { signal })
+  const info = JSON.parse(output.stdout) as { entries?: { id?: string; timestamp?: number }[] }
+  const since = Date.now() / 1000 - sinceDays * 86_400
+  return (info.entries ?? []).flatMap((entry) =>
+    // No date (e.g. a live stream) counts as recent rather than silently dropping it.
+    entry.id && (sinceDays <= 0 || entry.timestamp === undefined || entry.timestamp === null || entry.timestamp >= since)
+      ? [`https://www.youtube.com/watch?v=${entry.id}`]
+      : []
+  )
+}
+
+/** A channel's name and its first few keywords (as tags), without listing its videos. */
+export async function channelDetails(url: string, signal?: AbortSignal): Promise<{ name: string; tags: string[] }> {
+  const output = await runYtDlp(await ytDlpPath(), ['--flat-playlist', '-J', '--playlist-items', '0', '--', url], { signal })
+  const info = JSON.parse(output.stdout) as { channel?: string; uploader?: string; title?: string; tags?: unknown }
+  const keywords = Array.isArray(info.tags) ? info.tags.filter((tag): tag is string => typeof tag === 'string') : []
+  return {
+    name: info.channel ?? info.uploader ?? info.title ?? '',
+    tags: [...new Set(keywords.map((tag) => tag.trim().toLowerCase()).filter(Boolean))].slice(0, 3)
+  }
+}
+
+/** The channels the signed-in user subscribes to; needs the YouTube sign-in from Settings. */
+export async function subscribedChannels(signal?: AbortSignal): Promise<{ url: string; name: string }[]> {
+  const signIn = cookieArgs()
+  if (signIn.length === 0) throw new Error('Sign-in needed: choose how Siftora signs in to YouTube in Settings first.')
+  const ytDlp = await ytDlpPath()
+  type Entry = { url?: string; title?: string; channel?: string; channel_url?: string; channel_id?: string }
+  const list = async (page: string, extra: string[] = []): Promise<Entry[]> => {
+    const output = await run(ytDlp, [...signIn, '--flat-playlist', '-J', ...extra, '--', page], { signal }).catch(
+      (err: unknown) => {
+        throw explain(err)
+      }
+    )
+    return (JSON.parse(output.stdout) as { entries?: Entry[] } | null)?.entries ?? []
+  }
+  const channels = new Map<string, string>()
+  for (const entry of await list('https://www.youtube.com/feed/channels').catch(() => [])) {
+    const url = entry.url ?? entry.channel_url
+    if (url && /youtube\.com\/(channel\/|@)/.test(url)) channels.set(url, entry.title ?? entry.channel ?? url)
+  }
+  // Fallback: the channels behind the newest videos in the subscriptions feed (misses quiet channels).
+  if (channels.size === 0) {
+    for (const entry of await list(':ytsubs', ['--playlist-end', '300'])) {
+      const url = entry.channel_url ?? (entry.channel_id ? `https://www.youtube.com/channel/${entry.channel_id}` : undefined)
+      if (url && !channels.has(url)) channels.set(url, entry.channel ?? url)
+    }
+  }
+  return [...channels].map(([url, name]) => ({ url, name })).sort((a, b) => a.name.localeCompare(b.name))
 }
 
 /** Downloads a video from a link (up to `maxHeight`p, 0 = best, mp4) into `dir`. */

@@ -44,11 +44,13 @@ Everything runs on your own computer. Your videos and transcripts are never uplo
 - **Accurate captions.** Word-by-word timing from Whisper, voice detection so silence and music do not turn into made-up lines, and four caption fonts with an optional highlight on the spoken word.
 - **Hears the room.** Optional reaction detection picks up laughter, applause and cheering, and YouTube's "Most replayed" graph gives a boost to the parts viewers rewatch.
 - **Colour per speaker.** Optional speaker detection gives each person their own caption colour.
-- **Review fast.** Filter moments by topic (funny, emotional, educational…), heart the keepers, delete the rest in one click, and nudge a clip's start and end.
+- **Review fast.** Filter moments by topic (funny, emotional, educational…), heart the keepers and delete the rest in one click.
+- **Fine-tune the length.** Drag the ends of the clip on a timeline (the AI's cut stays outlined), click a transcript word to start the clip on it or Shift+click to end it there, or play and press I / O. The player jumps to every new start or end, and **Bigger** opens a large player with the editor under it.
 - **Preview before you render.** Pick the caption style and layout on a real frame of your clip, drag the captions where you want them (or turn them off), then render one reel or all of them.
 - **Ready to post.** Each rendered reel comes with a title, description and hashtags per platform, written with the video's chapters, the creator's own hashtags and a credit to their channel. Optionally, Siftora also reads the YouTube comments that point at a moment ("14:22 I lost it") to find the angle viewers loved.
 - **Uses what you already have.** Finds Ollama, Python Whisper, FFmpeg and model files on your computer, so you download as little as possible.
-- **Files or links.** YouTube, Facebook, TikTok, X, Instagram and the many other sites [yt-dlp](https://github.com/yt-dlp/yt-dlp) supports. Clip length and score limits can be set for all videos or per video.
+- **Files or links.** YouTube, Facebook, TikTok, X, Instagram and the many other sites [yt-dlp](https://github.com/yt-dlp/yt-dlp) supports. Clip length and score limits can be set for all videos or per video. The longest length is a hard cap; the shortest is a target, so a complete moment a little under it is kept as is, not padded. Paste a YouTube channel link to add its newest videos (1 to 50), optionally only those uploaded in the last day, week or month; ones Siftora already has are skipped.
+- **Your channels, one click.** Save favourite YouTube channels on **Channels** and group them with as many tags as you like (gaming, podcasts…); the tag box suggests the tags you already use as you type. Paste a channel link and its name and tags fill in by themselves, or pick channels from your YouTube subscriptions (needs the YouTube sign-in from Settings). On Create, pick a tag, one channel or all of them to add each one's newest videos with your current settings; videos Siftora already has are skipped.
 
 ## Requirements
 
@@ -62,7 +64,7 @@ Everything runs on your own computer. Your videos and transcripts are never uplo
 **Windows**
 
 1. Click **Download for Windows** above, or pick a version on the [Releases](../../releases) page.
-2. Run it. Windows may show "Windows protected your PC", because the app is not code-signed yet: choose **More info → Run anyway**.
+2. Run it. Windows may show "Windows protected your PC", because the app is not code-signed yet: choose **More info → Run anyway**. Accept the license, choose whether to install for just you or everyone on the computer, and pick a folder. Downloaded models still go to your user's app data folder. The last page can start Siftora and has links to this README, the changelog and Ko-fi.
 
 **macOS**
 
@@ -78,11 +80,11 @@ On first start, Siftora checks your hardware, recommends models that fit it, and
 
 ## How to use it
 
-1. **Create:** drop in a video or paste a link, then **Find clips**. Add as many as you like; the sidebar shows how many are still to do. If you add a video Siftora already has, it offers to open its results instead (or add it again anyway).
-2. **Queue:** follow the progress. Finished steps are saved, so a retry does not start over.
-3. **Results:** review the clips by score, pick a caption style and layout, and render the reels. They are saved in `Videos\Siftora`.
+1. **Create:** drop in a video, paste a link or a YouTube channel link, then **Find clips**. Add as many as you like; the sidebar shows how many are still to do. If you add a video Siftora already has, it offers to open its results instead (or add it again anyway).
+2. **Queue:** follow the progress. Finished steps are saved, so a retry does not start over. Filter the list by status, channel or when you added the video. Tick videos (or **Select all**) to find moments again, retry or delete them in one go; the same works on Results.
+3. **Results:** pick a video (filter them by channel or date added), review its clips by score, pick a caption style and layout, and render the reels. They are saved in `Videos\Siftora`.
 
-Age-restricted or members-only videos need your sign-in: in **Settings → Video links**, choose the browser you are signed in with (Firefox works best; Chrome-based browsers must be closed) or load a `cookies.txt` file. Siftora only uses it when a site asks for it.
+Age-restricted or members-only videos need your sign-in: in **Settings → Video links**, choose the browser you are signed in with (Firefox works best) or load a `cookies.txt` file. On Windows, Chrome, Edge, Brave and other Chrome-based browsers lock their sign-in so other apps usually can't read it: export a `cookies.txt` from them with a "cookies.txt" browser extension instead. Siftora only uses it when a site asks for it.
 
 Scores are estimates to help you choose. They do not guarantee that a clip will do well.
 
