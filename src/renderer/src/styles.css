@@ -3075,3 +3075,23 @@ option {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* To post (its reels reuse .clip-card from Results) */
+.posted-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.posted-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.posted-list .button {
+  margin-left: auto;
+}

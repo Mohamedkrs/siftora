@@ -57,6 +57,8 @@ export interface Clip {
   credit?: string
   /** Marked as a keeper by the user; "Delete unhearted" spares it. */
   hearted?: boolean
+  /** When the user marked its reel as posted; kept when the reel is rendered again, cleared when it is deleted. */
+  postedAt?: number
   title: string
   hook: string
   /**

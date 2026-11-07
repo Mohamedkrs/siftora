@@ -367,6 +367,8 @@ export interface Api {
   deleteReel(jobId: string, clipId: string): Promise<void>
   /** Marks a found moment as a keeper. */
   setClipHeart(jobId: string, clipId: string, hearted: boolean): Promise<void>
+  /** Marks a rendered reel as posted, or back to "to post". */
+  setClipPosted(jobId: string, clipId: string, posted: boolean): Promise<void>
   /** Removes found moments; their rendered reels go to the Recycle Bin / Trash. */
   deleteClips(jobId: string, clipIds: string[]): Promise<void>
   /** Sets a clip's start/end (ms in the source video) by hand. */
@@ -455,6 +457,7 @@ export const IPC = {
   deleteJob: 'jobs:delete',
   deleteReel: 'jobs:delete-reel',
   setClipHeart: 'jobs:set-clip-heart',
+  setClipPosted: 'jobs:set-clip-posted',
   deleteClips: 'jobs:delete-clips',
   setClipRange: 'jobs:set-clip-range',
   clipWords: 'jobs:clip-words',

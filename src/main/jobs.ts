@@ -658,6 +658,16 @@ export async function deleteReel(jobId: string, clipId: string): Promise<void> {
   // Only ever a file the app rendered into this video's output folder.
   if (path && existsSync(path) && isInside(path, job.outputDir)) await shell.trashItem(path)
   clip.render = { status: 'idle', progress: 0 }
+  clip.postedAt = undefined
+  update(job)
+}
+
+/** Marks a rendered reel as posted (or not), for the "To post" list. */
+export function setClipPosted(jobId: string, clipId: string, posted: boolean): void {
+  const job = jobs.get(jobId)
+  const clip = job?.clips.find((c) => c.id === clipId)
+  if (!job || !clip) return
+  clip.postedAt = posted ? Date.now() : undefined
   update(job)
 }
 

@@ -18,7 +18,7 @@ function scoreClass(score: number): string {
 }
 
 function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: number; stale: boolean }) {
-  const { render, deleteReel, setClipHeart, deleteClips } = useJobs()
+  const { render, deleteReel, setClipHeart, setClipPosted, deleteClips } = useJobs()
   const dialog = useDialog()
   const [showText, setShowText] = useState(false)
   const [adjusting, setAdjusting] = useState(false)
@@ -162,6 +162,14 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
                 </button>
                 <button
                   type="button"
+                  className="button"
+                  aria-pressed={clip.postedAt !== undefined}
+                  onClick={() => setClipPosted(job.id, clip.id, !clip.postedAt)}
+                >
+                  {clip.postedAt ? 'Posted ✓' : 'Mark as posted'}
+                </button>
+                <button
+                  type="button"
                   className="button primary"
                   onClick={() => void window.api.openPath(clip.render.path as string)}
                 >
@@ -260,6 +268,7 @@ export default function Results() {
   const { settings } = useSettings()
   const [params, setParams] = useSearchParams()
   const [topic, setTopic] = useKept<string | null>('results:topic', null)
+  const [posted, setPosted] = useKept<'posted' | 'not-posted' | null>('results:posted', null)
   const [filter, setFilter] = useKept('results:filter', NO_FILTER)
   const [selected, setSelected] = useKept<Set<string>>('results:selected', new Set())
   const doneJobs = jobs.filter((job) => job.stage === 'done')
@@ -297,6 +306,12 @@ export default function Results() {
   const shownTopic = topic !== null && topics.has(topic) ? topic : null
   const notRendered = clips.filter((clip) => clip.render.status === 'idle' || clip.render.status === 'error')
   const reels = clips.filter((clip) => clip.render.status === 'done').length
+  const postedReels = clips.filter((clip) => clip.render.status === 'done' && clip.postedAt).length
+  // A clip that is not rendered has no posted state, so the posted filter only shows rendered reels.
+  const matchesPosted = (clip: Clip): boolean =>
+    posted === null
+      ? true
+      : clip.render.status === 'done' && (posted === 'posted' ? clip.postedAt !== undefined : clip.postedAt === undefined)
   const rendering = clips.some((clip) => clip.render.status === 'queued' || clip.render.status === 'rendering')
   const removeVideo = (): void => {
     const what = [
@@ -502,28 +517,52 @@ export default function Results() {
         <p className="muted">No clips passed the minimum score. Lower it in Settings, then use “Find moments again”.</p>
       ) : (
         <>
-          {topics.size > 1 ? (
-            <div className="model-chips topic-filter" role="radiogroup" aria-label="Show moments by topic">
+          {topics.size > 1 || reels > 0 ? (
+            <div className="model-chips topic-filter" role="radiogroup" aria-label="Show moments">
               <span className="chips-label">Show</span>
-              {[null, ...topics.keys()].map((name) => (
-                <button
-                  key={name ?? 'all'}
-                  type="button"
-                  role="radio"
-                  aria-checked={shownTopic === name}
-                  className={shownTopic === name ? 'chip selected' : 'chip'}
-                  onClick={() => setTopic(name)}
-                >
-                  {name === null
-                    ? `All (${clips.length})`
-                    : `${name[0].toUpperCase()}${name.slice(1)} (${topics.get(name)})`}
-                </button>
-              ))}
+              {topics.size > 1
+                ? [null, ...topics.keys()].map((name) => (
+                    <button
+                      key={name ?? 'all'}
+                      type="button"
+                      role="radio"
+                      aria-checked={shownTopic === name}
+                      className={shownTopic === name ? 'chip selected' : 'chip'}
+                      onClick={() => setTopic(name)}
+                    >
+                      {name === null
+                        ? `All (${clips.length})`
+                        : `${name[0].toUpperCase()}${name.slice(1)} (${topics.get(name)})`}
+                    </button>
+                  ))
+                : null}
+              {reels > 0 ? (
+                <>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={posted === 'not-posted'}
+                    className={posted === 'not-posted' ? 'chip selected' : 'chip'}
+                    onClick={() => setPosted(posted === 'not-posted' ? null : 'not-posted')}
+                  >
+                    Not posted ({reels - postedReels})
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={posted === 'posted'}
+                    className={posted === 'posted' ? 'chip selected' : 'chip'}
+                    onClick={() => setPosted(posted === 'posted' ? null : 'posted')}
+                  >
+                    Posted ({postedReels})
+                  </button>
+                </>
+              ) : null}
             </div>
           ) : null}
           {/* Rank stays the place in the full list, so it matches the reel's file name. */}
           {clips.map((clip, index) =>
-            shownTopic === null || clip.category === shownTopic ? (
+            (shownTopic === null || clip.category === shownTopic) && matchesPosted(clip) ? (
               <ClipCard key={clip.id} job={job} clip={clip} rank={index + 1} stale={isStale(clip)} />
             ) : null
           )}

@@ -69,6 +69,7 @@ const api: Api = {
   deleteJob: (id) => ipcRenderer.invoke(IPC.deleteJob, id),
   deleteReel: (jobId, clipId) => ipcRenderer.invoke(IPC.deleteReel, jobId, clipId),
   setClipHeart: (jobId, clipId, hearted) => ipcRenderer.invoke(IPC.setClipHeart, jobId, clipId, hearted),
+  setClipPosted: (jobId, clipId, posted) => ipcRenderer.invoke(IPC.setClipPosted, jobId, clipId, posted),
   deleteClips: (jobId, clipIds) => ipcRenderer.invoke(IPC.deleteClips, jobId, clipIds),
   setClipRange: (jobId, clipId, start, end) => ipcRenderer.invoke(IPC.setClipRange, jobId, clipId, start, end),
   clipWords: (jobId, from, to) => ipcRenderer.invoke(IPC.clipWords, jobId, from, to),

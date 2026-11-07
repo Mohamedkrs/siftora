@@ -17,6 +17,7 @@ interface JobsContextValue {
   deleteReel: (jobId: string, clipId: string) => void
   setClipRange: (jobId: string, clipId: string, start: number, end: number) => void
   setClipHeart: (jobId: string, clipId: string, hearted: boolean) => void
+  setClipPosted: (jobId: string, clipId: string, posted: boolean) => void
   deleteClips: (jobId: string, clipIds: string[]) => void
   /** Removes a video with its reels and data. */
   deleteJob: (id: string) => void
@@ -55,6 +56,7 @@ export function JobsProvider({ children }: { children: ReactNode }) {
     deleteReel: (jobId, clipId) => void window.api.deleteReel(jobId, clipId),
     setClipRange: (jobId, clipId, start, end) => void window.api.setClipRange(jobId, clipId, start, end),
     setClipHeart: (jobId, clipId, hearted) => void window.api.setClipHeart(jobId, clipId, hearted),
+    setClipPosted: (jobId, clipId, posted) => void window.api.setClipPosted(jobId, clipId, posted),
     deleteClips: (jobId, clipIds) => void window.api.deleteClips(jobId, clipIds),
     deleteJob: (id) => {
       setJobs((current) => current.filter((job) => job.id !== id))

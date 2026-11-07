@@ -22,6 +22,7 @@ import {
   resumeAll,
   holdJob,
   setClipHeart,
+  setClipPosted,
   setClipRange,
   clipWords
 } from './jobs'
@@ -203,6 +204,9 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.deleteReel, (_event, jobId: unknown, clipId: unknown) => deleteReel(String(jobId), String(clipId)))
   ipcMain.handle(IPC.setClipHeart, (_event, jobId: unknown, clipId: unknown, hearted: unknown) =>
     setClipHeart(String(jobId), String(clipId), hearted === true)
+  )
+  ipcMain.handle(IPC.setClipPosted, (_event, jobId: unknown, clipId: unknown, posted: unknown) =>
+    setClipPosted(String(jobId), String(clipId), posted === true)
   )
   ipcMain.handle(IPC.deleteClips, (_event, jobId: unknown, clipIds: unknown) => deleteClips(String(jobId), ids(clipIds)))
   ipcMain.handle(IPC.setClipRange, (_event, jobId: unknown, clipId: unknown, start: unknown, end: unknown) => {

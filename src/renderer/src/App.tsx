@@ -10,6 +10,7 @@ import Onboarding from './screens/Onboarding'
 import Queue from './screens/Queue'
 import Results from './screens/Results'
 import SettingsScreen from './screens/Settings'
+import ToPost from './screens/ToPost'
 import { isActive, useJobs } from './state/jobs'
 import { useModels } from './state/models'
 import { useSettings } from './state/settings'
@@ -28,6 +29,7 @@ const navItems = [
   { to: '/create', label: 'Create', icon: icon(<><rect x="3" y="3" width="18" height="18" rx="4" /><path d="M12 8v8M8 12h8" /></>) },
   { to: '/queue', label: 'Queue', icon: icon(<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />) },
   { to: '/results', label: 'Results', icon: icon(<><rect x="6" y="2.5" width="12" height="19" rx="2.5" /><path d="M10.5 9.5v5l4-2.5z" /></>) },
+  { to: '/to-post', label: 'To post', icon: icon(<><path d="M12 15V3.5m-4 4 4-4 4 4" /><path d="M4 14v4.5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V14" /></>) },
   { to: '/channels', label: 'Channels', icon: icon(<><rect x="2.5" y="5" width="19" height="14" rx="3" /><path d="M10 9.5v5l4.5-2.5z" /><path d="M7 2.5h10" /></>) },
   { to: '/models', label: 'Models', icon: icon(<><rect x="6" y="6" width="12" height="12" rx="2" /><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4" /></>) },
   { to: '/settings', label: 'Settings', icon: icon(<><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></>) }
@@ -85,6 +87,10 @@ export default function App() {
   const waiting = jobs.filter((job) => job.stage === 'queued').length
   const paused = jobs.filter((job) => job.stage === 'queued' && job.held).length
   const toDo = waiting + jobs.filter(isActive).length
+  const toPost = jobs.reduce(
+    (count, job) => count + job.clips.filter((clip) => clip.render.status === 'done' && !clip.postedAt).length,
+    0
+  )
 
   return (
     <div className="app">
@@ -112,6 +118,10 @@ export default function App() {
               {item.to === '/queue' && toDo > 0 ? (
                 <span className="nav-count" title={`${toDo} to do`}>
                   {toDo}
+                </span>
+              ) : item.to === '/to-post' && toPost > 0 ? (
+                <span className="nav-count" title={`${toPost} to post`}>
+                  {toPost}
                 </span>
               ) : null}
             </NavLink>
@@ -166,6 +176,7 @@ export default function App() {
             <Route path="/create" element={<Create />} />
             <Route path="/queue" element={<Queue />} />
             <Route path="/results" element={<Results />} />
+            <Route path="/to-post" element={<ToPost />} />
             <Route path="/channels" element={<Channels />} />
             <Route path="/models" element={<Models />} />
             <Route path="/settings" element={<SettingsScreen />} />
