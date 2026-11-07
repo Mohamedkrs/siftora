@@ -181,6 +181,10 @@ const NEEDS_SIGN_IN = /confirm your age|sign in to confirm|members-only|private 
  * public videos never depend on the sign-in (e.g. Brave being open locks its cookies).
  */
 async function runYtDlp(ytDlp: string, args: string[], opts: RunOptions): Promise<{ stdout: string; stderr: string }> {
+  // YouTube's "n challenge" needs a JavaScript runtime or only images are offered; the app's own
+  // Electron runs as Node with ELECTRON_RUN_AS_NODE, so nothing extra is downloaded.
+  args = ['--js-runtimes', `node:${process.execPath}`, ...args]
+  opts = { ...opts, env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } }
   try {
     return await run(ytDlp, args, opts)
   } catch (err) {
@@ -207,7 +211,7 @@ function explain(err: unknown): Error {
   if (NEEDS_SIGN_IN.test(message)) {
     return new Error(
       browser === 'file'
-        ? 'Sign-in needed: the cookies.txt has no working YouTube sign-in (it may have expired). Export a new one and load it.'
+        ? 'Sign-in needed: the cookies.txt has no working YouTube sign-in (it may have expired). Export a new one from a private window you sign in to and close right after, then load it.'
         : browser
         ? `Sign-in needed: ${browser} is not signed in to YouTube with an account that may watch this video.`
         : 'Sign-in needed: this video is age-restricted or members-only.'

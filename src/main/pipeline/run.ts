@@ -11,6 +11,8 @@ export class Cancelled extends Error {
 
 export interface RunOptions {
   cwd?: string
+  /** Replaces the inherited environment. */
+  env?: NodeJS.ProcessEnv
   signal?: AbortSignal
   /** Called for every line on stderr (progress output). */
   onStderr?: (line: string) => void
@@ -21,7 +23,7 @@ export interface RunOptions {
 export function run(file: string, args: string[], opts: RunOptions = {}): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     if (opts.signal?.aborted) return reject(new Cancelled())
-    const child = spawn(file, args, { cwd: opts.cwd, windowsHide: true })
+    const child = spawn(file, args, { cwd: opts.cwd, env: opts.env, windowsHide: true })
     let stdout = ''
     let stderr = ''
     const lines = (onLine?: (line: string) => void) => {
