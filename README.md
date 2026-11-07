@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-<p align="center"><strong>Sift your long videos for the moments worth sharing.</strong><br><a href="https://mohamedkrs.github.io/siftora/">mohamedkrs.github.io/siftora</a></p>
+<p align="center"><strong>Sift your long videos for the moments worth sharing.</strong><br><a href="https://mohamedkrs.github.io/siftora/">Visit the website</a></p>
 
 <p align="center">
   <a href="../../releases/latest/download/Siftora-Setup.exe"><img src="resources/brand/download-windows.svg" alt="Download for Windows" height="60"></a>
