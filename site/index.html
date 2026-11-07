@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Siftora: free AI clip maker that runs on your PC</title>
+<meta name="description" content="Siftora turns long videos into vertical clips for TikTok, Reels and Shorts, with captions. Free, open source, and everything runs on your own computer.">
+<meta property="og:title" content="Siftora: free AI clip maker that runs on your PC">
+<meta property="og:description" content="Turn podcasts, streams and interviews into vertical clips with captions. Free, open source, no uploads.">
+<meta property="og:image" content="https://mohamedkrs.github.io/siftora/screenshots/results-dark.png">
+<link rel="icon" href="brand/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f7f6fa;
+    --surface: #ffffff;
+    --text: #16131f;
+    --muted: #5c5770;
+    --line: #e3e0ea;
+    --action: #5b3fe0;
+    --action-hover: #4a30c4;
+    --link: #5b3fe0;
+    --reel: #ff7a1a;
+    --shadow: 0 24px 60px -28px rgba(22, 19, 31, 0.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16131f;
+      --surface: #1e1a29;
+      --text: #f3f1f8;
+      --muted: #a9a2bc;
+      --line: #2e2940;
+      --action: #7b61ff;
+      --action-hover: #8d77ff;
+      --link: #a996ff;
+      --shadow: 0 28px 70px -30px rgba(0, 0, 0, 0.8);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 17px/1.6 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  a { color: var(--link); }
+  :focus-visible { outline: 3px solid var(--action); outline-offset: 3px; border-radius: 6px; }
+  img, video { max-width: 100%; display: block; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+  h1, h2, h3, .button, nav { font-family: Sora, system-ui, sans-serif; }
+  h1, h2, h3 { margin: 0; line-height: 1.12; letter-spacing: -0.025em; }
+
+  header .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 18px; padding-bottom: 18px; }
+  header nav { display: flex; gap: 24px; }
+  header nav a { color: var(--muted); text-decoration: none; font-size: 0.92rem; font-weight: 600; }
+  header nav a:hover { color: var(--text); }
+  .cup { width: 1.15em; height: 1.1em; flex: none; }
+  header nav .coffee { display: inline-flex; align-items: center; gap: 7px; color: var(--text); }
+  .button .cup { margin-right: 8px; }
+  .logo-dark { display: none; }
+  @media (prefers-color-scheme: dark) { .logo-light { display: none; } .logo-dark { display: block; } }
+
+  .hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 40px 64px; align-items: center; padding-top: 48px; padding-bottom: 24px; }
+  .hero h1 { font-size: clamp(2.3rem, 5vw, 3.8rem); max-width: 14ch; }
+  .hero p { color: var(--muted); font-size: 1.15rem; max-width: 50ch; margin: 20px 0 0; }
+  .buttons { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+  .button {
+    display: inline-flex; align-items: center; padding: 13px 22px; border-radius: 12px;
+    font-size: 0.95rem; font-weight: 700; text-decoration: none;
+    border: 1px solid var(--line); color: var(--text); background: var(--surface);
+  }
+  .button:hover { border-color: var(--action); }
+  .button.primary { background: var(--action); border-color: var(--action); color: #fff; }
+  .button.primary:hover { background: var(--action-hover); border-color: var(--action-hover); }
+  .platforms { color: var(--muted); font-size: 0.92rem; margin-top: 14px; }
+
+  /* The one loud thing on the page: a reel Siftora made, framed in the logo's "reel" orange. */
+  .reel { margin: 0; width: min(300px, 70vw); justify-self: center; }
+  .reel video, .reel img { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 28px; border: 4px solid var(--reel); box-shadow: var(--shadow); background: #000; }
+  .reel figcaption { color: var(--muted); font-size: 0.88rem; text-align: center; margin-top: 14px; }
+
+  .shot { border-radius: 14px; border: 1px solid var(--line); box-shadow: var(--shadow); overflow: hidden; }
+  .screens { padding-top: 56px; }
+  .screens .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px; }
+  .screens figure { margin: 0; }
+  .screens figcaption { color: var(--muted); font-size: 0.92rem; margin-top: 10px; }
+
+  section { padding-top: 96px; }
+  section h2 { font-size: clamp(1.7rem, 3.2vw, 2.4rem); max-width: 20ch; }
+  .lead { color: var(--muted); font-size: 1.1rem; max-width: 56ch; margin: 14px 0 0; }
+
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 36px 40px; margin-top: 44px; }
+  .features h3 { font-size: 1.08rem; margin-bottom: 8px; }
+  .features p { margin: 0; color: var(--muted); }
+
+  .facts { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; }
+  .facts h3 { font-size: 1.08rem; margin-bottom: 4px; }
+  .facts ul { margin: 0; padding-left: 20px; color: var(--muted); }
+  .facts li { margin: 8px 0; }
+  .facts strong { color: var(--text); font-weight: 600; }
+
+  .cta { padding-top: 96px; padding-bottom: 88px; }
+  .cta .buttons { margin-top: 24px; }
+
+  footer { border-top: 1px solid var(--line); padding: 28px 0 44px; color: var(--muted); font-size: 0.88rem; }
+  footer .wrap { display: grid; gap: 6px; }
+  footer a { color: var(--muted); }
+
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; }
+    .screens .pair, .features, .facts { grid-template-columns: 1fr; }
+    header nav a:not(.coffee) { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <a href="./" aria-label="Siftora home">
+      <img class="logo-light" src="brand/siftora-horizontal.svg" alt="Siftora" style="height:34px;width:auto">
+      <img class="logo-dark" src="brand/siftora-horizontal-on-dark.svg" alt="Siftora" style="height:34px;width:auto">
+    </a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#requirements">Requirements</a>
+      <a href="https://github.com/Mohamedkrs/siftora">GitHub</a>
+      <a class="coffee" href="https://ko-fi.com/mohamedkrs"><svg class="cup" viewBox="0 0 28 26" aria-hidden="true"><path d="M8 4c-1.6-1.4 1.6-2.6 0-4M14 4c-1.6-1.4 1.6-2.6 0-4M22 11h2a4 4 0 0 1 0 8h-2.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path fill-rule="evenodd" fill="currentColor" d="M2 8h20v9a8 8 0 0 1-8 8h-4a8 8 0 0 1-8-8zM12 21.5l-3.6-3.4a2.2 2.2 0 0 1 3.1-3.1l.5.5.5-.5a2.2 2.2 0 0 1 3.1 3.1z"/></svg>Buy me a coffee</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <div>
+      <h1>Sift your long videos for the moments worth sharing</h1>
+      <p>Siftora turns podcasts, streams, interviews and vlogs into vertical clips for TikTok, Instagram Reels and YouTube Shorts, with animated captions. It is free and open source, runs on your own computer, and never uploads your videos.</p>
+      <div class="buttons">
+        <a class="button primary" href="https://github.com/Mohamedkrs/siftora/releases/latest/download/Siftora-Setup.exe">Download for Windows</a>
+        <a class="button" href="https://github.com/Mohamedkrs/siftora/releases/latest/download/Siftora-mac-arm64.dmg">Download for macOS</a>
+      </div>
+      <p class="platforms">For Windows 10 and 11, and macOS 13.3 or newer. On an Intel Mac, get the <a href="https://github.com/Mohamedkrs/siftora/releases/latest/download/Siftora-mac-x64.dmg">Intel version</a>. <a href="https://github.com/Mohamedkrs/siftora#install">Install help</a></p>
+    </div>
+    <figure class="reel">
+      <video id="reel" src="media/reel.mp4" poster="media/reel.jpg" autoplay muted loop playsinline aria-label="A vertical reel Siftora made, with word-by-word captions"></video>
+      <figcaption>A reel Siftora found and captioned in a Trevor Noah podcast episode.</figcaption>
+    </figure>
+  </div>
+
+  <div class="wrap screens">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="screenshots/results-dark.png">
+      <img class="shot" src="screenshots/results-light.png" alt="Results: the moments Siftora found, each with a score, a topic and why it works as a clip" width="1100">
+    </picture>
+    <div class="pair">
+      <figure>
+        <picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/captions-dark.png"><img class="shot" src="screenshots/captions-light.png" alt="Caption style and layout with a live preview on a real frame" loading="lazy"></picture>
+        <figcaption>Pick the caption style and layout on a real frame of your clip.</figcaption>
+      </figure>
+      <figure>
+        <picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/share-dark.png"><img class="shot" src="screenshots/share-light.png" alt="Ready-to-paste titles, descriptions and hashtags per platform" loading="lazy"></picture>
+        <figcaption>Copy a title, description and hashtags for each platform.</figcaption>
+      </figure>
+      <figure>
+        <picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/create-dark.png"><img class="shot" src="screenshots/create-light.png" alt="Create: drop files, paste a link, or add the newest videos of your saved channels" loading="lazy"></picture>
+        <figcaption>Drop files, paste a link, or add the newest videos of your saved channels.</figcaption>
+      </figure>
+      <figure>
+        <picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/channels-dark.png"><img class="shot" src="screenshots/channels-light.png" alt="Channels: favourite YouTube channels grouped by tags" loading="lazy"></picture>
+        <figcaption>Save your favourite channels and group them with tags.</figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <section id="features">
+    <div class="wrap">
+      <h2>From a two-hour video to ready-to-post reels</h2>
+      <p class="lead">A local AI reads the whole transcript, picks the moments with a real payoff, and renders them as 1080×1920 reels.</p>
+      <div class="features">
+        <div><h3>Finds the moments</h3><p>Each clip is scored and explained. It starts where the setup starts and quotes the payoff word for word, so nothing is cut off or invented.</p></div>
+        <div><h3>Accurate captions</h3><p>Word-by-word timing from Whisper, four caption fonts, an optional highlight on the spoken word and a colour per speaker.</p></div>
+        <div><h3>Hears the room</h3><p>Laughter, applause and YouTube's "Most replayed" graph push the moments viewers loved to the top.</p></div>
+        <div><h3>Quick to fine-tune</h3><p>Drag the clip's ends on a timeline, or click a word in the transcript to start or end on it.</p></div>
+        <div><h3>Ready to post</h3><p>Every reel comes with a title, description and hashtags per platform, with a credit to the original channel.</p></div>
+        <div><h3>Files, links and channels</h3><p>Use your own files, or links from YouTube, TikTok, X, Instagram and more. Save channels and add their newest videos in one click.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="requirements">
+    <div class="wrap">
+      <h2>Private by design</h2>
+      <p class="lead">No account, no tracking, no subscription. Siftora only goes online to download its engines and models, and the videos you add by link.</p>
+      <div class="facts">
+        <div>
+          <h3>What you need</h3>
+          <ul>
+            <li><strong>Windows 10 or 11</strong> (64-bit), or <strong>macOS 13.3</strong> or newer</li>
+            <li><strong>8 GB of RAM</strong>; 16 GB or more is better</li>
+            <li><strong>3–12 GB</strong> of disk space for the AI models</li>
+            <li>An <strong>NVIDIA graphics card</strong> makes it 5–10 times faster. Any computer works, more slowly.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Open source</h3>
+          <ul>
+            <li>Free software under the <strong>GNU GPL v3</strong></li>
+            <li>Built on whisper.cpp, llama.cpp, FFmpeg, sherpa-onnx and yt-dlp</li>
+            <li>Uses the models and tools you already have, such as Ollama and FFmpeg</li>
+            <li><a href="https://github.com/Mohamedkrs/siftora">Source code, issues and changelog on GitHub</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap cta">
+    <h2>Try it on your next video</h2>
+    <div class="buttons">
+      <a class="button primary" href="https://github.com/Mohamedkrs/siftora/releases/latest/download/Siftora-Setup.exe">Download for Windows</a>
+      <a class="button" href="https://github.com/Mohamedkrs/siftora/releases/latest/download/Siftora-mac-arm64.dmg">Download for macOS</a>
+      <a class="button" href="https://ko-fi.com/mohamedkrs"><svg class="cup" viewBox="0 0 28 26" aria-hidden="true"><path d="M8 4c-1.6-1.4 1.6-2.6 0-4M14 4c-1.6-1.4 1.6-2.6 0-4M22 11h2a4 4 0 0 1 0 8h-2.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path fill-rule="evenodd" fill="currentColor" d="M2 8h20v9a8 8 0 0 1-8 8h-4a8 8 0 0 1-8-8zM12 21.5l-3.6-3.4a2.2 2.2 0 0 1 3.1-3.1l.5.5.5-.5a2.2 2.2 0 0 1 3.1 3.1z"/></svg>Buy me a coffee</a>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Siftora is free software under the GPL v3. Scores are estimates, not a guarantee that a clip will do well.</span>
+    <span>The sample reel and screenshots are from <a href="https://www.facebook.com/share/v/1Cf4mHV4Eq/">"Why Were The Avengers Never Willing to Do What Needed to Be Done?"</a> by Trevor Noah, who does not endorse Siftora.</span>
+  </div>
+</footer>
+<script>
+  // Visitors who ask for less motion get the still frame instead of a looping video.
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const reel = document.getElementById('reel')
+    reel.removeAttribute('autoplay')
+    reel.pause()
+  }
+</script>
+</body>
+</html>
