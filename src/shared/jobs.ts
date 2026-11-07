@@ -128,6 +128,8 @@ export interface Job {
   outputDir: string
   /** Removed from the Queue but kept, with its clips, on Results. */
   hiddenFromQueue?: boolean
+  /** Paused before it started: the queue skips it until it is resumed. */
+  held?: boolean
   /** Queued to rewrite its clips' post texts only, keeping the clips. */
   rewritePosts?: boolean
 }

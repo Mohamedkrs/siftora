@@ -80,18 +80,20 @@ On first start, Siftora checks your hardware, recommends models that fit it, and
 
 ## How to use it
 
+New to Siftora? A **Getting started** checklist at the top of Create ticks off the first steps as you do them and goes away when you are done (hide it any time; **Settings → Setup** brings it back).
+
 1. **Create:** drop in a video, paste a link or a YouTube channel link, then **Find clips**. Add as many as you like; the sidebar shows how many are still to do. If you add a video Siftora already has, it offers to open its results instead (or add it again anyway).
-2. **Queue:** follow the progress. Finished steps are saved, so a retry does not start over. Filter the list by status, channel or when you added the video. Tick videos (or **Select all**) to find moments again, retry or delete them in one go; the same works on Results.
+2. **Queue:** follow the progress. Finished steps are saved, so a retry does not start over. **Pause all** pauses every waiting video and stops the running one, which continues from its last finished step when resumed; **Resume all** starts them again. **Pause** or **Resume** single videos (or several ticked ones) too. Videos left unfinished when you close Siftora come back paused. Switch between a **List** and a **Grid** of cards at the top. Filter the list by status, channel or when you added the video. Tick videos (or **Select all**) to find moments again, retry or delete them in one go; the same works on Results.
 3. **Results:** pick a video (filter them by channel or date added), review its clips by score, pick a caption style and layout, and render the reels. They are saved in `Videos\Siftora`.
 
-Age-restricted or members-only videos need your sign-in: in **Settings → Video links**, choose the browser you are signed in with (Firefox works best) or load a `cookies.txt` file. On Windows, Chrome, Edge, Brave and other Chrome-based browsers lock their sign-in so other apps usually can't read it: export a `cookies.txt` from them with a "cookies.txt" browser extension instead. Siftora only uses it when a site asks for it.
+Age-restricted or members-only videos need your sign-in: in **Settings → Video links**, choose the browser you are signed in with (Firefox works best) or load a `cookies.txt` file. On Windows, Chrome, Edge, Brave and other Chrome-based browsers lock their sign-in so other apps usually can't read it: export a `cookies.txt` from them with a "cookies.txt" browser extension instead. Export it from a private (incognito) window you signed in to, and close that window right after: YouTube replaces the sign-in of open tabs, so a file exported from your normal window stops working within days. Siftora only uses it when a site asks for it.
 
-Scores are estimates to help you choose. They do not guarantee that a clip will do well.
+Scores are estimates to help you choose. They do not guarantee that a clip will do well. Roughly: 60 is a good clip, 80 stands out, 90+ is rare. Moments found by Siftora 0.3 and earlier used a looser scale, so their scores run higher; **Find moments again** rescores them.
 
 ## Privacy
 
 - Your videos, transcripts and clips **never leave your computer**. There is no account, no tracking and no analytics.
-- Siftora goes online only to download its engines and AI models (from GitHub and Hugging Face), to check for engine updates, and to download the videos you add by link (and their comments, if you turn that on).
+- Siftora goes online only to download its engines and AI models (from GitHub and Hugging Face), to check for engine updates and, once per start, for a newer Siftora (on GitHub; turn it off in **Settings → About**), and to download the videos you add by link (and their comments, if you turn that on).
 - If you choose a sign-in for video links, your browser's cookies (or your `cookies.txt`) are passed to yt-dlp on your computer, and only sent to the site of the video.
 - What you do with found moments (hearts, deletes, trims, renders) is written to `feedback.jsonl` in the app's data folder, so you can measure how good the picks are. It stays there.
 - If you point Ollama at another computer (its `OLLAMA_HOST` setting), transcripts are sent to that computer for the clip-finding step.

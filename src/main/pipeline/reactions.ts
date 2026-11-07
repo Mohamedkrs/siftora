@@ -1,7 +1,8 @@
 import { cpus } from 'node:os'
-import { mkdirSync, readdirSync, rmSync } from 'node:fs'
+import { mkdirSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { Cancelled, run } from './run'
+import { log } from '../logger'
 
 /** Reactions are measured per slice of this length. */
 export const SLICE_MS = 4000
@@ -48,34 +49,49 @@ export async function detectReactions(opts: {
     const segment = ['-f', 'segment', '-segment_time', String(SLICE_MS / 1000), '-c:a', 'pcm_s16le']
     await run(opts.ffmpeg, ['-y', '-v', 'error', '-i', opts.wav, ...segment, join(dir, '%06d.wav')], { signal: opts.signal })
     const slices = readdirSync(dir).filter((name) => name.endsWith('.wav')).sort()
+    // The last slice is the leftover after the final full SLICE_MS; under ~0.5 s (16 kHz mono 16-bit) the model rejects it.
+    if (slices.length > 1 && statSync(join(dir, slices[slices.length - 1])).size < 16_000) slices.pop()
 
     const levels = Object.fromEntries(
       Object.keys(REACTIONS).map((reaction) => [reaction, new Array<number>(slices.length).fill(0)])
     ) as ReactionLevels
     let next = 0
     let done = 0
+    let failed = 0
     const worker = async (): Promise<void> => {
       for (let i = next++; i < slices.length; i = next++) {
         if (opts.signal.aborted) throw new Cancelled()
-        const { stdout } = await run(
-          opts.binary,
-          [
-            '--print-args=false',
-            `--ced-model=${opts.model}`,
-            `--labels=${opts.labels}`,
-            '--top-k=527', // every label, so a reaction is reported even when speech dominates
-            join(dir, slices[i])
-          ],
-          { signal: opts.signal }
-        )
-        for (const [reaction, level] of Object.entries(reactionsIn(stdout)) as [Reaction, number][]) {
-          levels[reaction][i] = level
+        try {
+          const { stdout } = await run(
+            opts.binary,
+            [
+              '--print-args=false',
+              `--ced-model=${opts.model}`,
+              `--labels=${opts.labels}`,
+              '--top-k=527', // every label, so a reaction is reported even when speech dominates
+              join(dir, slices[i])
+            ],
+            { signal: opts.signal }
+          )
+          for (const [reaction, level] of Object.entries(reactionsIn(stdout)) as [Reaction, number][]) {
+            levels[reaction][i] = level
+          }
+        } catch (err) {
+          if (opts.signal.aborted) throw new Cancelled()
+          // One unreadable slice only loses that slice's reactions; it counts as silent.
+          failed++
+          log.warn('reactions', `slice ${slices[i]} skipped: ${String(err).slice(0, 300)}`)
         }
         opts.onProgress(++done / slices.length)
       }
     }
     const parallel = Math.max(1, Math.min(6, cpus().length - 2))
     await Promise.all(Array.from({ length: parallel }, worker))
+    if (slices.length > 0 && failed > slices.length / 2) {
+      throw new Error(
+        'Listening for reactions failed on this video. Retry it with "Listen for reactions" turned off on Create, or reinstall the reaction models on the Models screen.'
+      )
+    }
     return levels
   } finally {
     rmSync(dir, { recursive: true, force: true })

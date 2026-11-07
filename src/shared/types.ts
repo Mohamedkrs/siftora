@@ -144,6 +144,10 @@ export interface Settings {
   minClipSeconds: number
   minScore: number
   onboarded: boolean
+  /** The "Getting started" card on Create was hidden by the user. */
+  gettingStartedHidden: boolean
+  /** Ask GitHub once per launch whether a newer Siftora is out. */
+  checkUpdates: boolean
   transcriptionModel: string | null
   llmModel: string | null
   useVad: boolean
@@ -206,6 +210,8 @@ export const DEFAULT_SETTINGS: Settings = {
   minClipSeconds: 15,
   minScore: 6,
   onboarded: false,
+  gettingStartedHidden: false,
+  checkUpdates: true,
   transcriptionModel: null,
   llmModel: null,
   useVad: true,
@@ -301,6 +307,8 @@ export interface Api {
   subscribedChannels(): Promise<{ url: string; name: string }[]>
   log(level: 'info' | 'warn' | 'error', msg: string): void
   appInfo(): Promise<{ version: string; platform: string; userData: string }>
+  /** A newer release on GitHub, or null; null too when update checks are off. */
+  checkForUpdate(): Promise<{ version: string; url: string } | null>
   getPathForFile(file: File): string
   getHardware(force?: boolean): Promise<HardwareInfo>
   getRecommendation(): Promise<Recommendation>
@@ -344,6 +352,10 @@ export interface Api {
   /** Finished videos are only hidden from the Queue; others are deleted. */
   removeJob(id: string): Promise<void>
   retryJob(id: string): Promise<void>
+  /** Pause all (every waiting video and the running one) / resume all paused videos. */
+  setQueuePaused(paused: boolean): Promise<void>
+  /** Pause or resume one video that has not started. */
+  holdJob(id: string, held: boolean): Promise<void>
   /** Run moment discovery again on the cached transcript ("Find moments again"). */
   findAgain(id: string): Promise<void>
   /** Rewrites the clips' titles, captions and descriptions; the clips stay. */
@@ -407,6 +419,7 @@ export const IPC = {
   subscribedChannels: 'youtube:subscribed-channels',
   log: 'app:log',
   appInfo: 'app:info',
+  checkForUpdate: 'app:check-for-update',
   getHardware: 'hardware:get',
   getRecommendation: 'hardware:recommendation',
   getRequiredEngines: 'engines:required',
@@ -434,6 +447,8 @@ export const IPC = {
   cancelJob: 'jobs:cancel',
   removeJob: 'jobs:remove',
   retryJob: 'jobs:retry',
+  setQueuePaused: 'jobs:set-paused',
+  holdJob: 'jobs:hold',
   findAgain: 'jobs:find-again',
   rewritePosts: 'jobs:rewrite-posts',
   renderClips: 'jobs:render',

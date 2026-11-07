@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Navigate, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
 import { CATALOG } from '../../shared/catalog'
 import { ENGINES, engineBytes, engineLabel } from '../../shared/engines'
@@ -49,6 +49,15 @@ export default function App() {
   const { jobs } = useJobs()
   const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(readCollapsed)
+  const [update, setUpdate] = useState<{ version: string; url: string } | null>(null)
+  useEffect(() => {
+    if (!settings.onboarded || !settings.checkUpdates) return setUpdate(null)
+    let alive = true
+    void window.api.checkForUpdate().then((found) => alive && setUpdate(found))
+    return () => {
+      alive = false
+    }
+  }, [settings.onboarded, settings.checkUpdates])
 
   const toggleSidebar = (): void => {
     setCollapsed(!collapsed)
@@ -74,6 +83,7 @@ export default function App() {
 
   const activeJob = jobs.find(isActive)
   const waiting = jobs.filter((job) => job.stage === 'queued').length
+  const paused = jobs.filter((job) => job.stage === 'queued' && job.held).length
   const toDo = waiting + jobs.filter(isActive).length
 
   return (
@@ -107,6 +117,18 @@ export default function App() {
             </NavLink>
           ))}
         </nav>
+        {update ? (
+          <a
+            className="sidebar-update"
+            href={update.url}
+            target="_blank"
+            rel="noreferrer"
+            title={`Siftora ${update.version} is out: open the download page`}
+          >
+            {icon(<path d="M12 4v11m-5-5 5 5 5-5M5 20h14" />)}
+            <span className="nav-label">Update to {update.version}</span>
+          </a>
+        ) : null}
         <button
           type="button"
           className="sidebar-toggle"
@@ -128,7 +150,9 @@ export default function App() {
             : downloading
               ? `Downloading ${name} — ${percent}%`
               : waiting > 0
-                ? `${waiting} waiting`
+                ? [waiting > paused ? `${waiting - paused} waiting` : null, paused > 0 ? `${paused} paused` : null]
+                    .filter(Boolean)
+                    .join(' · ')
                 : 'Queue empty'}
           {activeJob ? (
             <span className="strip-progress">

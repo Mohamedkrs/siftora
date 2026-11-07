@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { mediaUrl, rangeKey, renderStyleKey, type Clip, type Job } from '../../../shared/jobs'
 import BulkBar from '../components/BulkBar'
@@ -8,6 +8,7 @@ import { useDialog } from '../components/Dialog'
 import JobFilter, { matchesFilter, NO_FILTER } from '../components/JobFilter'
 import SharePanel from '../components/SharePanel'
 import VideoCard from '../components/VideoCard'
+import { useKept } from '../lib/kept'
 import { formatClock } from '../lib/format'
 import { useJobs } from '../state/jobs'
 import { useSettings } from '../state/settings'
@@ -258,10 +259,16 @@ export default function Results() {
   const dialog = useDialog()
   const { settings } = useSettings()
   const [params, setParams] = useSearchParams()
-  const [topic, setTopic] = useState<string | null>(null)
-  const [filter, setFilter] = useState(NO_FILTER)
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [topic, setTopic] = useKept<string | null>('results:topic', null)
+  const [filter, setFilter] = useKept('results:filter', NO_FILTER)
+  const [selected, setSelected] = useKept<Set<string>>('results:selected', new Set())
   const doneJobs = jobs.filter((job) => job.stage === 'done')
+  // Opened for a video (View clips on the Queue) that the kept filter hides: show everything again.
+  const asked = doneJobs.find((item) => item.id === params.get('job'))
+  const hidden = asked !== undefined && !matchesFilter(asked, filter)
+  useEffect(() => {
+    if (hidden) setFilter(NO_FILTER)
+  }, [hidden, setFilter])
   const matching = doneJobs.filter((item) => matchesFilter(item, filter))
   // Pick from the filtered videos; if the filter matches none, keep showing one so the screen stays usable.
   const pool = matching.length > 0 ? matching : doneJobs

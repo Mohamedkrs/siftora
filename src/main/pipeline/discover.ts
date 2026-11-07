@@ -55,9 +55,10 @@ interface Moment {
 /**
  * Bump when the finder's prompt or scoring changes; saved with each found moment so
  * scripts/eval-clips.mjs can compare versions (2: reasons before choosing edges, video context, skip ads;
- * 3: soft minimum length, no padding moments that are only a little short).
+ * 3: soft minimum length, no padding moments that are only a little short;
+ * 4: what each score level means, mostly 3s expected; score = average / 5, so 3 = 60).
  */
-export const FINDER_VERSION = 3
+export const FINDER_VERSION = 4
 
 // Fields are generated in this order: the reasoning comes before the edges and scores it justifies.
 const SCHEMA = {
@@ -130,7 +131,9 @@ Rules:
 - Return at most 3 moments for this excerpt, only genuinely strong ones. An empty list is fine.
 - Pick start_id and end_id from the line ids. Never invent ids.
 - Write title, hook and rationale in the transcript's language.
-- Scores 1-5: hook = how strongly the first seconds grab attention; payoff = how satisfying the ending is; standalone = understandable without context; value = entertainment or information value. Be strict: 5 is rare.`
+- Scores 1-5: hook = how strongly the first seconds grab attention; payoff = how satisfying the ending is; standalone = understandable without context; value = entertainment or information value.
+  1 = weak: a viewer scrolls past. 2 = okay: fine in the video, forgettable as a short. 3 = good: a solid clip, the usual score for a moment worth returning. 4 = great: clearly stands out from the rest of this video. 5 = exceptional: you would bet on it being shared; most videos have none.
+  Score against what is typical for short-form clips, not against the rest of this excerpt. Mostly 3s is normal; give 4 or 5 only with a concrete reason in the rationale.`
 }
 
 export interface ChatOptions {
@@ -495,7 +498,8 @@ function refine(moment: Moment, segments: Segment[], minMs: number, maxMs: numbe
     category: moment.category,
     rationale: moment.rationale,
     scores: s,
-    score: Math.round(((average - 1) / 4) * 100),
+    // 3 (good) = 60, the default minimum; 4 = 80; 5 = 100.
+    score: Math.round((average / 5) * 100),
     notes,
     text: segments.slice(a, b + 1).map((segment) => segment.text).join(' '),
     render: { status: 'idle', progress: 0 }

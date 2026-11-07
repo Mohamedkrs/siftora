@@ -62,8 +62,13 @@ export function loadJobs(): void {
   for (const id of readdirSync(jobsRoot())) {
     try {
       const job = JSON.parse(readFileSync(join(jobDir(id), 'job.json'), 'utf8')) as Job
-      // Interrupted by closing the app: finished stages are cached, so just queue it again.
-      if (!['done', 'error', 'cancelled'].includes(job.stage)) job.stage = 'queued'
+      // Left unfinished when the app closed: finished stages are cached, so it waits, paused, to
+      // continue; nothing starts by itself after a restart.
+      if (!['done', 'error', 'cancelled'].includes(job.stage)) {
+        job.stage = 'queued'
+        job.progress = 0
+        job.held = true
+      }
       for (const clip of job.clips) {
         if (clip.render.status === 'rendering' || clip.render.status === 'queued') clip.render = { status: 'idle', progress: 0 }
       }
@@ -74,7 +79,6 @@ export function loadJobs(): void {
       // Not a job folder or unreadable; ignore.
     }
   }
-  void work()
 }
 
 /** True while a video is being processed or a reel rendered. */
@@ -149,7 +153,15 @@ export function cancelJob(id: string): void {
   const job = jobs.get(id)
   if (!job) return
   controllers.get(id)?.abort()
-  if (job.stage === 'queued') update(job, { stage: 'cancelled', message: undefined })
+  if (job.stage === 'queued') update(job, { stage: 'cancelled', message: undefined, held: undefined })
+}
+
+/** Pause or resume one video that has not started; a paused one is skipped by the queue. */
+export function holdJob(id: string, held: boolean): void {
+  const job = jobs.get(id)
+  if (!job || job.stage !== 'queued') return
+  update(job, { held: held || undefined })
+  if (!held) void work()
 }
 
 /** Takes a video off the Queue. A finished one keeps its results on Results; others are deleted. */
@@ -219,12 +231,23 @@ export function findAgain(id: string): void {
   void work()
 }
 
+/** Pause all: every waiting video is paused, and the running one goes back to waiting, paused (its finished steps are kept). */
+export function pauseAll(): void {
+  for (const job of jobs.values()) if (job.stage === 'queued' && !job.held) update(job, { held: true })
+  for (const controller of controllers.values()) controller.abort('pause')
+}
+
+export function resumeAll(): void {
+  for (const job of jobs.values()) if (job.stage === 'queued' && job.held) update(job, { held: undefined })
+  void work()
+}
+
 async function work(): Promise<void> {
   if (working) return
   working = true
   try {
     for (;;) {
-      const next = listJobs().reverse().find((job) => job.stage === 'queued')
+      const next = listJobs().reverse().find((job) => job.stage === 'queued' && !job.held)
       if (!next) break
       const controller = new AbortController()
       controllers.set(next.id, controller)
@@ -232,7 +255,9 @@ async function work(): Promise<void> {
         await runJob(next, controller.signal)
         update(next, { stage: 'done', progress: 1, message: `${next.clips.length} clips found` })
       } catch (err) {
-        if (err instanceof Cancelled || controller.signal.aborted) {
+        if (controller.signal.reason === 'pause') {
+          update(next, { stage: 'queued', progress: 0, message: undefined, held: true })
+        } else if (err instanceof Cancelled || controller.signal.aborted) {
           update(next, { stage: 'cancelled', message: undefined })
         } else {
           log.error('jobs', `${next.title}: ${String(err)}`)

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type Dispatch, type DragEvent, type FormEvent, type ReactNode, type SetStateAction } from 'react'
+import { useState, type DragEvent, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CATALOG, REACTION_MODEL_IDS, llamaTooOld, SPEAKER_MODEL_IDS } from '../../../shared/catalog'
 import { ENGINES, engineBytes, engineLabel, type EngineName } from '../../../shared/engines'
@@ -6,6 +6,8 @@ import { DEFAULT_YOUTUBE_HEIGHT, mediaUrl, type Job } from '../../../shared/jobs
 import type { ClipLimits, ModelState, YoutubeChoice, YoutubeInfo } from '../../../shared/types'
 import ModelProgress from '../components/ModelProgress'
 import NumberField from '../components/NumberField'
+import { useKept } from '../lib/kept'
+import GettingStarted from '../components/GettingStarted'
 import SignInPicker from '../components/SignInPicker'
 import VideoCard from '../components/VideoCard'
 import { formatBytes, formatClock, formatEta } from '../lib/format'
@@ -94,7 +96,7 @@ function SignInHelp(props: { reason: string; onCheckAgain: () => void }) {
       <span className="muted">
         Firefox works best. Chrome, Edge and Brave must be fully quit first, and newer versions may refuse anyway; then
         export a cookies.txt on youtube.com with an extension such as “Get cookies.txt LOCALLY” and pick “cookies.txt
-        file…”.
+        file…”. Export it from a private window you sign in to and close right after, so it keeps working.
       </span>
     </span>
   )
@@ -316,38 +318,6 @@ function VideoRow(props: {
       </button>
     </li>
   )
-}
-
-/** Create's state outlives the screen: switching tabs keeps the list, and link checks that finish meanwhile still land. */
-const kept = new Map<string, unknown>()
-/** The open Create screen's setters per key; work started on an earlier visit updates the screen shown now. */
-const shown = new Map<string, Set<(value: unknown) => void>>()
-
-function useKept<T>(key: string, initial: T): [T, Dispatch<SetStateAction<T>>] {
-  const [value, setValue] = useState<T>(() => (kept.has(key) ? (kept.get(key) as T) : initial))
-  useEffect(() => {
-    const listeners = shown.get(key) ?? new Set()
-    shown.set(key, listeners)
-    const listener = setValue as (value: unknown) => void
-    listeners.add(listener)
-    // Anything that landed between the first render and now.
-    if (kept.has(key)) setValue(kept.get(key) as T)
-    return () => {
-      listeners.delete(listener)
-    }
-  }, [key])
-  const set = useCallback<Dispatch<SetStateAction<T>>>(
-    (next) => {
-      const current = (kept.has(key) ? kept.get(key) : initial) as T
-      const value = typeof next === 'function' ? (next as (old: T) => T)(current) : next
-      kept.set(key, value)
-      for (const listener of shown.get(key) ?? []) listener(value)
-    },
-    // `initial` is only the first value; later ones are ignored, as with useState.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [key]
-  )
-  return [value, set]
 }
 
 export default function Create() {
@@ -623,6 +593,7 @@ export default function Create() {
 
       <div className="create-layout">
         <div className="create-main">
+          <GettingStarted />
           <section
             className={dragging ? 'card add-videos dragging' : 'card add-videos'}
             onDragOver={(event) => {

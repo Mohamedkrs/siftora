@@ -18,11 +18,15 @@ import {
   removeJob,
   renderClips,
   retryJob,
+  pauseAll,
+  resumeAll,
+  holdJob,
   setClipHeart,
   setClipRange,
   clipWords
 } from './jobs'
 import { log } from './logger'
+import { checkForUpdate } from './updates'
 import {
   detectOllama,
   detectOpenAiWhisper,
@@ -77,6 +81,7 @@ export function registerIpc(): void {
     platform: process.platform,
     userData: app.getPath('userData')
   }))
+  ipcMain.handle(IPC.checkForUpdate, () => (getSettings().checkUpdates ? checkForUpdate() : null))
 
   ipcMain.handle(IPC.getHardware, (_event, force: unknown) => detectHardware(force === true))
 
@@ -188,6 +193,8 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.cancelJob, (_event, id: unknown) => cancelJob(String(id)))
   ipcMain.handle(IPC.removeJob, (_event, id: unknown) => removeJob(String(id)))
   ipcMain.handle(IPC.retryJob, (_event, id: unknown) => retryJob(String(id)))
+  ipcMain.handle(IPC.setQueuePaused, (_event, value: unknown) => (value === true ? pauseAll() : resumeAll()))
+  ipcMain.handle(IPC.holdJob, (_event, id: unknown, held: unknown) => holdJob(String(id), held === true))
   ipcMain.handle(IPC.findAgain, (_event, id: unknown) => findAgain(String(id)))
   ipcMain.handle(IPC.rewritePosts, (_event, id: unknown) => rewritePosts(String(id)))
   ipcMain.handle(IPC.renderClips, (_event, jobId: unknown, clipIds: unknown) => renderClips(String(jobId), ids(clipIds)))

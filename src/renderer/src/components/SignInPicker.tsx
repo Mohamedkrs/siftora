@@ -50,7 +50,8 @@ export default function SignInPicker(props: { noneLabel: string; onChosen?: () =
       {chromiumOnWindows(settings.cookiesBrowser) ? (
         <span className="muted small signin-hint">
           On Windows, {capital(settings.cookiesBrowser!)} locks its sign-in so other apps can't read it (Firefox can be read).
-          If downloads still ask for a sign-in, open youtube.com in {capital(settings.cookiesBrowser!)} while signed in,
+          If downloads still ask for a sign-in, sign in to youtube.com in a private {capital(settings.cookiesBrowser!)} window
+          (close it right after exporting, so the file keeps working),
           export its cookies with a “cookies.txt” extension, and{' '}
           <button type="button" className="link-button" onClick={() => void choose('file')}>
             load the file here

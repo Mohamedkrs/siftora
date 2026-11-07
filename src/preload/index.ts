@@ -18,6 +18,7 @@ const api: Api = {
     ipcRenderer.send(IPC.log, level, msg)
   },
   appInfo: () => ipcRenderer.invoke(IPC.appInfo),
+  checkForUpdate: () => ipcRenderer.invoke(IPC.checkForUpdate),
   getPathForFile: (file) => webUtils.getPathForFile(file),
   getHardware: (force) => ipcRenderer.invoke(IPC.getHardware, force),
   getRecommendation: () => ipcRenderer.invoke(IPC.getRecommendation),
@@ -60,6 +61,8 @@ const api: Api = {
   cancelJob: (id) => ipcRenderer.invoke(IPC.cancelJob, id),
   removeJob: (id) => ipcRenderer.invoke(IPC.removeJob, id),
   retryJob: (id) => ipcRenderer.invoke(IPC.retryJob, id),
+  setQueuePaused: (paused) => ipcRenderer.invoke(IPC.setQueuePaused, paused),
+  holdJob: (id, held) => ipcRenderer.invoke(IPC.holdJob, id, held),
   findAgain: (id) => ipcRenderer.invoke(IPC.findAgain, id),
   rewritePosts: (id) => ipcRenderer.invoke(IPC.rewritePosts, id),
   renderClips: (jobId, clipIds) => ipcRenderer.invoke(IPC.renderClips, jobId, clipIds),

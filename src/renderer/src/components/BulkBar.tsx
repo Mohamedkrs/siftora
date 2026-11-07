@@ -8,13 +8,15 @@ const rendering = (job: Job): boolean =>
 
 /** "Select all" plus actions on the picked videos: find moments again, retry, delete. */
 export default function BulkBar(props: { jobs: Job[]; selected: Set<string>; onSelect: (ids: Set<string>) => void }) {
-  const { findAgain, retry, remove, deleteJob } = useJobs()
+  const { findAgain, retry, remove, deleteJob, hold } = useJobs()
   const dialog = useDialog()
   const all = useRef<HTMLInputElement>(null)
   // Only what is shown counts, so a filter narrows "Select all" too.
   const picked = props.jobs.filter((job) => props.selected.has(job.id))
   const done = picked.filter((job) => job.stage === 'done')
   const failed = picked.filter((job) => job.stage === 'error' || job.stage === 'cancelled')
+  const waiting = picked.filter((job) => job.stage === 'queued' && !job.held)
+  const held = picked.filter((job) => job.stage === 'queued' && job.held)
   // A video whose reels are rendering is kept; deleting it would pull files from under FFmpeg.
   const deletable = picked.filter((job) => !rendering(job))
 
@@ -82,6 +84,31 @@ export default function BulkBar(props: { jobs: Job[]; selected: Set<string>; onS
         >
           Find moments again ({done.length})
         </button>
+        {waiting.length > 0 ? (
+          <button
+            type="button"
+            className="button small"
+            title="Skip these videos until you resume them"
+            onClick={() => {
+              for (const job of waiting) hold(job.id, true)
+              clear()
+            }}
+          >
+            Pause ({waiting.length})
+          </button>
+        ) : null}
+        {held.length > 0 ? (
+          <button
+            type="button"
+            className="button small"
+            onClick={() => {
+              for (const job of held) hold(job.id, false)
+              clear()
+            }}
+          >
+            Resume ({held.length})
+          </button>
+        ) : null}
         {failed.length > 0 ? (
           <button
             type="button"

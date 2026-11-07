@@ -162,6 +162,8 @@ function sanitize(input: unknown): Settings {
     theme: raw.theme === 'dark' || raw.theme === 'light' ? raw.theme : defaults.theme,
     palette: PALETTES.find((p) => p.id === raw.palette)?.id ?? defaults.palette,
     onboarded: typeof raw.onboarded === 'boolean' ? raw.onboarded : defaults.onboarded,
+    gettingStartedHidden: raw.gettingStartedHidden === true,
+    checkUpdates: raw.checkUpdates !== false,
     transcriptionModel: modelIdOr(raw.transcriptionModel, 'transcription', customModels),
     llmModel: modelIdOr(raw.llmModel, 'llm', customModels),
     useVad: typeof raw.useVad === 'boolean' ? raw.useVad : defaults.useVad,

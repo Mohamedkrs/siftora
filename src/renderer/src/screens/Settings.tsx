@@ -135,6 +135,7 @@ function StorageSection() {
 export default function SettingsScreen() {
   const { settings, update } = useSettings()
   const [info, setInfo] = useState<AppInfo | null>(null)
+  const [newer, setNewer] = useState<{ version: string; url: string } | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -147,11 +148,16 @@ export default function SettingsScreen() {
       .catch((err: unknown) => {
         window.api.log('error', `appInfo failed: ${String(err)}`)
       })
+    if (settings.checkUpdates) {
+      void window.api.checkForUpdate().then((found) => {
+        if (alive) setNewer(found)
+      })
+    } else setNewer(null)
 
     return () => {
       alive = false
     }
-  }, [])
+  }, [settings.checkUpdates])
 
   const chooseOutputDir = async (): Promise<void> => {
     try {
@@ -289,7 +295,8 @@ export default function SettingsScreen() {
         <p className="muted">
           Needed for age-restricted or members-only videos. Firefox works best; Chrome, Edge and Brave must be
           fully quit first and may still refuse. Otherwise export a cookies.txt on youtube.com with an extension
-          such as “Get cookies.txt LOCALLY”.
+          such as “Get cookies.txt LOCALLY”. Export it from a private window you sign in to and close right after:
+          YouTube replaces the sign-in of open tabs, which breaks the file within days.
         </p>
       </section>
 
@@ -306,6 +313,17 @@ export default function SettingsScreen() {
             Run setup again
           </button>
         </div>
+        {settings.gettingStartedHidden ? (
+          <div className="row">
+            <div>
+              <div className="label">Getting started</div>
+              <div className="value">The checklist of first steps at the top of Create.</div>
+            </div>
+            <button type="button" className="button" onClick={() => update({ gettingStartedHidden: false })}>
+              Show again
+            </button>
+          </div>
+        ) : null}
         <p className="muted small">Your videos, results and downloaded models are kept.</p>
       </section>
 
@@ -314,7 +332,17 @@ export default function SettingsScreen() {
         {info ? (
           <dl className="about">
             <dt>Version</dt>
-            <dd>{info.version}</dd>
+            <dd>
+              {info.version}
+              {newer ? (
+                <>
+                  {' · '}
+                  <a href={newer.url} target="_blank" rel="noreferrer">
+                    Siftora {newer.version} is available
+                  </a>
+                </>
+              ) : null}
+            </dd>
             <dt>Platform</dt>
             <dd>{info.platform}</dd>
             <dt>User data</dt>
@@ -323,6 +351,19 @@ export default function SettingsScreen() {
         ) : (
           <p className="muted">Loading…</p>
         )}
+        <label className="toggle">
+          <input
+            type="checkbox"
+            checked={settings.checkUpdates}
+            onChange={(event) => update({ checkUpdates: event.target.checked })}
+          />
+          <span>
+            <strong>Check for updates</strong>
+            <span className="muted">
+              Once per start, Siftora asks GitHub for the newest version. Nothing about you or your videos is sent.
+            </span>
+          </span>
+        </label>
         <p className="muted kofi-note">Siftora is free, with no ads or accounts. If it saves you time, you can support it.</p>
         <a className="kofi-button" href="https://ko-fi.com/mohamedkrs" target="_blank" rel="noreferrer">
           <img src={kofiButton} alt="Buy me a coffee on Ko-fi" height={48} />

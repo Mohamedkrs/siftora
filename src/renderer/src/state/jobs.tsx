@@ -9,6 +9,8 @@ interface JobsContextValue {
   cancel: (id: string) => void
   remove: (id: string) => void
   retry: (id: string) => void
+  /** Pause or resume a video that has not started. */
+  hold: (id: string, held: boolean) => void
   findAgain: (id: string) => void
   rewritePosts: (id: string) => void
   render: (jobId: string, clipIds: string[]) => void
@@ -46,6 +48,7 @@ export function JobsProvider({ children }: { children: ReactNode }) {
       void window.api.removeJob(id)
     },
     retry: (id) => void window.api.retryJob(id),
+    hold: (id, held) => void window.api.holdJob(id, held),
     findAgain: (id) => void window.api.findAgain(id),
     rewritePosts: (id) => void window.api.rewritePosts(id),
     render: (jobId, clipIds) => void window.api.renderClips(jobId, clipIds),
