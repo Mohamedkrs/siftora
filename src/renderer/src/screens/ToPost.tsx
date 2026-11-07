@@ -27,7 +27,9 @@ function ToPostRow({ job, clip }: Item) {
           className="clip-reel"
           src={`${mediaUrl(path)}?v=${clip.render.at ?? 0}`}
           controls
-          preload="metadata"
+          // With a still to show, the reel loads only when played.
+          preload={clip.render.poster ? 'none' : 'metadata'}
+          poster={clip.render.poster ? `${mediaUrl(clip.render.poster)}?v=${clip.render.at ?? 0}` : undefined}
         />
       </div>
       <div className="clip-body">

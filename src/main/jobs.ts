@@ -1,6 +1,6 @@
 import { app, BrowserWindow, shell } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { CATALOG, REACTION_MODEL_IDS, llamaTooOld, SPEAKER_MODEL_IDS } from '../shared/catalog'
 import { pickEngine } from '../shared/engines'
@@ -46,6 +46,61 @@ function update(job: Job, patch: Partial<Job> = {}): void {
   }
 }
 
+/** One frame of `input` at `seconds` as a small JPG; from the start if the video is shorter than that. */
+async function grabStill(input: string, seconds: number, width: number, output: string): Promise<void> {
+  const { ffmpeg } = ffmpegPaths()
+  mkdirSync(dirname(output), { recursive: true })
+  let failure: unknown = new Error('no frame')
+  for (const at of seconds > 0 ? [seconds, 0] : [0]) {
+    try {
+      await run(ffmpeg, ['-y', '-v', 'error', '-ss', at.toFixed(2), '-i', input, '-frames:v', '1', '-vf', `scale=${width}:-2`, '-q:v', '5', output])
+      if (existsSync(output)) return
+    } catch (err) {
+      // Past the end FFmpeg fails rather than writing nothing; the next try starts at 0.
+      failure = err
+    }
+  }
+  throw failure
+}
+
+// One still at a time: the startup backfill can be a hundred of them.
+let stills: Promise<void> = Promise.resolve()
+
+/** Makes a video's card still and its reels' posters where missing, queued behind other stills. */
+function queueStills(job: Job): void {
+  stills = stills.then(async () => {
+    // Deleted while waiting (saving would bring its folder back), or no FFmpeg yet: nothing to do.
+    if (jobs.get(job.id) !== job || !enginePath('ffmpeg')) return
+    const best = [...job.clips].sort((a, b) => b.score - a.score)[0]
+    if (job.stage === 'done' && job.videoPath && existsSync(job.videoPath) && !(job.thumb && existsSync(job.thumb))) {
+      const thumb = join(jobDir(job.id), 'thumb.jpg')
+      try {
+        await grabStill(job.videoPath, (best?.start ?? 0) / 1000 + 1.5, 320, thumb)
+        if (jobs.get(job.id) === job) update(job, { thumb })
+      } catch (err) {
+        log.warn('jobs', `no thumbnail for ${job.title}: ${String(err)}`)
+      }
+    }
+    for (const clip of job.clips) await posterFor(job, clip)
+  })
+}
+
+/** The reel's poster, made again when the reel was rendered after it. */
+async function posterFor(job: Job, clip: Clip): Promise<void> {
+  const reel = clip.render.path
+  if (clip.render.status !== 'done' || !reel || !existsSync(reel)) return
+  const poster = join(jobDir(job.id), 'posters', `${clip.id}.jpg`)
+  if (clip.render.poster === poster && existsSync(poster) && statSync(poster).mtimeMs >= (clip.render.at ?? 0)) return
+  try {
+    await grabStill(reel, 1, 360, poster)
+    if (jobs.get(job.id) !== job) return
+    clip.render.poster = poster
+    update(job)
+  } catch (err) {
+    log.warn('jobs', `no poster for ${clip.title}: ${String(err)}`)
+  }
+}
+
 /** Progress updates are frequent; only broadcast/save a few per second. */
 function progressUpdater(job: Job): (progress: number, message?: string) => void {
   let last = 0
@@ -76,6 +131,8 @@ export function loadJobs(): void {
       job.channel ??= channelOf(jobDir(id))
       jobs.set(job.id, job)
       repairOutputDir(job)
+      // Stills for videos and reels from before they existed; in the background, one at a time.
+      queueStills(job)
     } catch {
       // Not a job folder or unreadable; ignore.
     }
@@ -281,6 +338,7 @@ async function work(): Promise<void> {
       try {
         await runJob(next, controller.signal)
         update(next, { stage: 'done', progress: 1, message: `${next.clips.length} clips found` })
+        queueStills(next)
       } catch (err) {
         if (controller.signal.reason === 'pause') {
           update(next, { stage: 'queued', progress: 0, message: undefined, held: true })
@@ -804,6 +862,7 @@ async function renderOne(job: Job, clip: Clip): Promise<void> {
       at: Date.now()
     }
     logFeedback(job, 'render', [clip])
+    queueStills(job)
   } catch (err) {
     log.error('render', `${job.title} / ${clip.title}: ${String(err)}`)
     clip.render = { status: 'error', progress: 0, error: err instanceof Error ? err.message : String(err) }

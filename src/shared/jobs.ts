@@ -94,6 +94,8 @@ export interface Clip {
     at?: number
     message?: string
     range?: string
+    /** A still of the rendered reel (JPG), its player's poster, so the reel loads only when played. */
+    poster?: string
   }
 }
 
@@ -111,6 +113,8 @@ export interface Job {
   source: string
   /** Local video file (same as source for files; set after download for URLs). */
   videoPath: string | null
+  /** A small still of its best clip (JPG), shown on video cards instead of loading the video itself. */
+  thumb?: string
   title: string
   /** Channel or uploader, for links (from yt-dlp's metadata). */
   channel?: string

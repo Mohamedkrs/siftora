@@ -3,7 +3,6 @@ import { formatClock } from '../lib/format'
 
 /** A finished video: a frame from its best clip, its title and how far along it is. */
 export default function VideoCard({ job, selected, onSelect }: { job: Job; selected: boolean; onSelect: () => void }) {
-  const best = [...job.clips].sort((a, b) => b.score - a.score)[0]
   const rendered = job.clips.filter((clip) => clip.render.status === 'done').length
   return (
     <button
@@ -14,16 +13,8 @@ export default function VideoCard({ job, selected, onSelect }: { job: Job; selec
       title={job.title}
     >
       <span className="video-card-frame">
-        {job.videoPath ? (
-          <video
-            src={mediaUrl(job.videoPath)}
-            muted
-            preload="metadata"
-            onLoadedMetadata={(event) => {
-              event.currentTarget.currentTime = (best?.start ?? 0) / 1000 + 1.5
-            }}
-          />
-        ) : null}
+        {/* A still made once, not the video: dozens of live <video> cards made Results lag. Blank until it exists. */}
+        {job.thumb ? <img src={mediaUrl(job.thumb)} alt="" loading="lazy" decoding="async" /> : null}
       </span>
       <span className="video-card-text">
         <strong>{job.title}</strong>

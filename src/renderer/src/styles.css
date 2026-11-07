@@ -1724,7 +1724,7 @@ option {
   background: #0a0c10;
 }
 
-.video-card-frame video {
+.video-card-frame img {
   display: block;
   width: 100%;
   height: 100%;

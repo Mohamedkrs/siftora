@@ -8,7 +8,9 @@ const TYPES: Record<string, string> = {
   '.mov': 'video/quicktime',
   '.webm': 'video/webm',
   '.mkv': 'video/x-matroska',
-  '.avi': 'video/x-msvideo'
+  '.avi': 'video/x-msvideo',
+  // Video and reel stills (thumb.jpg, posters/<clip>.jpg).
+  '.jpg': 'image/jpeg'
 }
 
 /**

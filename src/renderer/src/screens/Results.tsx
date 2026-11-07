@@ -72,7 +72,9 @@ function ClipCard({ job, clip, rank, stale }: { job: Job; clip: Clip; rank: numb
               className="clip-reel"
               src={`${mediaUrl(clip.render.path as string)}?v=${clip.render.at ?? 0}`}
               controls
-              preload="metadata"
+              // With a still to show, the reel loads only when played.
+              preload={clip.render.poster ? 'none' : 'metadata'}
+              poster={clip.render.poster ? `${mediaUrl(clip.render.poster)}?v=${clip.render.at ?? 0}` : undefined}
             />
           ) : job.videoPath ? (
             <video
