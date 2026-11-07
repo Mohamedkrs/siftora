@@ -75,6 +75,7 @@ export function loadJobs(): void {
       // Jobs from before the channel was kept.
       job.channel ??= channelOf(jobDir(id))
       jobs.set(job.id, job)
+      repairOutputDir(job)
     } catch {
       // Not a job folder or unreadable; ignore.
     }
@@ -94,8 +95,34 @@ function outputRoot(): string {
   return getSettings().outputDir || join(app.getPath('videos'), 'Siftora')
 }
 
-function safeName(name: string): string {
-  return name.replace(/[<>:"/\\|?*\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'video'
+/**
+ * A file or folder name Windows Explorer can open: no reserved characters or invisible ones, and no
+ * trailing dots or spaces (Node can create "Easy..." but Explorer then says "location not available").
+ */
+export function safeName(name: string): string {
+  const clean = name
+    .replace(/[<>:"/\\|?*\u0000-\u001f\u200b-\u200f\u2060-\u2064\ufeff]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80)
+    .replace(/[. ]+$/, '')
+  return /^(con|prn|aux|nul|com\d|lpt\d)$/i.test(clean) ? `${clean} video` : clean || 'video'
+}
+
+/** Moves a job's output folder off a name Explorer cannot open, from before safeName stripped trailing dots. */
+function repairOutputDir(job: Job): void {
+  const fixed = join(dirname(job.outputDir), safeName(basename(job.outputDir)))
+  if (fixed === job.outputDir) return
+  try {
+    if (existsSync(job.outputDir) && !existsSync(fixed)) renameSync(job.outputDir, fixed)
+    for (const clip of job.clips) {
+      if (clip.render.path?.startsWith(job.outputDir + sep)) clip.render.path = fixed + clip.render.path.slice(job.outputDir.length)
+    }
+    job.outputDir = fixed
+    save(job)
+  } catch (err) {
+    log.warn('jobs', `could not rename ${job.outputDir}: ${String(err)}`)
+  }
 }
 
 export function addJobs(
