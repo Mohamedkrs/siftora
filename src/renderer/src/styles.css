@@ -86,12 +86,12 @@ body,
 
 body {
   margin: 0;
-  background: var(--bg);
   color: var(--text);
   font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    'Segoe UI Variable Text', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
   font-size: 14px;
   line-height: 1.5;
+  background: var(--bg);
 }
 
 button,
@@ -230,9 +230,9 @@ option {
     flex-basis 0.15s;
   display: flex;
   flex-direction: column;
-  gap: 28px;
-  padding: 22px 14px;
-  background: var(--panel);
+  gap: 24px;
+  padding: 20px 12px;
+  background: linear-gradient(180deg, color-mix(in srgb, #fff 2%, var(--panel)), var(--panel) 160px);
   border-right: 1px solid var(--border);
 }
 
@@ -375,8 +375,9 @@ option {
 }
 
 .nav-link.active {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 22%, transparent), color-mix(in srgb, var(--accent) 10%, transparent));
   color: var(--text);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .workspace {
@@ -393,7 +394,8 @@ option {
   align-items: center;
   gap: 9px;
   padding: 0 22px;
-  background: var(--panel);
+  background: color-mix(in srgb, var(--panel) 86%, transparent);
+  backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
   color: var(--muted);
   font-size: 13px;
@@ -422,8 +424,11 @@ option {
 
 .screen-head h1 {
   margin: 0 0 4px;
-  font-size: 26px;
-  letter-spacing: -0.02em;
+  font-family: 'Segoe UI Variable Display', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  font-size: 28px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
 }
 
 .screen-head p {
@@ -433,14 +438,18 @@ option {
 
 .card {
   padding: 18px;
-  background: var(--panel);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 92%, var(--raised)), var(--panel));
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px -24px rgba(0, 0, 0, 0.45);
 }
 
 .card h2 {
   margin: 0 0 14px;
+  font-family: 'Segoe UI Variable Display', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
   font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
 }
 
 .create-grid {
@@ -492,14 +501,16 @@ option {
 }
 
 .button.primary {
-  background: var(--accent);
-  border-color: transparent;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff 12%), var(--accent));
+  border-color: color-mix(in srgb, var(--accent) 70%, #000);
   color: var(--on-accent);
   font-weight: 600;
+  box-shadow: 0 8px 18px -12px color-mix(in srgb, var(--accent) 70%, transparent);
 }
 
 .button.primary:hover:not(:disabled) {
-  background: var(--accent-hover);
+  filter: brightness(1.04);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff 12%), var(--accent));
 }
 
 .button.small {
@@ -868,6 +879,10 @@ option {
 .about dd {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.about + .toggle {
+  margin-top: 18px;
 }
 
 .error-panel {
@@ -2086,7 +2101,7 @@ option {
 }
 
 .toggle input {
-  margin-top: 3px;
+  margin: 3px 0 0;
   accent-color: var(--accent);
 }
 
