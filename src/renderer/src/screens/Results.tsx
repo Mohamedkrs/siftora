@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { mediaUrl, rangeKey, renderStyleKey, type Clip, type Job } from '../../../shared/jobs'
+import { isBlocked } from '../../../shared/types'
 import BulkBar from '../components/BulkBar'
 import CaptionStyle from '../components/CaptionStyle'
 import ClipTrimmer from '../components/ClipTrimmer'
@@ -9,6 +10,7 @@ import JobFilter, { matchesFilter, NO_FILTER } from '../components/JobFilter'
 import SharePanel from '../components/SharePanel'
 import VideoCard from '../components/VideoCard'
 import { useKept } from '../lib/kept'
+import { useBlockChannel } from '../lib/blockChannel'
 import { formatClock } from '../lib/format'
 import { useJobs } from '../state/jobs'
 import { useSettings } from '../state/settings'
@@ -268,6 +270,7 @@ export default function Results() {
   const { jobs, render, findAgain, rewritePosts, deleteJob, deleteClips, isUnopened, markOpened } = useJobs()
   const dialog = useDialog()
   const { settings } = useSettings()
+  const block = useBlockChannel()
   const [params, setParams] = useSearchParams()
   const [topic, setTopic] = useKept<string | null>('results:topic', null)
   const [posted, setPosted] = useKept<'posted' | 'not-posted' | null>('results:posted', null)
@@ -337,6 +340,12 @@ export default function Results() {
         setParams({})
         deleteJob(job.id)
       })
+  }
+  const channelBlocked = isBlocked(settings.blockedChannels, job.channelUrl, job.channelHandleUrl)
+  const blockChannel = (): void => {
+    const url = job.channelUrl
+    if (!url) return
+    void block({ url, handleUrl: job.channelHandleUrl, name: job.channel ?? url }).then((ok) => ok && setParams({}))
   }
   const hearted = clips.filter((clip) => clip.hearted).length
   const unhearted = clips.filter(
@@ -475,6 +484,22 @@ export default function Results() {
           <button type="button" className="button" onClick={() => findAgain(job.id)}>
             Find moments again
           </button>
+          {job.channelUrl ? (
+            channelBlocked ? (
+              <button type="button" className="button" disabled title="Unblock it on Channels">
+                Channel blocked
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="button"
+                title="Explore and Top videos never suggest this channel again"
+                onClick={blockChannel}
+              >
+                Block channel
+              </button>
+            )
+          ) : null}
           <button
             type="button"
             className="button danger"

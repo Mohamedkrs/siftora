@@ -37,7 +37,7 @@ import {
 } from './systemEngines'
 import { Cancelled } from './pipeline/run'
 import { getSettings, setSettings } from './settings'
-import { importCookies, isVideoUrl, youtubeInfo, ytDlpInstalled, ytDlpPath } from './youtube'
+import { channelDetails, channelVideos, exploreChannels, importCookies, isChannelUrl, isVideoUrl, searchVideos, subscribedChannels, youtubeInfo, ytDlpInstalled, ytDlpPath } from './youtube'
 
 export function registerIpc(): void {
   ipcMain.handle(IPC.getSettings, () => getSettings())
@@ -153,6 +153,42 @@ export function registerIpc(): void {
     })
   })
   ipcMain.handle(IPC.ytDlpInstalled, () => ytDlpInstalled())
+  ipcMain.handle(IPC.channelVideos, (_event, url: unknown, count: unknown, sinceDays: unknown) => {
+    if (typeof url !== 'string' || !isChannelUrl(url)) throw new Error('Not a YouTube channel link.')
+    if (typeof count !== 'number' || !Number.isInteger(count) || count < 1 || count > 50) throw new Error('Pick 1 to 50 videos.')
+    const days = typeof sinceDays === 'number' && Number.isFinite(sinceDays) ? Math.min(Math.max(0, sinceDays), 3650) : 0
+    return channelVideos(url.trim(), count, days, AbortSignal.timeout(60_000)).catch((err: unknown) => {
+      throw err instanceof Cancelled ? new Error('YouTube did not answer within a minute.') : err
+    })
+  })
+  ipcMain.handle(IPC.searchVideos, (_event, query: unknown, count: unknown, sinceDays: unknown, sort: unknown) => {
+    if (typeof query !== 'string' || !query.trim() || query.length > 200) throw new Error('Type what to search for.')
+    if (typeof count !== 'number' || !Number.isInteger(count) || count < 1 || count > 50) throw new Error('Pick 1 to 50 videos.')
+    const days = typeof sinceDays === 'number' && Number.isFinite(sinceDays) ? Math.min(Math.max(0, sinceDays), 3650) : 0
+    return searchVideos(
+      query.trim(),
+      count,
+      days,
+      sort === 'views' ? 'views' : 'relevance',
+      getSettings().blockedChannels,
+      AbortSignal.timeout(60_000)
+    ).catch((err: unknown) => {
+      throw err instanceof Cancelled ? new Error('YouTube did not answer within a minute.') : err
+    })
+  })
+  ipcMain.handle(IPC.exploreChannels, (_event, query: unknown, count: unknown, sinceDays: unknown) => {
+    if (typeof query !== 'string' || !query.trim() || query.length > 200) throw new Error('Type what to search for.')
+    if (typeof count !== 'number' || !Number.isInteger(count) || count < 1 || count > 10) throw new Error('Pick 1 to 10 channels.')
+    const days = typeof sinceDays === 'number' && Number.isFinite(sinceDays) ? Math.min(Math.max(0, sinceDays), 3650) : 30
+    return exploreChannels(query.trim(), count, days, AbortSignal.timeout(60_000)).catch((err: unknown) => {
+      throw err instanceof Cancelled ? new Error('YouTube did not answer within a minute.') : err
+    })
+  })
+  ipcMain.handle(IPC.channelDetails, (_event, url: unknown) => {
+    if (typeof url !== 'string' || !isChannelUrl(url)) throw new Error('Not a YouTube channel link.')
+    return channelDetails(url.trim(), AbortSignal.timeout(60_000))
+  })
+  ipcMain.handle(IPC.subscribedChannels, () => subscribedChannels(AbortSignal.timeout(180_000)))
   ipcMain.handle(IPC.addJobs, (_event, sources: unknown, links: unknown, limits: unknown) => {
     const valid: Record<string, YoutubeChoice> = {}
     if (links && typeof links === 'object') {

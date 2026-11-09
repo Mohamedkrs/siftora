@@ -13,8 +13,7 @@ export interface CustomModel {
   bytes: number
 }
 
-// Saved and blocked channels are Siftora Pro features. The free app only keeps them in settings,
-// so an upgrade to Pro still finds them.
+/** A YouTube channel saved on the Channels screen, to add its newest videos from Create. */
 export interface SavedChannel {
   url: string
   name: string
@@ -22,10 +21,22 @@ export interface SavedChannel {
   tags: string[]
 }
 
+/** A YouTube channel the user never wants suggested: Explore and video search skip it. */
 export interface BlockedChannel {
+  /** https://www.youtube.com/channel/UC… or @handle link. */
   url: string
+  /** Its other link (the @handle one), so either spelling matches. */
   handleUrl?: string
   name: string
+}
+
+/** A channel link without its trailing slash and case, so both spellings match. */
+export const channelKey = (link: string): string => link.trim().replace(/\/+$/, '').toLowerCase()
+
+/** Whether any of a channel's links is on the block list. */
+export function isBlocked(blocked: BlockedChannel[], ...links: (string | null | undefined)[]): boolean {
+  const keys = new Set(blocked.flatMap((channel) => [channel.url, channel.handleUrl ?? ''].filter(Boolean).map(channelKey)))
+  return links.some((link) => link && keys.has(channelKey(link)))
 }
 
 export interface EngineOption {
@@ -190,6 +201,24 @@ export interface Settings {
 export type CommentsSort = 'top' | 'new'
 
 /** Browsers yt-dlp can read cookies from (--cookies-from-browser). */
+/** How YouTube orders search results: its own ranking, or most viewed first. */
+export type VideoSort = 'relevance' | 'views'
+
+/** A channel found by Explore YouTube, from the top videos of a search. */
+export interface ExploredChannel {
+  /** https://www.youtube.com/channel/UC… */
+  url: string
+  /** https://www.youtube.com/@handle when known, to spot a channel already saved by its handle. */
+  handleUrl: string | null
+  name: string
+  /** How many of the search's top videos are this channel's. */
+  hits: number
+  /** Views of those videos together. */
+  views: number
+  /** Up to two of those videos' titles, to judge the channel by. */
+  sampleTitles: string[]
+}
+
 export const COOKIES_BROWSERS =['firefox', 'chrome', 'edge', 'brave', 'opera', 'vivaldi', 'chromium'] as const
 export type CookiesBrowser = (typeof COOKIES_BROWSERS)[number]
 /** A browser, or 'file' = a cookies.txt the user loaded (kept in the app's data folder). */
@@ -310,6 +339,18 @@ export interface Api {
   /** Asks the site about a video link (downloads yt-dlp the first time). */
   youtubeInfo(url: string): Promise<YoutubeInfo>
   ytDlpInstalled(): Promise<boolean>
+  /** Links to a YouTube channel's `count` newest videos. */
+  /** sinceDays > 0: only videos uploaded in that many days. */
+  channelVideos(url: string, count: number, sinceDays?: number): Promise<string[]>
+  /** Links to the top `count` YouTube search results (videos of 4 minutes or more, no Shorts). */
+  /** Video links, and how many results were dropped for coming from a blocked channel. */
+  searchVideos(query: string, count: number, sinceDays?: number, sort?: VideoSort): Promise<{ links: string[]; blocked: number }>
+  /** Up to `count` channels behind the top videos for `query`, best first; for Explore YouTube on Create. */
+  exploreChannels(query: string, count: number, sinceDays?: number): Promise<ExploredChannel[]>
+  /** A channel's name and a few of its keywords, for the Channels screen. */
+  channelDetails(url: string): Promise<{ name: string; tags: string[] }>
+  /** Channels the user subscribes to (needs the YouTube sign-in from Settings). */
+  subscribedChannels(): Promise<{ url: string; name: string }[]>
   log(level: 'info' | 'warn' | 'error', msg: string): void
   appInfo(): Promise<{ version: string; platform: string; userData: string }>
   /** A newer release on GitHub, or null; null too when update checks are off. */
@@ -421,6 +462,11 @@ export const IPC = {
   pickVideos: 'dialog:pick-videos',
   youtubeInfo: 'youtube:info',
   ytDlpInstalled: 'youtube:installed',
+  channelVideos: 'youtube:channel-videos',
+  searchVideos: 'youtube:search-videos',
+  exploreChannels: 'youtube:explore-channels',
+  channelDetails: 'youtube:channel-details',
+  subscribedChannels: 'youtube:subscribed-channels',
   log: 'app:log',
   appInfo: 'app:info',
   checkForUpdate: 'app:check-for-update',

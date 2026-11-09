@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { JobOptions } from '../shared/jobs'
-import type { YoutubeInfo } from '../shared/types'
+import { isBlocked, type BlockedChannel, type ExploredChannel, type VideoSort, type YoutubeInfo } from '../shared/types'
 import { emitModelState } from './downloads'
 import { log } from './logger'
 import { getSettings } from './settings'
@@ -235,6 +235,149 @@ export async function youtubeInfo(url: string, signal?: AbortSignal): Promise<Yo
     durationMs: Math.round((info.duration ?? 0) * 1000),
     heights: [...new Set(heights)].sort((a, b) => b - a)
   }
+}
+
+/** A YouTube channel page: /@name, /channel/…, /c/… or /user/…, optionally on a tab. */
+export function isChannelUrl(source: string): boolean {
+  try {
+    const url = new URL(source.trim())
+    return /(^|\.)youtube\.com$/.test(url.hostname) && /^\/(@[^/]+|(channel|c|user)\/[^/]+)(\/(videos|streams|shorts))?\/?$/.test(url.pathname)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Links to a channel's `count` newest videos, newest first, without downloading them.
+ * sinceDays > 0 keeps only those uploaded in that many days (YouTube's "3 days ago", so to the day).
+ */
+export async function channelVideos(url: string, count: number, sinceDays = 0, signal?: AbortSignal): Promise<string[]> {
+  const page = new URL(url.trim())
+  // A bare channel link lists its tabs, not videos.
+  if (!/\/(videos|streams|shorts)\/?$/.test(page.pathname)) page.pathname = `${page.pathname.replace(/\/$/, '')}/videos`
+  const ytDlp = await ytDlpPath()
+  const dates = sinceDays > 0 ? ['--extractor-args', 'youtubetab:approximate_date'] : []
+  const output = await runYtDlp(ytDlp, ['--flat-playlist', '-J', ...dates, '--playlist-end', String(count), '--', page.href], { signal })
+  const info = JSON.parse(output.stdout) as { entries?: { id?: string; timestamp?: number }[] }
+  const since = Date.now() / 1000 - sinceDays * 86_400
+  return (info.entries ?? []).flatMap((entry) =>
+    // No date (e.g. a live stream) counts as recent rather than silently dropping it.
+    entry.id && (sinceDays <= 0 || entry.timestamp === undefined || entry.timestamp === null || entry.timestamp >= since)
+      ? [`https://www.youtube.com/watch?v=${entry.id}`]
+      : []
+  )
+}
+
+type SearchEntry = {
+  id?: string
+  url?: string
+  title?: string
+  duration?: number | null
+  view_count?: number | null
+  channel?: string
+  channel_id?: string
+  channel_url?: string
+  uploader_url?: string
+}
+
+/**
+ * YouTube search results for `query`, videos only (no Shorts, nothing under 4 minutes, since short
+ * videos have no moments to find), optionally uploaded in the last day, week or month.
+ */
+async function searchEntries(query: string, limit: number, sinceDays: number, sort: VideoSort, signal?: AbortSignal): Promise<SearchEntry[]> {
+  // YouTube's search filter ("sp") is a small protobuf: field 1 = sort (3 = view count); field 2 holds
+  // 1 = upload date (2 today, 3 week, 4 month, 5 year) and 2 = type (1 video).
+  const date = sinceDays <= 0 ? [] : sinceDays <= 1 ? [0x08, 2] : sinceDays <= 7 ? [0x08, 3] : sinceDays <= 31 ? [0x08, 4] : [0x08, 5]
+  const filter = [...date, 0x10, 1]
+  const sp = Buffer.from([...(sort === 'views' ? [0x08, 3] : []), 0x12, filter.length, ...filter]).toString('base64')
+  const page = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=${encodeURIComponent(sp)}`
+  // More than asked for, as Shorts and short videos are dropped afterwards.
+  const output = await runYtDlp(await ytDlpPath(), ['--flat-playlist', '-J', '--playlist-end', String(Math.min(limit * 3, 150)), '--', page], { signal })
+  const info = JSON.parse(output.stdout) as { entries?: SearchEntry[] }
+  return (info.entries ?? []).filter((entry) => entry.id && !entry.url?.includes('/shorts/') && (entry.duration == null || entry.duration >= 240))
+}
+
+/** Links to the top `count` YouTube search results for `query` (see searchEntries), without blocked channels' videos. */
+export async function searchVideos(
+  query: string,
+  count: number,
+  sinceDays = 0,
+  sort: VideoSort = 'relevance',
+  blockedChannels: BlockedChannel[] = [],
+  signal?: AbortSignal
+): Promise<{ links: string[]; blocked: number }> {
+  const entries = await searchEntries(query, count, sinceDays, sort, signal)
+  const allowed = entries.filter((entry) => !isBlocked(blockedChannels, entry.channel_url, entry.uploader_url))
+  // Blocked ones counted only within the top `count`, the ones the user would otherwise have got.
+  const blocked = entries.slice(0, count).filter((entry) => !allowed.includes(entry)).length
+  return { links: allowed.slice(0, count).map((entry) => `https://www.youtube.com/watch?v=${entry.id}`), blocked }
+}
+
+/**
+ * Up to `count` channels behind the top videos for `query`: YouTube's channel search ranks names that
+ * contain the words, so channels whose videos rank are a better sign of the good ones. Ranked by how many
+ * of the top results are theirs, then by those videos' views.
+ */
+export async function exploreChannels(query: string, count: number, sinceDays = 30, signal?: AbortSignal): Promise<ExploredChannel[]> {
+  const entries = await searchEntries(query, 50, sinceDays, 'relevance', signal)
+  const channels = new Map<string, ExploredChannel>()
+  for (const entry of entries) {
+    // A video by several creators has no single channel.
+    if (!entry.channel_id || !entry.channel_url) continue
+    const channel = channels.get(entry.channel_id) ?? {
+      url: entry.channel_url,
+      handleUrl: entry.uploader_url ?? null,
+      name: entry.channel ?? entry.channel_url,
+      hits: 0,
+      views: 0,
+      sampleTitles: []
+    }
+    channel.hits++
+    channel.views += entry.view_count ?? 0
+    if (entry.title && channel.sampleTitles.length < 2) channel.sampleTitles.push(entry.title)
+    channels.set(entry.channel_id, channel)
+  }
+  return [...channels.values()].sort((a, b) => b.hits - a.hits || b.views - a.views).slice(0, count)
+}
+
+/** A channel's name and its first few keywords (as tags), without listing its videos. */
+export async function channelDetails(url: string, signal?: AbortSignal): Promise<{ name: string; tags: string[] }> {
+  const output = await runYtDlp(await ytDlpPath(), ['--flat-playlist', '-J', '--playlist-items', '0', '--', url], { signal })
+  const info = JSON.parse(output.stdout) as { channel?: string; uploader?: string; title?: string; tags?: unknown }
+  const keywords = Array.isArray(info.tags) ? info.tags.filter((tag): tag is string => typeof tag === 'string') : []
+  return {
+    name: info.channel ?? info.uploader ?? info.title ?? '',
+    tags: [...new Set(keywords.map((tag) => tag.trim().toLowerCase()).filter(Boolean))].slice(0, 3)
+  }
+}
+
+/** The channels the signed-in user subscribes to; needs the YouTube sign-in from Settings. */
+export async function subscribedChannels(signal?: AbortSignal): Promise<{ url: string; name: string }[]> {
+  const signIn = cookieArgs()
+  if (signIn.length === 0) throw new Error('Sign-in needed: choose how Siftora signs in to YouTube in Settings first.')
+  const ytDlp = await ytDlpPath()
+  type Entry = { url?: string; title?: string; channel?: string; channel_url?: string; channel_id?: string }
+  const list = async (page: string, extra: string[] = []): Promise<Entry[]> => {
+    const output = await run(ytDlp, [...signIn, '--flat-playlist', '-J', ...extra, '--', page], { signal }).catch(
+      (err: unknown) => {
+        throw explain(err)
+      }
+    )
+    return (JSON.parse(output.stdout) as { entries?: Entry[] } | null)?.entries ?? []
+  }
+  const channels = new Map<string, string>()
+  for (const entry of await list('https://www.youtube.com/feed/channels').catch(() => [])) {
+    const url = entry.url ?? entry.channel_url
+    if (url && /youtube\.com\/(channel\/|@)/.test(url)) channels.set(url, entry.title ?? entry.channel ?? url)
+  }
+  // Fallback: the channels behind the newest videos in the subscriptions feed (misses quiet channels).
+  if (channels.size === 0) {
+    for (const entry of await list(':ytsubs', ['--playlist-end', '300'])) {
+      const url = entry.channel_url ?? (entry.channel_id ? `https://www.youtube.com/channel/${entry.channel_id}` : undefined)
+      if (url && !channels.has(url)) channels.set(url, entry.channel ?? url)
+    }
+  }
+  return [...channels].map(([url, name]) => ({ url, name })).sort((a, b) => a.name.localeCompare(b.name))
 }
 
 /** Downloads a video from a link (up to `maxHeight`p, 0 = best, mp4) into `dir`. */

@@ -2796,6 +2796,111 @@ option {
   margin: 0 0 12px;
 }
 
+/* Channels screen and the saved-channels pick on Create */
+.channel-fields,
+.saved-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.channel-fields > input[type='text'] {
+  flex: 1 1 200px;
+}
+
+/* Same look as the app's dropdowns. */
+.channel-fields > input[type='text'],
+.channel-row > input[type='text'] {
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 10px;
+  background: var(--sunken);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+
+.channel-fields > input[type='text']::placeholder,
+.channel-row > input[type='text']::placeholder {
+  color: var(--muted);
+}
+
+.channel-fields > input[type='text']:hover,
+.channel-row > input[type='text']:hover {
+  border-color: var(--border-strong);
+  background: var(--raised);
+}
+
+.channel-fields > input[type='text']:focus-visible,
+.channel-row > input[type='text']:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.saved-pick {
+  margin-top: 12px;
+  /* The count field has its label on top; line the controls up on their bottom edge. */
+  align-items: flex-end;
+}
+
+.saved-pick select,
+.saved-pick .button,
+.saved-pick .field input {
+  height: 38px;
+}
+
+.saved-pick .field {
+  position: relative;
+  width: 130px;
+}
+
+/* Below the box without taking space, so the row does not shift while it shows. */
+.saved-pick .field-error {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+.saved-pick p {
+  flex-basis: 100%;
+  margin: 12px 0 0;
+}
+
+.channel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.channel-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 1.5fr) minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.channel-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .channel-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Select several videos (Queue, Results) for bulk actions */
 .bulk-bar {
   display: flex;
@@ -2857,6 +2962,120 @@ option {
   cursor: pointer;
 }
 
+.subs-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px 16px;
+  max-height: 320px;
+  margin: 12px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.subs-list label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+/* Tag field: chips plus a box to type; the dropdown lists tags already in use. */
+.tag-input {
+  position: relative;
+  display: flex;
+  flex: 1 1 220px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 3px 6px;
+  background: var(--sunken);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: text;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+
+.tag-input:hover {
+  border-color: var(--border-strong);
+}
+
+.tag-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.tag-input input {
+  flex: 1 0 80px;
+  min-width: 0;
+  padding: 3px 4px;
+  background: none;
+  border: 0;
+  outline: none;
+  color: var(--text);
+}
+
+.tag-input input::placeholder {
+  color: var(--muted);
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 2px 1px 8px;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.tag-chip button {
+  padding: 0 5px;
+  background: none;
+  border: 0;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tag-chip button:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.tag-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+}
+
+.tag-list li {
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tag-list li.active,
+.tag-list li:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
 .getting-started-head {
   display: flex;
   align-items: baseline;
@@ -2911,6 +3130,42 @@ option {
   margin-top: 4px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* Explore YouTube */
+.explore-channels {
+  display: flex;
+  flex-direction: column;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.explore-channel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.explore-channel:last-child {
+  border-bottom: none;
+}
+
+.explore-channel .toggle {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.explore-channel .button {
+  margin-left: auto;
+}
+
+.explore-actions {
+  margin-top: 12px;
 }
 
 /* To post (its reels reuse .clip-card from Results) */

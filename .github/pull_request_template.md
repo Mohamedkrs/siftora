@@ -9,4 +9,4 @@ Closes #
 - [ ] `npm run typecheck` and `npm run build` pass
 - [ ] Tried it in the app (`npm run dev`); screenshots below for anything visible
 
-By opening this pull request, I agree that my contribution is licensed under the GNU GPL v3, like the rest of Siftora, and to the extra license for Siftora Pro described in [CONTRIBUTING.md](../CONTRIBUTING.md#license).
+By opening this pull request, I agree that my contribution is licensed under the GNU GPL v3, like the rest of Siftora.

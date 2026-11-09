@@ -6,6 +6,7 @@ import { DEFAULT_YOUTUBE_HEIGHT, mediaUrl, type Job } from '../../../shared/jobs
 import type { ClipLimits, ModelState, YoutubeChoice, YoutubeInfo } from '../../../shared/types'
 import ModelProgress from '../components/ModelProgress'
 import NumberField from '../components/NumberField'
+import ExploreYoutube from '../components/ExploreYoutube'
 import { useKept } from '../lib/kept'
 import GettingStarted from '../components/GettingStarted'
 import SignInPicker from '../components/SignInPicker'
@@ -25,8 +26,8 @@ function isVideoUrl(value: string): boolean {
   }
 }
 
-/** A YouTube channel page: /@name, /channel/…, /c/… or /user/…; adding a channel is a Pro feature. */
-function isChannelUrl(value: string): boolean {
+/** A YouTube channel page (same test as the main process): /@name, /channel/…, /c/… or /user/…. */
+export function isChannelUrl(value: string): boolean {
   try {
     const url = new URL(value.trim())
     return /(^|\.)youtube\.com$/.test(url.hostname) && /^\/(@[^/]+|(channel|c|user)\/[^/]+)(\/(videos|streams|shorts))?\/?$/.test(url.pathname)
@@ -334,6 +335,22 @@ export default function Create() {
   const [url, setUrl] = useKept('url', '')
   const [urlError, setUrlError] = useKept('urlError', '')
   const [starting, setStarting] = useKept('starting', false)
+  /** How many of a channel's newest videos to add. */
+  const [channelCount, setChannelCount] = useKept('channelCount', 5)
+  const [listingChannel, setListingChannel] = useKept('listingChannel', false)
+  /** Only channel videos uploaded in this many days; 0 = any time. */
+  const [sinceDays, setSinceDays] = useKept('sinceDays', 0)
+  const sincePicker = (
+    <select value={sinceDays} onChange={(event) => setSinceDays(Number(event.target.value))} aria-label="Uploaded within">
+      <option value={0}>Uploaded any time</option>
+      <option value={1}>Uploaded in the last 24 hours</option>
+      <option value={7}>Uploaded in the last week</option>
+      <option value={30}>Uploaded in the last month</option>
+    </select>
+  )
+  /** Saved-channels pick: '' = all, 'tag:<tag>' or 'url:<channel link>'. */
+  const [savedPick, setSavedPick] = useKept('savedPick', '')
+  const [savedStatus, setSavedStatus] = useKept('savedStatus', '')
   /** How many videos the last "Find clips" queued; shown until more are added. */
   const [added, setAdded] = useKept('added', 0)
   /** Picked videos that Siftora already has; the user chooses: open its results or add it again. */
@@ -456,13 +473,84 @@ export default function Create() {
       setUrlError('Paste a link that starts with http:// or https://.')
       return
     }
+    setUrlError('')
     if (isChannelUrl(value)) {
-      setUrlError("That's a channel link. Adding a channel's newest videos is a Siftora Pro feature; paste a video link instead.")
+      setListingChannel(true)
+      window.api
+        .channelVideos(value, channelCount, sinceDays)
+        .then((links) => {
+          if (links.length === 0)
+            return setUrlError(sinceDays > 0 ? 'That channel uploaded nothing in that time.' : 'That channel has no videos.')
+          setUrl('')
+          // Ones already in Siftora go to "Already in Siftora", not the list.
+          for (const link of addVideos(links)) if (youtube[link] === undefined) checkLink(link)
+        })
+        .catch((err: unknown) => {
+          window.api.log('warn', `channelVideos failed: ${String(err)}`)
+          setUrlError(`Could not list that channel: ${(err instanceof Error ? err.message : String(err)).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')}`)
+        })
+        .finally(() => setListingChannel(false))
       return
     }
-    setUrlError('')
     setUrl('')
     if (addVideos([value]).length > 0 && youtube[value] === undefined) checkLink(value)
+  }
+
+  /** Adds the newest videos of the picked saved channels, skipping ones Siftora already has. */
+  const addFromSaved = async (): Promise<void> => {
+    const picked = settings.savedChannels.filter((channel) =>
+      savedPick.startsWith('tag:')
+        ? channel.tags.includes(savedPick.slice(4))
+        : savedPick.startsWith('url:')
+          ? channel.url === savedPick.slice(4)
+          : true
+    )
+    setListingChannel(true)
+    // Per channel, so the list keeps the channels' order however the listings finish.
+    const found: string[][] = picked.map(() => [])
+    const failed: string[] = []
+    let next = 0
+    let listed = 0
+    setSavedStatus(`Listing ${picked.length} ${picked.length === 1 ? 'channel' : 'channels'}…`)
+    // A few at a time: each listing is its own yt-dlp run, and too many at once trips YouTube's limits.
+    const worker = async (): Promise<void> => {
+      while (next < picked.length) {
+        const index = next++
+        const channel = picked[index]
+        try {
+          found[index] = await window.api.channelVideos(channel.url, channelCount, sinceDays)
+        } catch (err) {
+          window.api.log('warn', `channelVideos ${channel.url} failed: ${String(err)}`)
+          failed.push(channel.name)
+        }
+        listed++
+        setSavedStatus(`Listed ${listed} of ${picked.length} channels…`)
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(4, picked.length) }, worker))
+    const links = found.flat()
+    setListingChannel(false)
+    const fresh = links.filter((link) => !existingJob(link) && !videos.some((video) => sameVideo(video, link)))
+    for (const link of addVideos(fresh)) if (youtube[link] === undefined) checkLink(link)
+    setSavedStatus(
+      [
+        `Added ${fresh.length} new ${fresh.length === 1 ? 'video' : 'videos'}`,
+        links.length > fresh.length ? `skipped ${links.length - fresh.length} already in Siftora or in your list` : null,
+        failed.length > 0 ? `could not list ${failed.join(', ')}` : null
+      ]
+        .filter(Boolean)
+        .join('; ') + '.'
+    )
+  }
+
+  /** Adds videos found by Explore YouTube, skipping ones Siftora already has or that are already in the list. */
+  const addFromExplore = (links: string[]): { added: number; skipped: number } => {
+    const unique = Array.from(new Set(links))
+    const fresh = unique.filter(
+      (link) => !existingJob(link) && !videos.some((video) => sameVideo(video, link))
+    )
+    for (const link of addVideos(fresh)) if (youtube[link] === undefined) checkLink(link)
+    return { added: fresh.length, skipped: unique.length - fresh.length }
   }
 
   /** Looks the link up; again after the user picked a browser to sign in with. */
@@ -546,14 +634,51 @@ export default function Create() {
                 type="text"
                 value={url}
                 onChange={(event) => setUrl(event.target.value)}
-                placeholder="Paste a video link"
-                aria-label="Video link"
+                placeholder="Paste a video or YouTube channel link"
+                aria-label="Video or channel link"
               />
-              <button type="submit" className="button">
-                Add
+              <button type="submit" className="button" disabled={listingChannel}>
+                {listingChannel ? 'Listing…' : isChannelUrl(url) ? `Add ${channelCount} newest` : 'Add'}
               </button>
             </form>
+            {isChannelUrl(url) ? (
+              <div className="saved-pick">
+                <NumberField label="Newest videos" value={channelCount} min={1} max={50} onCommit={setChannelCount} />
+                {sincePicker}
+              </div>
+            ) : null}
             {urlError ? <p className="error">{urlError}</p> : null}
+            {settings.savedChannels.length > 0 ? (
+              <div className="saved-pick">
+                <select value={savedPick} onChange={(event) => setSavedPick(event.target.value)} aria-label="Saved channels to add from">
+                  <option value="">All my channels ({settings.savedChannels.length})</option>
+                  {[...new Set(settings.savedChannels.flatMap((channel) => channel.tags))].sort().map((tag) => (
+                    <option key={tag} value={`tag:${tag}`}>
+                      Tag: {tag} ({settings.savedChannels.filter((channel) => channel.tags.includes(tag)).length})
+                    </option>
+                  ))}
+                  {settings.savedChannels.map((channel) => (
+                    <option key={channel.url} value={`url:${channel.url}`}>
+                      {channel.name}
+                    </option>
+                  ))}
+                </select>
+                <NumberField label="Newest per channel" value={channelCount} min={1} max={50} onCommit={setChannelCount} />
+                {sincePicker}
+                <button type="button" className="button" disabled={listingChannel} onClick={() => void addFromSaved()}>
+                  {listingChannel ? 'Listing…' : 'Add newest'}
+                </button>
+                {savedStatus ? <p className="muted">{savedStatus}</p> : null}
+              </div>
+            ) : (
+              <p className="muted">
+                Tip: save your favourite channels on <Link to="/channels">Channels</Link> to add their newest videos in one click.
+              </p>
+            )}
+          </section>
+
+          <section className="card">
+            <ExploreYoutube onAdd={addFromExplore} />
           </section>
 
           {already.length > 0 ? (

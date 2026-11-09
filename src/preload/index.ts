@@ -11,6 +11,11 @@ const api: Api = {
   pickVideos: () => ipcRenderer.invoke(IPC.pickVideos),
   youtubeInfo: (url) => ipcRenderer.invoke(IPC.youtubeInfo, url),
   ytDlpInstalled: () => ipcRenderer.invoke(IPC.ytDlpInstalled),
+  channelVideos: (url, count, sinceDays) => ipcRenderer.invoke(IPC.channelVideos, url, count, sinceDays),
+  searchVideos: (query, count, sinceDays, sort) => ipcRenderer.invoke(IPC.searchVideos, query, count, sinceDays, sort),
+  exploreChannels: (query, count, sinceDays) => ipcRenderer.invoke(IPC.exploreChannels, query, count, sinceDays),
+  channelDetails: (url) => ipcRenderer.invoke(IPC.channelDetails, url),
+  subscribedChannels: () => ipcRenderer.invoke(IPC.subscribedChannels),
   log: (level, msg) => {
     ipcRenderer.send(IPC.log, level, msg)
   },

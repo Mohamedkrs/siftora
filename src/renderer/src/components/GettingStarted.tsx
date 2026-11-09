@@ -8,7 +8,7 @@ export default function GettingStarted() {
   const { jobs } = useJobs()
   const clips = jobs.flatMap((job) => job.clips)
   const steps = [
-    { done: jobs.length > 0, text: <>Add a video or a link below, then press <b>Find clips</b>.</> },
+    { done: jobs.length > 0, text: <>Add a video, a link or a channel below, then press <b>Find clips</b>.</> },
     {
       done: jobs.some((job) => job.stage === 'done'),
       text: <>Follow the progress on <Link to="/queue">Queue</Link>. The first video takes longest.</>
@@ -38,6 +38,9 @@ export default function GettingStarted() {
           </li>
         ))}
       </ol>
+      <p className="hint">
+        Tip: save your favourite channels on <Link to="/channels">Channels</Link> to add their newest videos in one go.
+      </p>
     </section>
   )
 }

@@ -118,6 +118,9 @@ export interface Job {
   title: string
   /** Channel or uploader, for links (from yt-dlp's metadata). */
   channel?: string
+  /** The channel's links, to block it from Results. */
+  channelUrl?: string
+  channelHandleUrl?: string
   createdAt: number
   options: JobOptions
   stage: JobStage

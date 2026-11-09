@@ -27,12 +27,12 @@ Everything runs on your own computer. Your videos and transcripts are never uplo
   <tr>
     <td width="33%"><picture><source media="(prefers-color-scheme: dark)" srcset="site/screenshots/captions-dark.png"><img src="site/screenshots/captions-light.png" alt="Caption style and layout with a live preview on a real frame" width="100%"></picture></td>
     <td width="33%"><picture><source media="(prefers-color-scheme: dark)" srcset="site/screenshots/share-dark.png"><img src="site/screenshots/share-light.png" alt="Share kit: ready-to-paste titles, descriptions and hashtags per platform" width="100%"></picture></td>
-    <td width="33%"><picture><source media="(prefers-color-scheme: dark)" srcset="site/screenshots/create-dark.png"><img src="site/screenshots/create-light.png" alt="Create: add video files or links" width="100%"></picture></td>
+    <td width="33%"><picture><source media="(prefers-color-scheme: dark)" srcset="site/screenshots/create-dark.png"><img src="site/screenshots/create-light.png" alt="Create: add files, links or the newest videos of your saved channels" width="100%"></picture></td>
   </tr>
   <tr>
     <td align="center">Captions with a live preview</td>
     <td align="center">Post texts for every platform</td>
-    <td align="center">Add files or links</td>
+    <td align="center">Add files, links or channels</td>
   </tr>
 </table>
 
@@ -50,11 +50,8 @@ Everything runs on your own computer. Your videos and transcripts are never uplo
 - **Ready to post.** Each rendered reel comes with a title, description and hashtags per platform, written with the video's chapters, the creator's own hashtags and a credit to their channel. Optionally, Siftora also reads the YouTube comments that point at a moment ("14:22 I lost it") to find the angle viewers loved.
 - **Know what's left to post.** Mark a reel as posted when you've uploaded it. **To post** in the sidebar lists every rendered reel you haven't posted yet, across all your videos, with its share kit, plus your recently posted reels with buttons to open each one's video in Results or show the reel in its folder; on Results, filter a video's moments by posted or not.
 - **Uses what you already have.** Finds Ollama, Python Whisper, FFmpeg and model files on your computer, so you download as little as possible.
-- **Files or links.** YouTube, Facebook, TikTok, X, Instagram and the many other sites [yt-dlp](https://github.com/yt-dlp/yt-dlp) supports. Clip length and score limits can be set for all videos or per video. The longest length is a hard cap; the shortest is a target, so a complete moment a little under it is kept as is, not padded.
-
-### Siftora Pro
-
-Everything above is free and open source, and stays that way. **Siftora Pro** (coming soon) adds tools for finding videos to clip: saved YouTube channels grouped by tags, adding a channel's newest videos in one click, importing your YouTube subscriptions, **Explore YouTube** to discover channels by topic, and blocking channels you never want suggested. Buying Pro is also the best way to support Siftora's development.
+- **Files or links.** YouTube, Facebook, TikTok, X, Instagram and the many other sites [yt-dlp](https://github.com/yt-dlp/yt-dlp) supports. Clip length and score limits can be set for all videos or per video. The longest length is a hard cap; the shortest is a target, so a complete moment a little under it is kept as is, not padded. Paste a YouTube channel link to add its newest videos (1 to 50), optionally only those uploaded in the last day, week or month; ones Siftora already has are skipped. **Explore YouTube** on Create finds channels by topic (`gaming, funny`): it lists the channels behind the top recent videos, lets you tick the ones you want and add their newest videos, or save them to Channels. Or it adds the top videos for each topic, most relevant or most viewed (4 minutes or more, no Shorts). **Block** a channel there, or from its video on Results when the clips are bad, and Explore and Top videos never suggest it again. Its videos on Results are deleted with their clips (rendered reels go to the Recycle Bin); you confirm first. Unblock it on Channels.
+- **Your channels, one click.** Save favourite YouTube channels on **Channels** and group them with as many tags as you like (gaming, podcasts…); the tag box suggests the tags you already use as you type. Paste a channel link and its name and tags fill in by themselves, or pick channels from your YouTube subscriptions (needs the YouTube sign-in from Settings). On Create, pick a tag, one channel or all of them to add each one's newest videos with your current settings; videos Siftora already has are skipped.
 
 ## Requirements
 
@@ -178,7 +175,7 @@ The original design notes are in [docs/planning](docs/planning).
 
 ## Support Siftora
 
-Siftora is free, with no ads, accounts or subscriptions. If it saves you editing time, you can buy me a coffee on Ko-fi (no account needed), or get [Siftora Pro](#siftora-pro) once it's out. Testing on other computers helps just as much: see [Tested on](#tested-on).
+Siftora is free, with no ads, accounts or subscriptions. If it saves you editing time, you can buy me a coffee on Ko-fi (no account needed). Testing on other computers helps just as much: see [Tested on](#tested-on).
 
 <a href="https://ko-fi.com/mohamedkrs"><img src="resources/brand/support-kofi.svg" alt="Buy me a coffee on Ko-fi" height="48"></a>
 

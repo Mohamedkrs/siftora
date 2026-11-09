@@ -129,6 +129,7 @@ export function loadJobs(): void {
       }
       // Jobs from before the channel was kept.
       job.channel ??= channelOf(jobDir(id))
+      if (job.channel && !job.channelUrl) Object.assign(job, channelLinksOf(jobDir(id)))
       jobs.set(job.id, job)
       repairOutputDir(job)
       // Stills for videos and reels from before they existed; in the background, one at a time.
@@ -388,6 +389,7 @@ async function runJob(job: Job, signal: AbortSignal): Promise<void> {
       videoPath: result.path,
       title: result.title,
       channel: channelOf(dir),
+      ...channelLinksOf(dir),
       outputDir: join(outputRoot(), safeName(result.title))
     })
   }
@@ -583,7 +585,9 @@ function videoContext(title: string, dir: string): string {
 
 interface VideoInfo {
   channel?: string
+  channel_url?: string
   uploader?: string
+  uploader_url?: string
   uploader_id?: string
   description?: string
   tags?: string[]
@@ -604,6 +608,12 @@ function readVideoInfo(dir: string): VideoInfo | null {
 function channelOf(dir: string): string | undefined {
   const info = readVideoInfo(dir)
   return info?.channel ?? info?.uploader
+}
+
+/** The channel's /channel/UC… and @handle links, to block it from Results. */
+function channelLinksOf(dir: string): Pick<Job, 'channelUrl' | 'channelHandleUrl'> {
+  const info = readVideoInfo(dir)
+  return { channelUrl: info?.channel_url ?? info?.uploader_url, channelHandleUrl: info?.uploader_url }
 }
 
 /** "@KSI"; Facebook and others give a number, which is no use as a credit. */

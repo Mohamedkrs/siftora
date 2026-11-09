@@ -28,5 +28,3 @@ Every pull request is reviewed by the maintainer before it is merged. Releases a
 ## License
 
 Siftora is licensed under the [GNU GPL v3](LICENSE). By submitting a pull request, you agree that your contribution is licensed under the same terms.
-
-Siftora also has a paid edition, Siftora Pro, built on this code. By submitting a pull request, you also grant the project owner (GitHub: Mohamedkrs) a perpetual, worldwide, royalty-free license to use, change and distribute your contribution under other terms, including in Siftora Pro. You keep the copyright to your contribution.
