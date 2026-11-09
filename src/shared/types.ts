@@ -195,10 +195,76 @@ export interface Settings {
   readComments: boolean
   commentsMax: number
   commentsSort: CommentsSort
+  /** Explore and Top videos keep only videos whose titles are mostly in this alphabet. */
+  exploreScript: TitleScript
+  /** Explore and Top videos skip videos that look written in another language than this one. */
+  exploreLanguage: TitleLanguage
+  /** Explore and Top videos skip videos whose title, channel or description contains one of these words. */
+  exploreSkipWords: string[]
+  /** Explore and Top videos search with the YouTube sign-in from Settings, so results follow the account's history. */
+  explorePersonalized: boolean
 }
 
 /** YouTube's own orders: 'top' = most liked and replied first, 'new' = newest first. */
 export type CommentsSort = 'top' | 'new'
+
+// YouTube search ignores region and language settings, so Explore filters by the title's alphabet instead.
+export const TITLE_SCRIPTS = {
+  any: { label: 'Any alphabet', pattern: null },
+  latin: { label: 'Latin (English, Spanish, French…)', pattern: /\p{Script=Latin}/u },
+  arabic: { label: 'Arabic', pattern: /\p{Script=Arabic}/u },
+  cyrillic: { label: 'Cyrillic (Russian, Ukrainian…)', pattern: /\p{Script=Cyrillic}/u },
+  greek: { label: 'Greek', pattern: /\p{Script=Greek}/u },
+  devanagari: { label: 'Devanagari (Hindi, Marathi…)', pattern: /\p{Script=Devanagari}/u },
+  japanese: { label: 'Japanese', pattern: /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u },
+  korean: { label: 'Korean', pattern: /\p{Script=Hangul}/u },
+  chinese: { label: 'Chinese', pattern: /\p{Script=Han}/u },
+  thai: { label: 'Thai', pattern: /\p{Script=Thai}/u }
+} as const
+export type TitleScript = keyof typeof TITLE_SCRIPTS
+
+// Each language's commonest little words: a title's language shows in them, and short titles are too short for more.
+// shortcut: function-word counts, not real detection; titles with none of these words always pass. Use a detector if that lets too much through.
+const WORDS = (list: string): ReadonlySet<string> => new Set(list.split(' '))
+export const TITLE_LANGUAGES = {
+  any: { label: 'Any language', words: null },
+  en: { label: 'English', words: WORDS('the and of to is with for how what why you your my this that from are was best all') },
+  fr: { label: 'French', words: WORDS('le les des du une et est avec pour dans sur pas qui ce cette mon ma je nous vous au aux comment pourquoi très') },
+  es: { label: 'Spanish', words: WORDS('el los las del una y es con para por que como cómo mi muy más pero este esta lo al') },
+  pt: { label: 'Portuguese', words: WORDS('o os as do da dos das um uma e é com para não que como meu minha mais isso você no na') },
+  de: { label: 'German', words: WORDS('der die das und ist mit für ein eine nicht ich du wie was auf zu im von den dem auch') },
+  it: { label: 'Italian', words: WORDS('il lo gli della di del e è con per che come un una non mio sono più nel alla') },
+  nl: { label: 'Dutch', words: WORDS('de het een en van is met voor niet ik je wat hoe op zijn dit naar ook mijn') },
+  tr: { label: 'Turkish', words: WORDS('ve bir bu için ile ne nasıl çok en da de mi değil gibi var yok') },
+  id: { label: 'Indonesian', words: WORDS('dan yang di ini itu dengan untuk tidak ada cara apa aku saya kamu dari ke') },
+  pl: { label: 'Polish', words: WORDS('i w z na się nie jak to co jest od do dla po że ale czy mój') }
+} as const
+export type TitleLanguage = keyof typeof TITLE_LANGUAGES
+
+/** False only when `text` has more of another language's little words than of `language`'s. */
+export function languageAllowed(text: string, language: TitleLanguage): boolean {
+  if (language === 'any') return true
+  const words = text.toLowerCase().match(/\p{L}+/gu) ?? []
+  const score = (code: Exclude<TitleLanguage, 'any'>): number => words.filter((word) => TITLE_LANGUAGES[code].words.has(word)).length
+  const own = score(language)
+  return (Object.keys(TITLE_LANGUAGES) as TitleLanguage[]).every((code) => code === 'any' || code === language || score(code) <= own)
+}
+
+/**
+ * Whether a search result passes Explore's filters: at least 90% of the title's letters in `script`
+ * (digits, emoji and punctuation don't count), and no skip word in the title or `other` (channel name, description).
+ */
+export function titleAllowed(title: string, other: string, script: TitleScript, skipWords: string[]): boolean {
+  const pattern = TITLE_SCRIPTS[script].pattern
+  if (pattern) {
+    const letters = title.match(/\p{L}/gu) ?? []
+    const inScript = letters.filter((letter) => pattern.test(letter)).length
+    if (letters.length > 0 && inScript / letters.length < 0.9) return false
+  }
+  const text = ` ${title} ${other} `.toLowerCase()
+  // Whole words only, so "tamil" skips "Tamil Gaming" but "art" does not skip "party".
+  return !skipWords.some((word) => new RegExp(`[^\\p{L}\\p{N}]${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^\\p{L}\\p{N}]`, 'u').test(text))
+}
 
 /** Browsers yt-dlp can read cookies from (--cookies-from-browser). */
 /** How YouTube orders search results: its own ranking, or most viewed first. */
@@ -272,7 +338,11 @@ export const DEFAULT_SETTINGS: Settings = {
   cookiesBrowser: null,
   readComments: false,
   commentsMax: 300,
-  commentsSort: 'top'
+  commentsSort: 'top',
+  exploreScript: 'any',
+  exploreLanguage: 'any',
+  exploreSkipWords: [],
+  explorePersonalized: false
 }
 
 export interface GpuInfo {

@@ -174,7 +174,8 @@ export default function Queue() {
     setSelected(next)
   }
   const queued = all.filter((job) => !job.hiddenFromQueue)
-  const jobs = queued.filter((job) => matchesFilter(job, filter))
+  // The picker hides with one video left; a filter nobody can see or clear must not hide that video.
+  const jobs = queued.length > 1 ? queued.filter((job) => matchesFilter(job, filter)) : queued
   return (
     <div className="screen">
       <div className="screen-head screen-head-row">

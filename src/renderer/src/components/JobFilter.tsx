@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { STAGE_LABELS, type Job, type JobStage } from '../../../shared/jobs'
 
 export interface JobFilterValue {
@@ -27,6 +28,12 @@ export default function JobFilter(props: {
   statuses?: boolean
 }) {
   const channels = [...new Set(props.jobs.map((job) => job.channel).filter((name): name is string => !!name))].sort()
+  // A channel whose last video was deleted: the picker would show "All channels" while still filtering on it.
+  const gone = props.value.channel !== '' && !channels.includes(props.value.channel)
+  const { value, onChange } = props
+  useEffect(() => {
+    if (gone) onChange({ ...value, channel: '' })
+  }, [gone, value, onChange])
   return (
     <div className="job-filter">
       {channels.length > 0 ? (

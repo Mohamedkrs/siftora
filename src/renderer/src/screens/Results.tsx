@@ -269,7 +269,7 @@ let lastJobId: string | null = null
 export default function Results() {
   const { jobs, render, findAgain, rewritePosts, deleteJob, deleteClips, isUnopened, markOpened } = useJobs()
   const dialog = useDialog()
-  const { settings } = useSettings()
+  const { settings, update } = useSettings()
   const block = useBlockChannel()
   const [params, setParams] = useSearchParams()
   const [topic, setTopic] = useKept<string | null>('results:topic', null)
@@ -346,6 +346,12 @@ export default function Results() {
     const url = job.channelUrl
     if (!url) return
     void block({ url, handleUrl: job.channelHandleUrl, name: job.channel ?? url }).then((ok) => ok && setParams({}))
+  }
+  // isBlocked only matches links (channel or @handle), so it also tells whether the channel is saved.
+  const channelSaved = isBlocked(settings.savedChannels, job.channelUrl, job.channelHandleUrl)
+  const saveChannel = (): void => {
+    const url = job.channelUrl
+    if (url) update({ savedChannels: [...settings.savedChannels, { url, name: job.channel ?? url, tags: [] }] })
   }
   const hearted = clips.filter((clip) => clip.hearted).length
   const unhearted = clips.filter(
@@ -484,6 +490,17 @@ export default function Results() {
           <button type="button" className="button" onClick={() => findAgain(job.id)}>
             Find moments again
           </button>
+          {job.channelUrl && !channelBlocked ? (
+            <button
+              type="button"
+              className="button"
+              disabled={channelSaved}
+              title={channelSaved ? 'Edit or remove it on Channels' : 'Add this channel to My channels, to pull its newest videos from Create'}
+              onClick={saveChannel}
+            >
+              {channelSaved ? 'In my channels' : 'Add to my channels'}
+            </button>
+          ) : null}
           {job.channelUrl ? (
             channelBlocked ? (
               <button type="button" className="button" disabled title="Unblock it on Channels">

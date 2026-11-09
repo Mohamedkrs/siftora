@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { CATALOG } from '../shared/catalog'
 import {
   COOKIES_BROWSERS,
+  TITLE_LANGUAGES, TITLE_SCRIPTS,
   CAPTION_FONTS,
   DEFAULT_SETTINGS,
   MAX_SPEAKER_COLORS,
@@ -206,7 +207,19 @@ function sanitize(input: unknown): Settings {
       raw.cookiesBrowser === 'file' ? 'file' : (COOKIES_BROWSERS.find((browser) => browser === raw.cookiesBrowser) ?? null),
     readComments: raw.readComments === true,
     commentsMax: Math.round(clamp(numberOr(raw.commentsMax, defaults.commentsMax), 20, 5000)),
-    commentsSort: raw.commentsSort === 'new' ? 'new' : 'top'
+    commentsSort: raw.commentsSort === 'new' ? 'new' : 'top',
+    exploreScript:
+      typeof raw.exploreScript === 'string' && Object.hasOwn(TITLE_SCRIPTS, raw.exploreScript)
+        ? (raw.exploreScript as Settings['exploreScript'])
+        : defaults.exploreScript,
+    exploreLanguage:
+      typeof raw.exploreLanguage === 'string' && Object.hasOwn(TITLE_LANGUAGES, raw.exploreLanguage)
+        ? (raw.exploreLanguage as Settings['exploreLanguage'])
+        : defaults.exploreLanguage,
+    exploreSkipWords: Array.isArray(raw.exploreSkipWords)
+      ? [...new Set(raw.exploreSkipWords.filter((word): word is string => typeof word === 'string').map((word) => word.trim().toLowerCase().slice(0, 50)).filter(Boolean))].slice(0, 100)
+      : [],
+    explorePersonalized: raw.explorePersonalized === true
   }
 }
 
