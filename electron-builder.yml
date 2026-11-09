@@ -1,0 +1,51 @@
+appId: app.siftora
+productName: Siftora
+# 1024px PNG for macOS/Linux; Windows gets icon.ico, which uses the simpler symbol at 16-32 px
+# (see resources/brand/BRAND.md)
+icon: resources/icon.png
+directories:
+  output: release
+files:
+  - out/**
+# Caption fonts: used by the preview (bundled by Vite) and by the video renderer (libass),
+# which reads them from <resources>/fonts.
+extraResources:
+  # The window/taskbar icon, read at runtime (src/main/index.ts appIcon)
+  - from: resources
+    to: .
+    filter:
+      - icon.png
+      - icon.ico
+  - from: resources/fonts
+    to: fonts
+    filter:
+      - '*.ttf'
+      - README.md
+win:
+  target: nsis
+  icon: resources/icon.ico
+nsis:
+  # A short wizard: license, then for-me/all-users, then the install folder
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  license: LICENSE
+  # Asks on uninstall whether to delete downloaded models and settings (never on updates)
+  include: build/installer.nsh
+  # A fixed name, so releases/latest/download/Siftora-Setup.exe always gets the newest installer
+  artifactName: Siftora-Setup.${ext}
+mac:
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  # Ad-hoc signature (no Apple Developer ID yet): Apple Silicon will not launch an unsigned app.
+  # Ad-hoc signing needs hardened runtime off, or Electron's own frameworks fail library validation.
+  identity: '-'
+  hardenedRuntime: false
+dmg:
+  # Fixed names, so releases/latest/download/Siftora-mac-arm64.dmg always gets the newest build
+  artifactName: Siftora-mac-${arch}.${ext}
+linux:
+  target: AppImage
+extraMetadata:
+  license: GPL-3.0-only
+# electron-builder has no top-level license field; package.json and extraMetadata carry GPL-3.0-only

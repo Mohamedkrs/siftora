@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="264" height="60" viewBox="0 0 264 60" role="img" aria-label="Download for Windows">
+  <title>Download for Windows</title>
+  <rect width="264" height="60" rx="14" fill="#7B61FF"/>
+  <g fill="#FFFFFF" transform="translate(22 18)">
+    <rect width="11" height="11" rx="1.5"/>
+    <rect x="13" width="11" height="11" rx="1.5"/>
+    <rect y="13" width="11" height="11" rx="1.5"/>
+    <rect x="13" y="13" width="11" height="11" rx="1.5"/>
+  </g>
+  <text x="62" y="28" fill="#FFFFFF" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="17" font-weight="700">Download for Windows</text>
+  <text x="62" y="45" fill="#FFFFFF" fill-opacity="0.8" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="12">Windows 10 and 11 · 64-bit · free</text>
+</svg>

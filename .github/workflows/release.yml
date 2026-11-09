@@ -1,0 +1,166 @@
+# Builds the Windows installer and the macOS disk images on clean machines, and makes releases.
+#
+# Actions → Release → Run workflow, then choose what to do:
+#   - Only build: the installer is a download on the run; nothing is released.
+#   - Draft release: a draft for the version in package.json (tag v<version>). Review it, add
+#     notes, then publish it yourself. A draft creates no tag until you publish it.
+#   - Publish release: released right away; the Download button serves it immediately. This
+#     creates the tag from the workflow, so a tag ruleset must not restrict creating v* tags
+#     (keep updates and deletions restricted).
+# Pushing a version tag (git tag v0.1.0 && git push --tags) makes a draft too; the tag must match
+# package.json.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'What to do'
+        type: choice
+        options:
+          - Only build
+          - Draft release
+          - Publish release
+        default: Only build
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write # create the release
+    outputs:
+      mode: ${{ steps.version.outputs.mode }}
+      tag: ${{ steps.version.outputs.tag }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Work out the version
+        id: version
+        env:
+          ACTION: ${{ inputs.action }}
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          tag="v$version"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            if [ "$GITHUB_REF_NAME" != "$tag" ]; then
+              echo "The tag $GITHUB_REF_NAME does not match the version $version in package.json."
+              exit 1
+            fi
+            mode=draft
+          elif [ "$ACTION" = "Draft release" ] || [ "$ACTION" = "Publish release" ]; then
+            # A release for this version must not exist yet: bump the version in package.json first.
+            if gh release view "$tag" >/dev/null 2>&1 || gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+              echo "$tag is already released. Set a new version in package.json, commit it, and run again."
+              exit 1
+            fi
+            [ "$ACTION" = "Publish release" ] && mode=publish || mode=draft
+          else
+            mode=none
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Version $version (tag $tag), release: $mode"
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - name: Build the installer
+        # No publishing from electron-builder itself; the release is created below. Unsigned until
+        # a code signing certificate is set up.
+        run: npm run dist -- --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Keep the installer with the run
+        uses: actions/upload-artifact@v4
+        with:
+          name: Siftora-Setup
+          path: release/Siftora-Setup.exe
+          if-no-files-found: error
+
+      - name: Create the release
+        if: steps.version.outputs.mode != 'none'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          MODE: ${{ steps.version.outputs.mode }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" release/Siftora-Setup.exe --clobber
+            echo "Updated the installer on the existing release $TAG."
+          elif [ "$MODE" = "publish" ]; then
+            if ! gh release create "$TAG" release/Siftora-Setup.exe --target "$GITHUB_SHA" \
+              --title "Siftora ${TAG#v}" --generate-notes; then
+              echo "::error::Could not publish $TAG. If a tag ruleset restricts creating v* tags, untick 'Restrict creations' in it, or use Draft release and publish it yourself."
+              exit 1
+            fi
+            echo "Published $TAG. The Download button now serves it."
+          else
+            gh release create "$TAG" release/Siftora-Setup.exe --draft --target "$GITHUB_SHA" \
+              --title "Siftora ${TAG#v}" --generate-notes
+            echo "Draft release $TAG is ready: open Releases, review it and publish it."
+          fi
+
+  # Runs after the Windows job, which creates the release, and adds the disk images to it.
+  macos:
+    needs: windows
+    runs-on: macos-15
+    permissions:
+      contents: write # upload to the release
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.windows.outputs.tag }}
+      MODE: ${{ needs.windows.outputs.mode }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build the disk images (Apple Silicon and Intel)
+        # Ad-hoc signed (electron-builder.yml), not notarized until there is an Apple Developer ID.
+        run: npm run dist -- --mac --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Check the apps are signed (an unsigned app does not launch on Apple Silicon)
+        run: |
+          for app in release/mac-arm64/Siftora.app release/mac/Siftora.app; do
+            codesign --verify --deep --strict --verbose=2 "$app"
+          done
+          ls -l release/*.dmg
+
+      - name: Keep the disk images with the run
+        uses: actions/upload-artifact@v4
+        with:
+          name: Siftora-mac
+          path: release/Siftora-mac-*.dmg
+          if-no-files-found: error
+
+      - name: Add them to the release
+        if: needs.windows.outputs.mode != 'none'
+        run: gh release upload "$TAG" release/Siftora-mac-arm64.dmg release/Siftora-mac-x64.dmg --clobber

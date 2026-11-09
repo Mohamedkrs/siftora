@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="264" height="60" viewBox="0 0 264 60" role="img" aria-label="Download for macOS">
+  <title>Download for macOS</title>
+  <rect width="264" height="60" rx="14" fill="#7B61FF"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linejoin="round" transform="translate(22 19)">
+    <rect x="3" y="0" width="18" height="13" rx="2"/>
+    <path d="M0 17 H24 L22 20 H2 Z" fill="#FFFFFF"/>
+  </g>
+  <text x="62" y="28" fill="#FFFFFF" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="17" font-weight="700">Download for macOS</text>
+  <text x="62" y="45" fill="#FFFFFF" fill-opacity="0.8" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="12">Apple Silicon · test version · free</text>
+</svg>

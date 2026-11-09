@@ -1,0 +1,39 @@
+name: Bug report
+description: Something does not work as it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Add a 20-minute MP4 on Create
+        2. Click Find clips
+        3. …
+  - type: input
+    id: version
+    attributes:
+      label: Siftora version
+      description: Shown in Settings → About.
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: System
+      placeholder: Windows 11, NVIDIA RTX 4060, 16 GB RAM
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log (optional)
+      description: From the logs folder inside the data folder (Settings → About shows where). Remove anything private first; it can contain the names of your video files.
+      render: text

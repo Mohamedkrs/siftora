@@ -1,0 +1,5 @@
+/* Caption fonts, shared with the video renderer. See resources/fonts/README.md. */
+@font-face { font-family: 'Montserrat'; src: url('../../../resources/fonts/Montserrat-ExtraBold.ttf'); font-weight: 800; }
+@font-face { font-family: 'Poppins'; src: url('../../../resources/fonts/Poppins-Black.ttf'); font-weight: 900; }
+@font-face { font-family: 'Anton'; src: url('../../../resources/fonts/Anton-Regular.ttf'); font-weight: 400; }
+@font-face { font-family: 'Bebas Neue'; src: url('../../../resources/fonts/BebasNeue-Regular.ttf'); font-weight: 400; }

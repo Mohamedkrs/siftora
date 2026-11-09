@@ -1,0 +1,144 @@
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import type {
+  HardwareInfo,
+  ModelState,
+  Recommendation,
+  RequiredEngines
+} from '../../../shared/types'
+
+interface ModelsContextValue {
+  models: Record<string, ModelState>
+  hardware: HardwareInfo | null
+  recommendation: Recommendation | null
+  requiredEngines: RequiredEngines | null
+  checking: boolean
+  recheck: () => void
+  download: (ids: string[]) => void
+  cancel: (id: string) => void
+  remove: (id: string) => void
+}
+
+const ModelsContext = createContext<ModelsContextValue | null>(null)
+
+export function ModelsProvider({ children }: { children: ReactNode }) {
+  const [models, setModels] = useState<Record<string, ModelState>>({})
+  const [hardware, setHardware] = useState<HardwareInfo | null>(null)
+  const [recommendation, setRecommendation] = useState<Recommendation | null>(null)
+  const [requiredEngines, setRequiredEngines] = useState<RequiredEngines | null>(null)
+  const [checking, setChecking] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+
+    window.api
+      .listModels()
+      .then((list) => {
+        if (!alive) return
+        setModels(Object.fromEntries(list.map((state) => [state.id, state])))
+      })
+      .catch((err: unknown) => {
+        window.api.log('error', `listModels failed: ${String(err)}`)
+      })
+
+    window.api
+      .getHardware()
+      .then((info) => {
+        if (alive) setHardware(info)
+      })
+      .catch((err: unknown) => {
+        window.api.log('error', `getHardware failed: ${String(err)}`)
+      })
+
+    window.api
+      .getRecommendation()
+      .then((result) => {
+        if (alive) setRecommendation(result)
+      })
+      .catch((err: unknown) => {
+        window.api.log('error', `getRecommendation failed: ${String(err)}`)
+      })
+
+    window.api
+      .getRequiredEngines()
+      .then((result) => {
+        if (alive) setRequiredEngines(result)
+      })
+      .catch((err: unknown) => {
+        window.api.log('error', `getRequiredEngines failed: ${String(err)}`)
+      })
+
+    const unsubscribe = window.api.onModelState((state) => {
+      setModels((current) => ({ ...current, [state.id]: state }))
+    })
+
+    return () => {
+      alive = false
+      unsubscribe()
+    }
+  }, [])
+
+  const recheck = (): void => {
+    setChecking(true)
+    window.api
+      .getHardware(true)
+      .then((info) => {
+        setHardware(info)
+        return Promise.all([
+          window.api.getRecommendation(),
+          window.api.getRequiredEngines(),
+          window.api.listModels()
+        ])
+      })
+      .then(([nextRecommendation, nextEngines, list]) => {
+        setRecommendation(nextRecommendation)
+        setRequiredEngines(nextEngines)
+        setModels(Object.fromEntries(list.map((state) => [state.id, state])))
+      })
+      .catch((err: unknown) => {
+        window.api.log('error', `recheck failed: ${String(err)}`)
+      })
+      .finally(() => setChecking(false))
+  }
+
+  const download = (ids: string[]): void => {
+    window.api.downloadModels(ids).catch((err: unknown) => {
+      window.api.log('error', `downloadModels failed: ${String(err)}`)
+    })
+  }
+
+  const cancel = (id: string): void => {
+    window.api.cancelDownload(id).catch((err: unknown) => {
+      window.api.log('error', `cancelDownload failed: ${String(err)}`)
+    })
+  }
+
+  const remove = (id: string): void => {
+    window.api.deleteModel(id).catch((err: unknown) => {
+      window.api.log('error', `deleteModel failed: ${String(err)}`)
+    })
+  }
+
+  return (
+    <ModelsContext.Provider
+      value={{
+        models,
+        hardware,
+        recommendation,
+        requiredEngines,
+        checking,
+        recheck,
+        download,
+        cancel,
+        remove
+      }}
+    >
+      {children}
+    </ModelsContext.Provider>
+  )
+}
+
+export function useModels(): ModelsContextValue {
+  const value = useContext(ModelsContext)
+  if (!value) throw new Error('useModels must be used inside ModelsProvider')
+  return value
+}

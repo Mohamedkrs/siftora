@@ -1,0 +1,15 @@
+name: Idea or feature request
+description: Suggest something new or a better way to do something.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do?
+      description: Describe the problem or the goal, not only the solution. For example, "I want captions in two languages".
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could Siftora help?

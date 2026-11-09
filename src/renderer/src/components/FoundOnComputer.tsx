@@ -1,0 +1,477 @@
+import { useEffect, useState } from 'react'
+import type {
+  EngineKind,
+  OllamaInfo,
+  OpenAiWhisperInfo,
+  ScannedModel,
+  Settings,
+  SystemEngine
+} from '../../../shared/types'
+import { formatBytes } from '../lib/format'
+import { useModels } from '../state/models'
+import { useSettings } from '../state/settings'
+
+// ── Shared search state: one search fills every section, kept for the session. ──
+
+interface ScanResult {
+  engines: SystemEngine[]
+  ollama: OllamaInfo
+  pyWhisper: OpenAiWhisperInfo
+  /** Other model files (LM Studio, Hugging Face, …). Ollama's own blobs are covered by `ollama`. */
+  files: ScannedModel[]
+  /** Files that are one of the app's own catalog models (e.g. Ollama's qwen3:14b), usable without a download. */
+  copies: ScannedModel[]
+}
+
+let result: ScanResult | null = null
+let scanning = false
+const listeners = new Set<() => void>()
+const notify = (): void => listeners.forEach((listener) => listener())
+
+export async function searchComputer(): Promise<void> {
+  if (scanning) return
+  scanning = true
+  notify()
+  try {
+    const [engines, ollama, pyWhisper, files] = await Promise.all([
+      window.api.findSystemEngines(true),
+      window.api.detectOllama(),
+      window.api.detectOpenAiWhisper(),
+      window.api.scanForModels()
+    ])
+    result = {
+      engines,
+      ollama,
+      pyWhisper,
+      files: files.filter((file) => !file.catalogId && file.source !== 'Ollama'),
+      copies: files.filter((file) => file.catalogId)
+    }
+  } catch (err) {
+    window.api.log('error', `search computer failed: ${String(err)}`)
+  } finally {
+    scanning = false
+    notify()
+  }
+}
+
+export function useComputerSearch(): { result: ScanResult | null; scanning: boolean } {
+  const [, rerender] = useState(0)
+  useEffect(() => {
+    const listener = (): void => rerender((n) => n + 1)
+    listeners.add(listener)
+    return () => {
+      listeners.delete(listener)
+    }
+  }, [])
+  return { result, scanning }
+}
+
+/**
+ * Copies of catalog models found on this computer: `copyFor(id)` gives the file, `use(id)` makes
+ * the app use it in place of a download (it is linked, never copied or moved).
+ */
+export function useLocalCopies(onChange?: () => void): {
+  copyFor: (catalogId: string) => ScannedModel | undefined
+  use: (catalogId: string) => Promise<void>
+  busy: string | null
+} {
+  const { settings, refresh } = useSettings()
+  const { result: found } = useComputerSearch()
+  const [busy, setBusy] = useState<string | null>(null)
+  const copyFor = (catalogId: string): ScannedModel | undefined => found?.copies.find((file) => file.catalogId === catalogId)
+  const use = async (catalogId: string): Promise<void> => {
+    const copy = copyFor(catalogId)
+    if (!copy || busy || settings.linkedModels[catalogId] === copy.path) return
+    setBusy(catalogId)
+    try {
+      await window.api.addCustomModel(copy.path, copy.name)
+      if (result) result = { ...result, copies: result.copies.filter((file) => file.path !== copy.path) }
+      await refresh()
+      notify()
+      onChange?.()
+    } finally {
+      setBusy(null)
+    }
+  }
+  return { copyFor, use, busy }
+}
+
+/** "your Ollama", "LM Studio", … for a found copy. */
+export function copySource(copy: ScannedModel): string {
+  return copy.source === 'Ollama' ? 'your Ollama' : copy.source === 'Folder' ? 'a folder on this computer' : copy.source
+}
+
+// ── Helpers ──
+
+const NAMES: Record<EngineKind, string> = { llama: 'llama.cpp', whisper: 'whisper.cpp', ffmpeg: 'FFmpeg' }
+const PROGRAMS: Record<EngineKind, string> = { llama: 'llama-server', whisper: 'whisper-cli', ffmpeg: 'ffmpeg' }
+
+function shortPath(path: string): string {
+  return path.length > 60 ? `…${path.slice(-57)}` : path
+}
+
+function FoundBadge() {
+  return <span className="badge badge-ok">Found on this computer</span>
+}
+
+/** Saves settings and waits for the main process, then lets the parent recompute sizes. */
+function useSaver(onChange?: () => void) {
+  const { refresh } = useSettings()
+  return async (patch: Partial<Settings>): Promise<void> => {
+    await window.api.setSettings(patch)
+    await refresh()
+    onChange?.()
+  }
+}
+
+function Row(props: {
+  selected: boolean
+  title: React.ReactNode
+  lines: React.ReactNode[]
+  action?: React.ReactNode
+}) {
+  return (
+    <div className={props.selected ? 'choice selected found-row' : 'choice found-row'}>
+      <span className="choice-text">
+        <strong>{props.title}</strong>
+        {props.lines.filter(Boolean).map((line, index) => (
+          <span key={index}>{line}</span>
+        ))}
+      </span>
+      {props.action}
+    </div>
+  )
+}
+
+/** Adds a model file the user already has (link or custom entry). */
+function useAddModelFile() {
+  const { refresh } = useSettings()
+  const [busy, setBusy] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const add = async (path: string, name?: string): Promise<boolean> => {
+    setBusy(path)
+    setError(null)
+    try {
+      const outcome = await window.api.addCustomModel(path, name)
+      if (outcome.error) {
+        setError(outcome.error)
+        return false
+      }
+      if (result) result = { ...result, files: result.files.filter((file) => file.path !== path) }
+      await refresh()
+      notify()
+      return true
+    } finally {
+      setBusy(null)
+    }
+  }
+  const choose = async (): Promise<void> => {
+    const path = await window.api.pickModelFile()
+    if (path) await add(path)
+  }
+  return { add, choose, busy, error }
+}
+
+// ── Engines section ──
+
+export function FoundEngines(props: { onChange?: () => void; autoPickFfmpeg?: boolean }) {
+  const { settings, refresh } = useSettings()
+  const { hardware } = useModels()
+  const { result: found } = useComputerSearch()
+  const [problem, setProblem] = useState<string | null>(null)
+
+  const use = async (engine: EngineKind, path: string): Promise<void> => {
+    const outcome = await window.api.useSystemEngine(engine, path)
+    setProblem(outcome.ok ? null : `${NAMES[engine]}: ${outcome.problem ?? 'not usable'}`)
+    if (outcome.ok) {
+      await refresh()
+      props.onChange?.()
+    }
+  }
+  const stop = async (engine: EngineKind): Promise<void> => {
+    await window.api.stopUsingSystemEngine(engine)
+    await refresh()
+    props.onChange?.()
+  }
+  const choose = async (engine: EngineKind): Promise<void> => {
+    const path = await window.api.pickEngineBinary(engine)
+    if (path) await use(engine, path)
+  }
+
+  // Onboarding: a working FFmpeg is as good as ours, so use it without asking.
+  useEffect(() => {
+    if (!props.autoPickFfmpeg || !found || settings.enginePaths.ffmpeg) return
+    const ffmpeg = found.engines.find((engine) => engine.engine === 'ffmpeg' && engine.usable)
+    if (ffmpeg) void use('ffmpeg', ffmpeg.path)
+  }, [found])
+
+  const gpuMachine = hardware !== null && hardware.backend !== 'cpu'
+  // Show what is in use even before (or without) a search.
+  const chosenOnly = (Object.keys(settings.enginePaths) as EngineKind[]).filter(
+    (engine) => !found?.engines.some((item) => item.path === settings.enginePaths[engine])
+  )
+
+  return (
+    <div className="found-list">
+      {chosenOnly.map((engine) => (
+        <Row
+          key={engine}
+          selected
+          title={<>{NAMES[engine]} <span className="badge badge-ok">Your program</span></>}
+          lines={[<span title={settings.enginePaths[engine]}>{shortPath(settings.enginePaths[engine] ?? '')}</span>]}
+          action={
+            <button type="button" className="button" onClick={() => void stop(engine)}>
+              Stop using
+            </button>
+          }
+        />
+      ))}
+
+      {found?.engines.map((engine) => {
+        const inUse = settings.enginePaths[engine.engine] === engine.path
+        return (
+          <Row
+            key={engine.path}
+            selected={inUse}
+            title={
+              <>
+                {NAMES[engine.engine]} {engine.version ?? ''}
+                {engine.backend !== 'unknown' ? <span className="badge">{engine.backend.toUpperCase()}</span> : null}
+                <FoundBadge />
+              </>
+            }
+            lines={[
+              <span title={engine.path}>
+                {shortPath(engine.path)} ({engine.source}){engine.note ? ` · ${engine.note}` : ''}
+              </span>,
+              engine.problem ? <span className="model-warning">{engine.problem}</span> : null,
+              inUse && engine.engine !== 'ffmpeg' && engine.backend === 'cpu' && gpuMachine ? (
+                <span className="model-warning">
+                  This build does not use your GPU — the app's GPU engines would be much faster.
+                </span>
+              ) : null
+            ]}
+            action={
+              engine.usable ? (
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => void (inUse ? stop(engine.engine) : use(engine.engine, engine.path))}
+                >
+                  {inUse ? 'Stop using' : 'Use this'}
+                </button>
+              ) : undefined
+            }
+          />
+        )
+      })}
+
+      <div className="actions">
+        {(Object.keys(PROGRAMS) as EngineKind[]).map((engine) => (
+          <button key={engine} type="button" className="button small" onClick={() => void choose(engine)}>
+            Choose {PROGRAMS[engine]}…
+          </button>
+        ))}
+      </div>
+      {problem ? <p className="model-warning">{problem}</p> : null}
+    </div>
+  )
+}
+
+// ── Transcription section ──
+
+/**
+ * OpenAI's Python Whisper: a separate program the user installed, with its own models. Shown as
+ * one choice with a model picker, so it is not mistaken for the app's own Whisper models.
+ */
+function PythonWhisper(props: {
+  info: OpenAiWhisperInfo
+  using: boolean
+  onSave: (patch: Partial<Settings>) => Promise<void>
+}) {
+  const { settings } = useSettings()
+  const { info } = props
+  const [model, setModel] = useState(
+    (props.using && settings.openaiWhisperModel) || (info.models.includes('large-v3') ? 'large-v3' : info.models[0]) || ''
+  )
+  return (
+    <div className={props.using ? 'choice selected found-row' : 'choice found-row'}>
+      <span className="choice-text">
+        <strong>
+          OpenAI Whisper (Python)
+          {info.version ? <span className="title-note">version {info.version}</span> : null}
+          {info.cuda !== null ? <span className="badge">{info.cuda ? 'GPU' : 'CPU only'}</span> : null}
+          <FoundBadge />
+        </strong>
+        <span>
+          A separate program you installed, not part of Siftora. It uses its own models, already on this computer. Slower
+          than the built-in engine below, with the same accuracy.
+        </span>
+        {info.models.length > 0 ? (
+          <span className="model-chips" role="radiogroup" aria-label="OpenAI Whisper model">
+            <span className="chips-label">Its models</span>
+            {info.models.map((name) => (
+              <button
+                key={name}
+                type="button"
+                role="radio"
+                aria-checked={model === name}
+                className={model === name ? 'chip selected' : 'chip'}
+                onClick={() => {
+                  setModel(name)
+                  if (props.using) void props.onSave({ openaiWhisperModel: name })
+                }}
+              >
+                {name}
+              </button>
+            ))}
+          </span>
+        ) : (
+          <span className="model-warning">No models downloaded by it yet; it fetches one on first use.</span>
+        )}
+      </span>
+      <button
+        type="button"
+        className="button"
+        onClick={() =>
+          void props.onSave(
+            props.using
+              ? { transcriptionProvider: 'app' }
+              : { transcriptionProvider: 'openai-whisper', openaiWhisperPath: info.path, openaiWhisperModel: model || 'large-v3' }
+          )
+        }
+      >
+        {props.using ? 'Stop using' : `Use ${model || 'this'}`}
+      </button>
+    </div>
+  )
+}
+
+export function FoundTranscription(props: { onChange?: () => void }) {
+  const { settings } = useSettings()
+  const { result: found } = useComputerSearch()
+  const save = useSaver(props.onChange)
+  const files = useAddModelFile()
+  const py = found?.pyWhisper
+  const usingPy = settings.transcriptionProvider === 'openai-whisper'
+
+  return (
+    <div className="found-list">
+      {py?.path ? <PythonWhisper info={py} using={usingPy} onSave={save} /> : null}
+
+      {found?.files
+        .filter((file) => file.kind === 'transcription')
+        .map((file) => (
+          <Row
+            key={file.path}
+            selected={false}
+            title={<>{file.name} <FoundBadge /></>}
+            lines={[`${file.source} · ${formatBytes(file.bytes)}`]}
+            action={
+              <button type="button" className="button" disabled={files.busy !== null} onClick={() => void files.add(file.path, file.name)}>
+                {files.busy === file.path ? 'Adding…' : 'Use this'}
+              </button>
+            }
+          />
+        ))}
+
+      <div className="actions">
+        <button type="button" className="button small" onClick={() => void files.choose()}>
+          Choose a whisper.cpp model file…
+        </button>
+      </div>
+      {files.error ? <p className="error">{files.error}</p> : null}
+    </div>
+  )
+}
+
+// ── Clip finder AI section ──
+
+export function FoundLlms(props: { onChange?: () => void }) {
+  const { settings } = useSettings()
+  const { result: found } = useComputerSearch()
+  const save = useSaver(props.onChange)
+  const files = useAddModelFile()
+  const ollama = found?.ollama
+
+  return (
+    <div className="found-list">
+      {ollama?.installed && !ollama.running ? (
+        <p className="muted">Ollama is installed but not running — start it to use its models.</p>
+      ) : null}
+
+      {ollama?.models.map((model) => {
+        const inUse = settings.llmProvider === 'ollama' && settings.ollamaModel === model.name
+        const isCatalogModel = found?.copies.some((copy) => copy.source === 'Ollama' && copy.name === `${model.name} (Ollama)`)
+        if (isCatalogModel && !inUse) return null
+        return (
+          <Row
+            key={model.name}
+            selected={inUse}
+            title={<>{model.name} (Ollama) <FoundBadge /></>}
+            lines={[
+              `${formatBytes(model.bytes)}${model.quantization ? ` · ${model.quantization}` : ''} · runs through your Ollama, nothing to download`
+            ]}
+            action={
+              <button
+                type="button"
+                className="button"
+                onClick={() =>
+                  void save(inUse ? { llmProvider: 'app' } : { llmProvider: 'ollama', ollamaModel: model.name })
+                }
+              >
+                {inUse ? 'Stop using' : 'Use this'}
+              </button>
+            }
+          />
+        )
+      })}
+
+      {found?.files
+        .filter((file) => file.kind === 'llm')
+        .map((file) => (
+          <Row
+            key={file.path}
+            selected={false}
+            title={<>{file.name} <FoundBadge /></>}
+            lines={[`${file.source} · ${formatBytes(file.bytes)}`]}
+            action={
+              <button type="button" className="button" disabled={files.busy !== null} onClick={() => void files.add(file.path, file.name)}>
+                {files.busy === file.path ? 'Adding…' : 'Use this'}
+              </button>
+            }
+          />
+        ))}
+
+      <div className="actions">
+        <button type="button" className="button small" onClick={() => void files.choose()}>
+          Choose a .gguf model file…
+        </button>
+      </div>
+      {files.error ? <p className="error">{files.error}</p> : null}
+    </div>
+  )
+}
+
+// ── Search button ──
+
+export function SearchComputerButton(props: { auto?: boolean }) {
+  const { result: found, scanning } = useComputerSearch()
+  useEffect(() => {
+    if (props.auto && !found) void searchComputer()
+  }, [])
+  return (
+    <div className="actions">
+      <button type="button" className="button" disabled={scanning} onClick={() => void searchComputer()}>
+        {scanning ? 'Searching…' : found ? 'Search this computer again' : 'Search this computer'}
+      </button>
+      <span className="muted">
+        {scanning
+          ? 'Looking for Ollama, Python Whisper, FFmpeg, llama.cpp, whisper.cpp and model files…'
+          : found
+            ? 'Results are shown in each section below, marked “Found on this computer”.'
+            : 'Find models and programs you already have, so you download less.'}
+      </span>
+    </div>
+  )
+}
