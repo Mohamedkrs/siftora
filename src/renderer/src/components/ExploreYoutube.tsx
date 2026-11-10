@@ -1,6 +1,7 @@
 import type { FormEvent } from 'react'
-import { channelKey, isBlocked, type ExploredChannel } from '../../../shared/types'
+import { channelKey, isBlocked, TITLE_LANGUAGES, TITLE_SCRIPTS, type ExploredChannel, type TitleLanguage, type TitleScript } from '../../../shared/types'
 import NumberField from './NumberField'
+import TagInput from './TagInput'
 import { useKept } from '../lib/kept'
 import { useBlockChannel } from '../lib/blockChannel'
 import { useSettings } from '../state/settings'
@@ -13,6 +14,9 @@ interface FoundChannel extends ExploredChannel {
 }
 
 const VIEWS = new Intl.NumberFormat('en', { notation: 'compact' })
+
+/** Words that often mark videos in a language the title's alphabet doesn't give away. */
+const SKIP_SUGGESTIONS = ['hindi', 'tamil', 'telugu', 'bangla', 'urdu', 'malayalam', 'kannada', 'punjabi', 'marathi', 'india', 'bhai', 'aap']
 
 /** Electron wraps errors from the main process; keep only their own words. */
 function reason(err: unknown): string {
@@ -247,6 +251,48 @@ export default function ExploreYoutube(props: { onAdd: (links: string[]) => { ad
             </select>
           </>
         )}
+      </div>
+      <div className="saved-pick explore-filters">
+        <select
+          value={settings.exploreScript}
+          onChange={(event) => update({ exploreScript: event.target.value as TitleScript })}
+          aria-label="Title alphabet"
+          title="Keep only videos whose titles are mostly in this alphabet"
+        >
+          {Object.entries(TITLE_SCRIPTS).map(([value, script]) => (
+            <option key={value} value={value}>
+              {value === 'any' ? 'Titles in any alphabet' : `Titles in ${script.label}`}
+            </option>
+          ))}
+        </select>
+        <select
+          value={settings.exploreLanguage}
+          onChange={(event) => update({ exploreLanguage: event.target.value as TitleLanguage })}
+          aria-label="Title language"
+          title="Skip videos whose title and description look written in another language (titles with no clue are kept)"
+        >
+          {Object.entries(TITLE_LANGUAGES).map(([value, language]) => (
+            <option key={value} value={value}>
+              {value === 'any' ? 'Any language' : language.label}
+            </option>
+          ))}
+        </select>
+        <TagInput
+          label="Skip videos whose title, channel or description has these words"
+          placeholder="Skip words, for example: hindi"
+          value={settings.exploreSkipWords}
+          suggestions={SKIP_SUGGESTIONS}
+          onChange={(words) => update({ exploreSkipWords: words })}
+        />
+        <label className="toggle" title={settings.cookiesBrowser ? 'Search as your YouTube account, so results follow its history' : 'Choose how Siftora signs in to YouTube in Settings first'}>
+          <input
+            type="checkbox"
+            checked={settings.explorePersonalized && !!settings.cookiesBrowser}
+            disabled={!settings.cookiesBrowser}
+            onChange={(event) => update({ explorePersonalized: event.target.checked })}
+          />
+          Personalized results
+        </label>
       </div>
       {status ? <p className="muted">{status}</p> : null}
       {mode === 'channels' && found.length > 0 ? (

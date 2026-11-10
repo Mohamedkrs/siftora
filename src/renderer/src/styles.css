@@ -3168,6 +3168,22 @@ option {
   margin-top: 12px;
 }
 
+/* Same height as the dropdown next to it. */
+.explore-filters .tag-input {
+  min-height: 38px;
+}
+
+/* Same height as the fields beside it, checkbox centred on its text. */
+.explore-filters .toggle {
+  height: 38px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.explore-filters .toggle input {
+  margin: 0;
+}
+
 /* To post (its reels reuse .clip-card from Results) */
 .posted-list {
   display: flex;

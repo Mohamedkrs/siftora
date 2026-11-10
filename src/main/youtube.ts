@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { JobOptions } from '../shared/jobs'
-import { isBlocked, type BlockedChannel, type ExploredChannel, type VideoSort, type YoutubeInfo } from '../shared/types'
+import { isBlocked, languageAllowed, titleAllowed, type BlockedChannel, type ExploredChannel, type VideoSort, type YoutubeInfo } from '../shared/types'
 import { emitModelState } from './downloads'
 import { log } from './logger'
 import { getSettings } from './settings'
@@ -278,6 +278,8 @@ type SearchEntry = {
   channel_id?: string
   channel_url?: string
   uploader_url?: string
+  /** The snippet YouTube shows under the result. */
+  description?: string
 }
 
 /**
@@ -291,10 +293,21 @@ async function searchEntries(query: string, limit: number, sinceDays: number, so
   const filter = [...date, 0x10, 1]
   const sp = Buffer.from([...(sort === 'views' ? [0x08, 3] : []), 0x12, filter.length, ...filter]).toString('base64')
   const page = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=${encodeURIComponent(sp)}`
+  const { exploreScript, exploreSkipWords, exploreLanguage, explorePersonalized } = getSettings()
+  // Signed out unless asked: a search never fails for want of a sign-in, so runYtDlp would not add it.
+  const signIn = explorePersonalized ? cookieArgs() : []
   // More than asked for, as Shorts and short videos are dropped afterwards.
-  const output = await runYtDlp(await ytDlpPath(), ['--flat-playlist', '-J', '--playlist-end', String(Math.min(limit * 3, 150)), '--', page], { signal })
+  const output = await runYtDlp(await ytDlpPath(), [...signIn, '--flat-playlist', '-J', '--playlist-end', String(Math.min(limit * 3, 150)), '--', page], { signal })
   const info = JSON.parse(output.stdout) as { entries?: SearchEntry[] }
-  return (info.entries ?? []).filter((entry) => entry.id && !entry.url?.includes('/shorts/') && (entry.duration == null || entry.duration >= 240))
+  return (info.entries ?? []).filter(
+    (entry) =>
+      entry.id &&
+      !entry.url?.includes('/shorts/') &&
+      (entry.duration == null || entry.duration >= 240) &&
+      titleAllowed(entry.title ?? '', `${entry.channel ?? ''} ${entry.description ?? ''}`, exploreScript, exploreSkipWords) &&
+      // Title and snippet, not the channel name: names are often English whatever the videos' language.
+      languageAllowed(`${entry.title ?? ''} ${entry.description ?? ''}`, exploreLanguage)
+  )
 }
 
 /** Links to the top `count` YouTube search results for `query` (see searchEntries), without blocked channels' videos. */
