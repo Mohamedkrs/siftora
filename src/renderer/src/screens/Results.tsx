@@ -405,7 +405,15 @@ export default function Results() {
 
       {doneJobs.length > 1 ? (
         <>
-          <JobFilter jobs={doneJobs} value={filter} onChange={setFilter} />
+          <JobFilter
+            jobs={doneJobs}
+            value={filter}
+            onChange={(next) => {
+              // A ?job= the new filter hides would trip the reset effect above and undo the pick.
+              setParams({})
+              setFilter(next)
+            }}
+          />
           <BulkBar jobs={matching} selected={selected} onSelect={setSelected} />
           {matching.length === 0 ? (
             <p className="muted">No videos match this filter.</p>
